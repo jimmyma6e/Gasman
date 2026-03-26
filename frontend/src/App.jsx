@@ -170,6 +170,8 @@ export default function App() {
   const [activeFuel, setActiveFuel] = useState("regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
+  const [search, setSearch]   = useState("");
+  const [areaFilter, setAreaFilter] = useState("all");
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -221,9 +223,13 @@ export default function App() {
   }
 
   // Filter
-  const filtered = tab === "mine"
-    ? stationsWithArea.filter((s) => favourites.includes(s.station_id))
-    : stationsWithArea;
+  const q = search.trim().toLowerCase();
+  const filtered = stationsWithArea.filter((s) => {
+    if (tab === "mine" && !favourites.includes(s.station_id)) return false;
+    if (areaFilter !== "all" && s._area !== areaFilter) return false;
+    if (q && !s.name.toLowerCase().includes(q) && !s.address.toLowerCase().includes(q)) return false;
+    return true;
+  });
 
   // Sort
   const sorted = [...filtered].sort((a, b) => {
@@ -286,6 +292,27 @@ export default function App() {
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
             </button>
           </div>
+        </div>
+
+        {/* Search + Area filter */}
+        <div className="search-row">
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search stations or address…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="area-select"
+            value={areaFilter}
+            onChange={(e) => setAreaFilter(e.target.value)}
+          >
+            <option value="all">All Areas</option>
+            {AREAS.map((a) => (
+              <option key={a.name} value={a.name}>{a.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* Controls */}
