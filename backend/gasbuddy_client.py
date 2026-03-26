@@ -2,9 +2,12 @@
 Custom GasBuddy GraphQL client.
 
 Uses FlareSolverr to get cf_clearance + session cookies from gasbuddy.com,
-then replays those cookies (with matching User-Agent) on direct POST requests
-to the /graphql endpoint — bypassing Cloudflare without routing large payloads
-through FlareSolverr's browser.
+then replays those cookies via curl-cffi (Chrome TLS impersonation) on POST
+requests to /graphql.
+
+Why curl-cffi: Cloudflare ties cf_clearance to the browser's TLS fingerprint.
+aiohttp has a different JA3/HTTP2 fingerprint from Chrome, so requests are
+blocked even with valid cookies. curl-cffi impersonates Chrome exactly.
 """
 
 import json
@@ -12,6 +15,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 import aiohttp
+from curl_cffi.requests import AsyncSession as CurlSession
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +125,6 @@ async def _graphql(query: str, variables: dict) -> dict:
     await _ensure_cookies()
 
     headers = {
-        "User-Agent":      _state["ua"],
         "Content-Type":    "application/json",
         "Accept":          "application/json",
         "Origin":          GASBUDDY_HOME,
@@ -129,21 +132,25 @@ async def _graphql(query: str, variables: dict) -> dict:
         "Accept-Language": "en-CA,en;q=0.9",
     }
 
-    async with aiohttp.ClientSession(cookies=_state["cookies"]) as http:
-        async with http.post(
+    # curl-cffi impersonates Chrome's TLS + HTTP/2 fingerprint so
+    # Cloudflare accepts the cf_clearance cookie we got via FlareSolverr.
+    async with CurlSession(impersonate="chrome120") as session:
+        resp = await session.post(
             GASBUDDY_GRAPHQL,
             json={"query": query, "variables": variables},
             headers=headers,
-        ) as resp:
-            ct   = resp.headers.get("Content-Type", "")
-            text = await resp.text()
+            cookies=_state["cookies"],
+        )
+
+    ct   = resp.headers.get("Content-Type", "")
+    text = resp.text
 
     if "json" not in ct:
         if "Just a moment" in text or "cf_chl" in text:
-            _state["fetched_at"] = None   # force refresh on next call
-            raise RuntimeError("Cloudflare challenge on /graphql — cookies expired, will refresh")
-        logger.error("Non-JSON /graphql response (status %s): %s", resp.status, text[:400])
-        raise RuntimeError(f"Non-JSON response (HTTP {resp.status})")
+            _state["fetched_at"] = None   # force cookie refresh on next call
+            raise RuntimeError("Cloudflare challenge on /graphql — will refresh cookies")
+        logger.error("Non-JSON /graphql response (status %s): %s", resp.status_code, text[:400])
+        raise RuntimeError(f"Non-JSON response (HTTP {resp.status_code})")
 
     payload = json.loads(text)
 
