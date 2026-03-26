@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import PriceChart from "./components/PriceChart";
+import StationTable from "./components/StationTable";
 
 const AREAS = [
   { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
@@ -194,6 +195,7 @@ export default function App() {
   const [search, setSearch]     = useState("");
   const [areaFilter, setAreaFilter]   = useState(new Set());   // empty = all
   const [brandFilter, setBrandFilter] = useState(new Set());   // empty = all
+  const [viewMode, setViewMode]       = useState("card");      // "card" | "table" | "compact"
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -368,13 +370,33 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div className="sort-controls">
-            <label>Sort by</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="price">Price</option>
-              <option value="name">Name</option>
-              <option value="city">City / Area</option>
-            </select>
+          <div className="controls-right">
+            {viewMode !== "table" && (
+              <div className="sort-controls">
+                <label>Sort by</label>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                  <option value="price">Price</option>
+                  <option value="name">Name</option>
+                  <option value="city">City / Area</option>
+                </select>
+              </div>
+            )}
+            <div className="view-toggle">
+              {[
+                { id: "card",    icon: "⊞", title: "Card view"    },
+                { id: "compact", icon: "☰", title: "Compact view" },
+                { id: "table",   icon: "⊟", title: "Table view"   },
+              ].map(({ id, icon, title }) => (
+                <button
+                  key={id}
+                  className={`view-btn ${viewMode === id ? "view-btn-active" : ""}`}
+                  onClick={() => setViewMode(id)}
+                  title={title}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -397,20 +419,80 @@ export default function App() {
         {data && sorted.length > 0 && (
           <>
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
-            <div className="grid">
-              {sorted.map((station) => (
-                <StationCard
-                  key={station.station_id}
-                  station={station}
-                  activeFuel={activeFuel}
-                  cheapestPrices={cheapestPrices}
-                  isFavourite={favourites.includes(station.station_id)}
-                  onToggleFavourite={toggleFavourite}
-                  onOpenChart={setChartStation}
-                  showArea={sortBy === "city"}
-                />
-              ))}
-            </div>
+
+            {viewMode === "card" && (
+              <div className="grid">
+                {sorted.map((station) => (
+                  <StationCard
+                    key={station.station_id}
+                    station={station}
+                    activeFuel={activeFuel}
+                    cheapestPrices={cheapestPrices}
+                    isFavourite={favourites.includes(station.station_id)}
+                    onToggleFavourite={toggleFavourite}
+                    onOpenChart={setChartStation}
+                    showArea={sortBy === "city"}
+                  />
+                ))}
+              </div>
+            )}
+
+            {viewMode === "compact" && (
+              <div className="compact-list">
+                {sorted.map((station) => {
+                  const fuelData = station[activeFuel];
+                  const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
+                  const delta = station.price_delta?.[activeFuel];
+                  const isFav = favourites.includes(station.station_id);
+                  return (
+                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""}`}>
+                      <button
+                        className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
+                        onClick={() => toggleFavourite(station.station_id)}
+                      >
+                        {isFav ? "★" : "☆"}
+                      </button>
+                      <div className="compact-info">
+                        <span className="compact-name">{station.name}</span>
+                        <a
+                          className="compact-addr"
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {station.address}, {station._area}
+                        </a>
+                      </div>
+                      <div className="compact-price">
+                        {fuelData?.price != null ? (
+                          <>
+                            <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
+                              {formatPrice(fuelData.price, station.unit_of_measure)}
+                            </span>
+                            {delta != null && (
+                              <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
+                                {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                              </span>
+                            )}
+                          </>
+                        ) : <span className="tbl-empty">—</span>}
+                      </div>
+                      <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {viewMode === "table" && (
+              <StationTable
+                stations={sorted}
+                cheapestPrices={cheapestPrices}
+                favourites={favourites}
+                onToggleFavourite={toggleFavourite}
+                onOpenChart={setChartStation}
+              />
+            )}
           </>
         )}
       </main>
