@@ -1,6 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import PriceChart from "./components/PriceChart";
 
+// Haversine distance in km between two lat/lng points
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function fmtDist(km) {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
 const FUEL_TYPES = [
   { key: "regular_gas",  label: "Regular" },
   { key: "midgrade_gas", label: "Mid" },
@@ -86,13 +102,14 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, distance }) {
   const fuelData = station[activeFuel];
   const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
 
   return (
     <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
       {isCheapest && <div className="cheapest-tag">Cheapest</div>}
+      {distance != null && <div className="distance-badge">📍 {fmtDist(distance)}</div>}
 
       <div className="card-top">
         <div className="card-header">
@@ -143,11 +160,15 @@ export default function App() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
-  const [tab, setTab]         = useState("all");        // "all" | "mine"
+  const [tab, setTab]         = useState("all");        // "all" | "mine" | "near"
   const [sortBy, setSortBy]   = useState("price");
   const [activeFuel, setActiveFuel] = useState("regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
+
+  const [userLocation, setUserLocation] = useState(null);   // {lat, lon}
+  const [locStatus, setLocStatus]       = useState("idle"); // "idle"|"loading"|"ok"|"denied"
+  const [nearRadius, setNearRadius]     = useState(5);      // km
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -177,6 +198,23 @@ export default function App() {
     }
   }, []);
 
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocStatus("denied");
+      return;
+    }
+    setLocStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setLocStatus("ok");
+        setTab("near");
+      },
+      () => setLocStatus("denied"),
+      { timeout: 10000 }
+    );
+  }, []);
+
   useEffect(() => {
     fetchData();
     const id = setInterval(fetchData, REFRESH_INTERVAL);
@@ -185,6 +223,14 @@ export default function App() {
 
   const allStations = data?.stations ?? [];
 
+  // Attach distance (km) to each station when location is known
+  const stationsWithDist = allStations.map((s) => ({
+    ...s,
+    _dist: userLocation && s.latitude != null && s.longitude != null
+      ? haversine(userLocation.lat, userLocation.lon, s.latitude, s.longitude)
+      : null,
+  }));
+
   // Cheapest price per fuel type
   const cheapestPrices = {};
   for (const { key } of FUEL_TYPES) {
@@ -192,12 +238,17 @@ export default function App() {
     cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
   }
 
-  // Filter + sort
-  const filtered = tab === "mine"
-    ? allStations.filter((s) => favourites.includes(s.station_id))
-    : allStations;
+  // Filter
+  let filtered = stationsWithDist;
+  if (tab === "mine") {
+    filtered = stationsWithDist.filter((s) => favourites.includes(s.station_id));
+  } else if (tab === "near") {
+    filtered = stationsWithDist.filter((s) => s._dist != null && s._dist <= nearRadius);
+  }
 
+  // Sort
   const sorted = [...filtered].sort((a, b) => {
+    if (tab === "near") return (a._dist ?? Infinity) - (b._dist ?? Infinity);
     if (sortBy === "price") {
       const pa = a[activeFuel]?.price ?? Infinity;
       const pb = b[activeFuel]?.price ?? Infinity;
@@ -249,8 +300,36 @@ export default function App() {
               ★ My Stations
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
             </button>
+            <button
+              className={`tab-nav ${tab === "near" ? "tab-nav-active" : ""}`}
+              onClick={locStatus === "ok" ? () => setTab("near") : requestLocation}
+              disabled={locStatus === "loading"}
+            >
+              {locStatus === "loading" ? "Locating…" : "📍 Near Me"}
+              {tab === "near" && sorted.length > 0 && <span className="tab-badge">{sorted.length}</span>}
+            </button>
           </div>
+
+          {/* Radius slider — only shown on Near Me tab */}
+          {tab === "near" && locStatus === "ok" && (
+            <div className="radius-control">
+              <span>Within</span>
+              <input
+                type="range" min="1" max="20" step="1"
+                value={nearRadius}
+                onChange={(e) => setNearRadius(Number(e.target.value))}
+              />
+              <span className="radius-label">{nearRadius} km</span>
+            </div>
+          )}
         </div>
+
+        {/* Location denied warning */}
+        {locStatus === "denied" && (
+          <div className="loc-error">
+            Location access denied. Enable it in your browser settings and try again.
+          </div>
+        )}
 
         {/* Controls */}
         <div className="controls">
@@ -293,12 +372,19 @@ export default function App() {
           </div>
         )}
 
-        {/* Empty My Stations */}
         {tab === "mine" && favourites.length === 0 && (
           <div className="empty-state">
             <p style={{ fontSize: "2.5rem" }}>☆</p>
             <p><strong>No favourite stations yet</strong></p>
             <p>Click the ☆ on any station to add it here.</p>
+          </div>
+        )}
+
+        {tab === "near" && locStatus === "ok" && sorted.length === 0 && (
+          <div className="empty-state">
+            <p style={{ fontSize: "2.5rem" }}>📍</p>
+            <p><strong>No stations within {nearRadius} km</strong></p>
+            <p>Try increasing the radius above.</p>
           </div>
         )}
 
@@ -315,6 +401,7 @@ export default function App() {
                   isFavourite={favourites.includes(station.station_id)}
                   onToggleFavourite={toggleFavourite}
                   onOpenChart={setChartStation}
+                  distance={station._dist}
                 />
               ))}
             </div>
