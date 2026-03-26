@@ -17,6 +17,26 @@ function fmtDist(km) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
 
+// Map station coordinates to a neighbourhood name using nearest centroid
+const AREAS = [
+  { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
+  { name: "East Vancouver",     lat: 49.2640, lng: -123.0586 },
+  { name: "North Vancouver",    lat: 49.3163, lng: -123.0724 },
+  { name: "Richmond",           lat: 49.2045, lng: -123.1116 },
+  { name: "Burnaby",            lat: 49.2488, lng: -122.9805 },
+];
+
+function getArea(lat, lng) {
+  if (lat == null || lng == null) return "Other";
+  let best = AREAS[0];
+  let min = Infinity;
+  for (const a of AREAS) {
+    const d = haversine(lat, lng, a.lat, a.lng);
+    if (d < min) { min = d; best = a; }
+  }
+  return best.name;
+}
+
 const FUEL_TYPES = [
   { key: "regular_gas",  label: "Regular" },
   { key: "midgrade_gas", label: "Mid" },
@@ -102,7 +122,7 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, distance }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, distance, showArea }) {
   const fuelData = station[activeFuel];
   const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
 
@@ -115,6 +135,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         <div className="card-header">
           <div className="station-name">{station.name}</div>
           <div className="station-address">{station.address}</div>
+          {showArea && <div className="station-area">{station._area}</div>}
         </div>
         <button
           className={`btn-fav ${isFavourite ? "btn-fav-active" : ""}`}
@@ -223,12 +244,13 @@ export default function App() {
 
   const allStations = data?.stations ?? [];
 
-  // Attach distance (km) to each station when location is known
+  // Attach distance + area to each station
   const stationsWithDist = allStations.map((s) => ({
     ...s,
     _dist: userLocation && s.latitude != null && s.longitude != null
       ? haversine(userLocation.lat, userLocation.lon, s.latitude, s.longitude)
       : null,
+    _area: getArea(s.latitude, s.longitude),
   }));
 
   // Cheapest price per fuel type
@@ -250,6 +272,14 @@ export default function App() {
   const sorted = [...filtered].sort((a, b) => {
     if (tab === "near") return (a._dist ?? Infinity) - (b._dist ?? Infinity);
     if (sortBy === "price") {
+      const pa = a[activeFuel]?.price ?? Infinity;
+      const pb = b[activeFuel]?.price ?? Infinity;
+      return pa - pb;
+    }
+    if (sortBy === "city") {
+      const cmp = a._area.localeCompare(b._area);
+      if (cmp !== 0) return cmp;
+      // Within same area, sort cheapest first
       const pa = a[activeFuel]?.price ?? Infinity;
       const pb = b[activeFuel]?.price ?? Infinity;
       return pa - pb;
@@ -354,6 +384,7 @@ export default function App() {
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
               <option value="price">Price</option>
               <option value="name">Name</option>
+              <option value="city">City / Area</option>
             </select>
           </div>
         </div>
@@ -402,6 +433,7 @@ export default function App() {
                   onToggleFavourite={toggleFavourite}
                   onOpenChart={setChartStation}
                   distance={station._dist}
+                  showArea={sortBy === "city"}
                 />
               ))}
             </div>

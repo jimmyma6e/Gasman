@@ -87,6 +87,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .card-header { flex: 1; min-width: 0; }
 .station-name { font-weight: 600; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .station-address { font-size: 0.78rem; color: var(--text-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.station-area { font-size: 0.7rem; color: var(--accent); margin-top: 3px; opacity: 0.8; }
 
 /* Favourite button */
 .btn-fav { background: none; border: 1px solid var(--border); color: var(--text-dim); font-size: 1.1rem; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; flex-shrink: 0; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
