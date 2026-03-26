@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import PriceChart from "./components/PriceChart";
 
-// Map station coordinates to a neighbourhood name using nearest centroid
 const AREAS = [
   { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
   { name: "East Vancouver",     lat: 49.2640, lng: -123.0586 },
@@ -12,11 +11,9 @@ const AREAS = [
 
 function getArea(lat, lng) {
   if (lat == null || lng == null) return "Other";
-  let best = AREAS[0];
-  let min = Infinity;
+  let best = AREAS[0], min = Infinity;
   for (const a of AREAS) {
-    const dlat = lat - a.lat, dlng = lng - a.lng;
-    const d = dlat * dlat + dlng * dlng;
+    const d = (lat - a.lat) ** 2 + (lng - a.lng) ** 2;
     if (d < min) { min = d; best = a; }
   }
   return best.name;
@@ -29,12 +26,12 @@ const FUEL_TYPES = [
   { key: "diesel",       label: "Diesel" },
 ];
 
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const REFRESH_INTERVAL = 5 * 60 * 1000;
 
 function formatPrice(price, unit) {
   if (price == null) return null;
-  const isPerLitre = unit?.includes("litre") || unit?.includes("liter");
-  return `${price.toFixed(isPerLitre ? 1 : 2)}${isPerLitre ? "¢/L" : "$/gal"}`;
+  const perLitre = unit?.includes("litre") || unit?.includes("liter");
+  return `${price.toFixed(perLitre ? 1 : 2)}${perLitre ? "¢/L" : "$/gal"}`;
 }
 
 function timeAgo(isoString) {
@@ -47,13 +44,20 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// Toggle a value in/out of a Set, returning a new Set
+function toggleSet(set, value) {
+  const next = new Set(set);
+  next.has(value) ? next.delete(value) : next.add(value);
+  return next;
+}
+
 // ---------- Trend Banner ----------
 function TrendBanner({ trend }) {
   if (!trend?.length) return null;
   const bc = trend.find((t) => t.country === "CA") || trend[0];
   if (!bc) return null;
   const arrow = bc.trend === 1 ? "↑" : bc.trend === -1 ? "↓" : "→";
-  const cls = bc.trend === 1 ? "trend-up" : bc.trend === -1 ? "trend-down" : "trend-stable";
+  const cls   = bc.trend === 1 ? "trend-up" : bc.trend === -1 ? "trend-down" : "trend-stable";
   return (
     <div className={`trend-banner ${cls}`}>
       <span className="trend-area">{bc.areaName}</span>
@@ -68,9 +72,9 @@ function TrendBanner({ trend }) {
 // ---------- Chart Modal ----------
 function ChartModal({ station, onClose }) {
   useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
   return (
@@ -83,22 +87,17 @@ function ChartModal({ station, onClose }) {
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-
-        {/* Current prices summary */}
         <div className="modal-prices">
           {FUEL_TYPES.map(({ key, label }) => {
             const price = station[key]?.price;
             return price != null ? (
               <div key={key} className="modal-price-chip">
                 <span className="modal-price-label">{label}</span>
-                <span className="modal-price-value">
-                  {formatPrice(price, station.unit_of_measure)}
-                </span>
+                <span className="modal-price-value">{formatPrice(price, station.unit_of_measure)}</span>
               </div>
             ) : null;
           })}
         </div>
-
         <h3 className="modal-chart-title">Price Today</h3>
         <PriceChart stationId={station.station_id} />
       </div>
@@ -108,8 +107,9 @@ function ChartModal({ station, onClose }) {
 
 // ---------- Station Card ----------
 function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea }) {
-  const fuelData = station[activeFuel];
+  const fuelData  = station[activeFuel];
   const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
+  const deltas    = station.price_delta || {};
 
   return (
     <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
@@ -133,13 +133,21 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
       <div className="fuel-grid">
         {FUEL_TYPES.map(({ key, label }) => {
           const price = station[key]?.price;
+          const delta = deltas[key];
           return (
             <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
               <span className="fuel-label">{label}</span>
               {price != null ? (
-                <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
-                  {formatPrice(price, station.unit_of_measure)}
-                </span>
+                <div className="fuel-price-row">
+                  <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
+                    {formatPrice(price, station.unit_of_measure)}
+                  </span>
+                  {delta != null && (
+                    <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
+                      {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                    </span>
+                  )}
+                </div>
               ) : (
                 <span className="badge badge-empty">—</span>
               )}
@@ -162,17 +170,17 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
 
 // ---------- App ----------
 export default function App() {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-  const [tab, setTab]         = useState("all");   // "all" | "mine"
-  const [sortBy, setSortBy]   = useState("price");
+  const [data, setData]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+  const [tab, setTab]           = useState("all");
+  const [sortBy, setSortBy]     = useState("price");
   const [activeFuel, setActiveFuel] = useState("regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
-  const [search, setSearch]       = useState("");
-  const [areaFilter, setAreaFilter] = useState("all");
-  const [brandFilter, setBrandFilter] = useState("all");
+  const [search, setSearch]     = useState("");
+  const [areaFilter, setAreaFilter]   = useState(new Set());   // empty = all
+  const [brandFilter, setBrandFilter] = useState(new Set());   // empty = all
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -188,8 +196,7 @@ export default function App() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await fetch("/api/stations");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -210,52 +217,43 @@ export default function App() {
 
   const allStations = data?.stations ?? [];
 
-  // Attach area to each station
   const stationsWithArea = allStations.map((s) => ({
     ...s,
     _area: getArea(s.latitude, s.longitude),
   }));
 
-  // Sorted unique brand names from live data
   const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))].sort();
 
-  // Cheapest price per fuel type
   const cheapestPrices = {};
   for (const { key } of FUEL_TYPES) {
     const prices = allStations.map((s) => s[key]?.price).filter((p) => p != null);
     cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
   }
 
-  // Filter
   const q = search.trim().toLowerCase();
   const filtered = stationsWithArea.filter((s) => {
     if (tab === "mine" && !favourites.includes(s.station_id)) return false;
-    if (areaFilter !== "all" && s._area !== areaFilter) return false;
-    if (brandFilter !== "all" && s.name !== brandFilter) return false;
+    if (areaFilter.size  > 0 && !areaFilter.has(s._area))    return false;
+    if (brandFilter.size > 0 && !brandFilter.has(s.name))    return false;
     if (q && !s.name.toLowerCase().includes(q) && !s.address.toLowerCase().includes(q)) return false;
     return true;
   });
 
-  // Sort
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "price") {
-      const pa = a[activeFuel]?.price ?? Infinity;
-      const pb = b[activeFuel]?.price ?? Infinity;
-      return pa - pb;
+      return (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
     }
     if (sortBy === "city") {
       const cmp = a._area.localeCompare(b._area);
-      if (cmp !== 0) return cmp;
-      const pa = a[activeFuel]?.price ?? Infinity;
-      const pb = b[activeFuel]?.price ?? Infinity;
-      return pa - pb;
+      return cmp !== 0 ? cmp : (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
     }
     return a.name.localeCompare(b.name);
   });
 
+  const hasFilters = areaFilter.size > 0 || brandFilter.size > 0 || q;
+
   return (
     <div className="app">
-      {/* Header */}
       <header className="header">
         <div className="header-inner">
           <div className="header-title">
@@ -266,9 +264,7 @@ export default function App() {
             </div>
           </div>
           <div className="header-actions">
-            {lastRefresh && (
-              <span className="refresh-time">Refreshed {timeAgo(lastRefresh.toISOString())}</span>
-            )}
+            {lastRefresh && <span className="refresh-time">Refreshed {timeAgo(lastRefresh.toISOString())}</span>}
             <button className="btn-refresh" onClick={fetchData} disabled={loading}>
               {loading ? "Loading..." : "Refresh"}
             </button>
@@ -282,24 +278,18 @@ export default function App() {
         {/* Tabs */}
         <div className="tabs-row">
           <div className="tabs">
-            <button
-              className={`tab-nav ${tab === "all" ? "tab-nav-active" : ""}`}
-              onClick={() => setTab("all")}
-            >
+            <button className={`tab-nav ${tab === "all"  ? "tab-nav-active" : ""}`} onClick={() => setTab("all")}>
               All Stations
               {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
             </button>
-            <button
-              className={`tab-nav ${tab === "mine" ? "tab-nav-active" : ""}`}
-              onClick={() => setTab("mine")}
-            >
+            <button className={`tab-nav ${tab === "mine" ? "tab-nav-active" : ""}`} onClick={() => setTab("mine")}>
               ★ My Stations
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
             </button>
           </div>
         </div>
 
-        {/* Search + Area filter */}
+        {/* Search */}
         <div className="search-row">
           <input
             className="search-input"
@@ -308,36 +298,44 @@ export default function App() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <select
-            className="area-select"
-            value={areaFilter}
-            onChange={(e) => setAreaFilter(e.target.value)}
-          >
-            <option value="all">All Areas</option>
+          {hasFilters && (
+            <button className="btn-clear-filters" onClick={() => { setAreaFilter(new Set()); setBrandFilter(new Set()); setSearch(""); }}>
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        {/* Area chips */}
+        <div className="filter-section">
+          <span className="filter-label">Area</span>
+          <div className="chip-row">
             {AREAS.map((a) => (
-              <option key={a.name} value={a.name}>{a.name}</option>
+              <button
+                key={a.name}
+                className={`brand-chip ${areaFilter.has(a.name) ? "brand-chip-active" : ""}`}
+                onClick={() => setAreaFilter(toggleSet(areaFilter, a.name))}
+              >
+                {a.name}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         {/* Brand chips */}
         {brands.length > 0 && (
-          <div className="brand-row">
-            <button
-              className={`brand-chip ${brandFilter === "all" ? "brand-chip-active" : ""}`}
-              onClick={() => setBrandFilter("all")}
-            >
-              All
-            </button>
-            {brands.map((b) => (
-              <button
-                key={b}
-                className={`brand-chip ${brandFilter === b ? "brand-chip-active" : ""}`}
-                onClick={() => setBrandFilter(brandFilter === b ? "all" : b)}
-              >
-                {b}
-              </button>
-            ))}
+          <div className="filter-section">
+            <span className="filter-label">Brand</span>
+            <div className="chip-row">
+              {brands.map((b) => (
+                <button
+                  key={b}
+                  className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
+                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -352,9 +350,7 @@ export default function App() {
               >
                 {label}
                 {cheapestPrices[key] != null && (
-                  <span className="tab-price">
-                    {formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}
-                  </span>
+                  <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
                 )}
               </button>
             ))}
@@ -370,17 +366,11 @@ export default function App() {
         </div>
 
         {error && (
-          <div className="error-box">
-            Failed to load: {error}.{" "}
-            <button onClick={fetchData}>Retry</button>
-          </div>
+          <div className="error-box">Failed to load: {error}.{" "}<button onClick={fetchData}>Retry</button></div>
         )}
 
         {loading && !data && (
-          <div className="loading-box">
-            <div className="spinner" />
-            <p>Fetching gas prices across Vancouver...</p>
-          </div>
+          <div className="loading-box"><div className="spinner" /><p>Fetching gas prices across Vancouver...</p></div>
         )}
 
         {tab === "mine" && favourites.length === 0 && (
@@ -412,9 +402,7 @@ export default function App() {
         )}
       </main>
 
-      {chartStation && (
-        <ChartModal station={chartStation} onClose={() => setChartStation(null)} />
-      )}
+      {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
     </div>
   );
 }

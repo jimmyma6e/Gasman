@@ -46,6 +46,11 @@ app.add_middleware(
 @app.get("/api/stations")
 async def get_stations():
     stations, trend = await gb.get_all_vancouver()
+    deltas = database.get_price_deltas()
+    for s in stations:
+        d = deltas.get(s["station_id"])
+        if d:
+            s["price_delta"] = d
     return {
         "stations":   stations,
         "trend":      trend,

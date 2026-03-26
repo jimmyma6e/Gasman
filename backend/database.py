@@ -62,6 +62,41 @@ def insert_prices(stations: list):
         conn.close()
 
 
+def get_price_deltas() -> dict:
+    """
+    Compare the two most recent poll snapshots.
+    Returns {station_id: {fuel_type: delta}} — only entries where price changed.
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        times = conn.execute(
+            "SELECT DISTINCT recorded_at FROM price_history ORDER BY recorded_at DESC LIMIT 2"
+        ).fetchall()
+        if len(times) < 2:
+            return {}
+        t_now, t_prev = times[0]["recorded_at"], times[1]["recorded_at"]
+        rows = conn.execute(
+            "SELECT station_id, fuel_type, price, recorded_at FROM price_history WHERE recorded_at IN (?, ?)",
+            (t_now, t_prev),
+        ).fetchall()
+
+    current, previous = {}, {}
+    for r in rows:
+        k = (r["station_id"], r["fuel_type"])
+        if r["recorded_at"] == t_now:
+            current[k] = r["price"]
+        else:
+            previous[k] = r["price"]
+
+    result: dict = {}
+    for (sid, fuel), price in current.items():
+        if (sid, fuel) in previous:
+            delta = round(price - previous[(sid, fuel)], 1)
+            if delta != 0:
+                result.setdefault(sid, {})[fuel] = delta
+    return result
+
+
 def get_station_history(station_id: str, hours: int = 24) -> list:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
