@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
+import PriceChart from "./components/PriceChart";
 
 const FUEL_TYPES = [
-  { key: "regular_gas", label: "Regular" },
+  { key: "regular_gas",  label: "Regular" },
   { key: "midgrade_gas", label: "Mid" },
-  { key: "premium_gas", label: "Premium" },
-  { key: "diesel", label: "Diesel" },
+  { key: "premium_gas",  label: "Premium" },
+  { key: "diesel",       label: "Diesel" },
 ];
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -25,70 +26,141 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// ---------- Trend Banner ----------
 function TrendBanner({ trend }) {
   if (!trend?.length) return null;
   const bc = trend.find((t) => t.country === "CA") || trend[0];
   if (!bc) return null;
   const arrow = bc.trend === 1 ? "↑" : bc.trend === -1 ? "↓" : "→";
-  const color = bc.trend === 1 ? "trend-up" : bc.trend === -1 ? "trend-down" : "trend-stable";
+  const cls = bc.trend === 1 ? "trend-up" : bc.trend === -1 ? "trend-down" : "trend-stable";
   return (
-    <div className={`trend-banner ${color}`}>
+    <div className={`trend-banner ${cls}`}>
       <span className="trend-area">{bc.areaName}</span>
       <span className="trend-price">
         {arrow} Avg today: <strong>{bc.today?.toFixed(1)}</strong>
-        {bc.todayLow ? ` | Low: ${bc.todayLow.toFixed(1)}` : ""}
+        {bc.todayLow ? ` · Low: ${bc.todayLow.toFixed(1)}` : ""}
       </span>
     </div>
   );
 }
 
-function PriceBadge({ fuelData, unit, highlight }) {
-  if (!fuelData || fuelData.price == null) return <span className="badge badge-empty">—</span>;
-  const display = formatPrice(fuelData.price, unit);
+// ---------- Chart Modal ----------
+function ChartModal({ station, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
-    <span className={`badge ${highlight ? "badge-cheapest" : ""}`} title={`Updated ${timeAgo(fuelData.last_updated)}`}>
-      {display}
-    </span>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h2 className="modal-title">{station.name}</h2>
+            <p className="modal-address">{station.address}</p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Current prices summary */}
+        <div className="modal-prices">
+          {FUEL_TYPES.map(({ key, label }) => {
+            const price = station[key]?.price;
+            return price != null ? (
+              <div key={key} className="modal-price-chip">
+                <span className="modal-price-label">{label}</span>
+                <span className="modal-price-value">
+                  {formatPrice(price, station.unit_of_measure)}
+                </span>
+              </div>
+            ) : null;
+          })}
+        </div>
+
+        <h3 className="modal-chart-title">Price Today</h3>
+        <PriceChart stationId={station.station_id} />
+      </div>
+    </div>
   );
 }
 
-function StationCard({ station, activeFuel, cheapestPrices }) {
+// ---------- Station Card ----------
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart }) {
   const fuelData = station[activeFuel];
   const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
 
   return (
     <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
       {isCheapest && <div className="cheapest-tag">Cheapest</div>}
-      <div className="card-header">
-        <div className="station-name">{station.name}</div>
-        <div className="station-address">{station.address}</div>
+
+      <div className="card-top">
+        <div className="card-header">
+          <div className="station-name">{station.name}</div>
+          <div className="station-address">{station.address}</div>
+        </div>
+        <button
+          className={`btn-fav ${isFavourite ? "btn-fav-active" : ""}`}
+          onClick={() => onToggleFavourite(station.station_id)}
+          title={isFavourite ? "Remove from My Stations" : "Add to My Stations"}
+        >
+          {isFavourite ? "★" : "☆"}
+        </button>
       </div>
+
       <div className="fuel-grid">
-        {FUEL_TYPES.map(({ key, label }) => (
-          <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
-            <span className="fuel-label">{label}</span>
-            <PriceBadge
-              fuelData={station[key]}
-              unit={station.unit_of_measure}
-              highlight={key === activeFuel && isCheapest}
-            />
-          </div>
-        ))}
+        {FUEL_TYPES.map(({ key, label }) => {
+          const price = station[key]?.price;
+          return (
+            <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
+              <span className="fuel-label">{label}</span>
+              {price != null ? (
+                <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
+                  {formatPrice(price, station.unit_of_measure)}
+                </span>
+              ) : (
+                <span className="badge badge-empty">—</span>
+              )}
+            </div>
+          );
+        })}
       </div>
-      {fuelData?.last_updated && (
-        <div className="last-updated">Updated {timeAgo(fuelData.last_updated)}</div>
-      )}
+
+      <div className="card-footer">
+        {fuelData?.last_updated && (
+          <span className="last-updated">Updated {timeAgo(fuelData.last_updated)}</span>
+        )}
+        <button className="btn-chart" onClick={() => onOpenChart(station)}>
+          📈 Price History
+        </button>
+      </div>
     </div>
   );
 }
 
+// ---------- App ----------
 export default function App() {
-  const [data, setData] = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [sortBy, setSortBy] = useState("price");
+  const [error, setError]     = useState(null);
+  const [tab, setTab]         = useState("all");        // "all" | "mine"
+  const [sortBy, setSortBy]   = useState("price");
   const [activeFuel, setActiveFuel] = useState("regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [chartStation, setChartStation] = useState(null);
+
+  const [favourites, setFavourites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
+    catch { return []; }
+  });
+
+  const toggleFavourite = useCallback((id) => {
+    setFavourites((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      localStorage.setItem("gasman-favourites", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,8 +168,7 @@ export default function App() {
     try {
       const res = await fetch("/api/stations");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setData(json);
+      setData(await res.json());
       setLastRefresh(new Date());
     } catch (e) {
       setError(e.message);
@@ -108,21 +179,25 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, REFRESH_INTERVAL);
-    return () => clearInterval(interval);
+    const id = setInterval(fetchData, REFRESH_INTERVAL);
+    return () => clearInterval(id);
   }, [fetchData]);
 
-  const stations = data?.stations ?? [];
+  const allStations = data?.stations ?? [];
 
-  // Find cheapest price per fuel type
+  // Cheapest price per fuel type
   const cheapestPrices = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = stations.map((s) => s[key]?.price).filter((p) => p != null);
+    const prices = allStations.map((s) => s[key]?.price).filter((p) => p != null);
     cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
   }
 
-  // Sort stations
-  const sorted = [...stations].sort((a, b) => {
+  // Filter + sort
+  const filtered = tab === "mine"
+    ? allStations.filter((s) => favourites.includes(s.station_id))
+    : allStations;
+
+  const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "price") {
       const pa = a[activeFuel]?.price ?? Infinity;
       const pb = b[activeFuel]?.price ?? Infinity;
@@ -133,6 +208,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Header */}
       <header className="header">
         <div className="header-inner">
           <div className="header-title">
@@ -156,6 +232,27 @@ export default function App() {
       <main className="main">
         {data?.trend && <TrendBanner trend={data.trend} />}
 
+        {/* Tabs */}
+        <div className="tabs-row">
+          <div className="tabs">
+            <button
+              className={`tab-nav ${tab === "all" ? "tab-nav-active" : ""}`}
+              onClick={() => setTab("all")}
+            >
+              All Stations
+              {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
+            </button>
+            <button
+              className={`tab-nav ${tab === "mine" ? "tab-nav-active" : ""}`}
+              onClick={() => setTab("mine")}
+            >
+              ★ My Stations
+              {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
+            </button>
+          </div>
+        </div>
+
+        {/* Controls */}
         <div className="controls">
           <div className="fuel-tabs">
             {FUEL_TYPES.map(({ key, label }) => (
@@ -167,7 +264,7 @@ export default function App() {
                 {label}
                 {cheapestPrices[key] != null && (
                   <span className="tab-price">
-                    {formatPrice(cheapestPrices[key], stations[0]?.unit_of_measure)}
+                    {formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}
                   </span>
                 )}
               </button>
@@ -184,7 +281,8 @@ export default function App() {
 
         {error && (
           <div className="error-box">
-            Failed to load data: {error}. <button onClick={fetchData}>Retry</button>
+            Failed to load: {error}.{" "}
+            <button onClick={fetchData}>Retry</button>
           </div>
         )}
 
@@ -195,9 +293,18 @@ export default function App() {
           </div>
         )}
 
-        {data && (
+        {/* Empty My Stations */}
+        {tab === "mine" && favourites.length === 0 && (
+          <div className="empty-state">
+            <p style={{ fontSize: "2.5rem" }}>☆</p>
+            <p><strong>No favourite stations yet</strong></p>
+            <p>Click the ☆ on any station to add it here.</p>
+          </div>
+        )}
+
+        {data && sorted.length > 0 && (
           <>
-            <p className="station-count">{sorted.length} stations found</p>
+            <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
             <div className="grid">
               {sorted.map((station) => (
                 <StationCard
@@ -205,12 +312,19 @@ export default function App() {
                   station={station}
                   activeFuel={activeFuel}
                   cheapestPrices={cheapestPrices}
+                  isFavourite={favourites.includes(station.station_id)}
+                  onToggleFavourite={toggleFavourite}
+                  onOpenChart={setChartStation}
                 />
               ))}
             </div>
           </>
         )}
       </main>
+
+      {chartStation && (
+        <ChartModal station={chartStation} onClose={() => setChartStation(null)} />
+      )}
     </div>
   );
 }
