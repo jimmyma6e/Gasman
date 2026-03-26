@@ -170,8 +170,9 @@ export default function App() {
   const [activeFuel, setActiveFuel] = useState("regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
-  const [search, setSearch]   = useState("");
+  const [search, setSearch]       = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -215,6 +216,9 @@ export default function App() {
     _area: getArea(s.latitude, s.longitude),
   }));
 
+  // Sorted unique brand names from live data
+  const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))].sort();
+
   // Cheapest price per fuel type
   const cheapestPrices = {};
   for (const { key } of FUEL_TYPES) {
@@ -227,6 +231,7 @@ export default function App() {
   const filtered = stationsWithArea.filter((s) => {
     if (tab === "mine" && !favourites.includes(s.station_id)) return false;
     if (areaFilter !== "all" && s._area !== areaFilter) return false;
+    if (brandFilter !== "all" && s.name !== brandFilter) return false;
     if (q && !s.name.toLowerCase().includes(q) && !s.address.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -314,6 +319,27 @@ export default function App() {
             ))}
           </select>
         </div>
+
+        {/* Brand chips */}
+        {brands.length > 0 && (
+          <div className="brand-row">
+            <button
+              className={`brand-chip ${brandFilter === "all" ? "brand-chip-active" : ""}`}
+              onClick={() => setBrandFilter("all")}
+            >
+              All
+            </button>
+            {brands.map((b) => (
+              <button
+                key={b}
+                className={`brand-chip ${brandFilter === b ? "brand-chip-active" : ""}`}
+                onClick={() => setBrandFilter(brandFilter === b ? "all" : b)}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Controls */}
         <div className="controls">

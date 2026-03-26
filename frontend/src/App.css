@@ -64,6 +64,12 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .area-select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; outline: none; transition: border-color 0.15s; }
 .area-select:focus { border-color: var(--accent); }
 
+/* ── Brand chips ── */
+.brand-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.brand-chip { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.brand-chip:hover { border-color: var(--accent); color: var(--text); }
+.brand-chip-active { background: rgba(245,158,11,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
 /* ── Fuel Type Tabs + Sort ── */
 .controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
