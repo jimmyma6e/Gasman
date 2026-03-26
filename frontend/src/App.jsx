@@ -189,6 +189,7 @@ export default function App() {
 
   const [userLocation, setUserLocation] = useState(null);   // {lat, lon}
   const [locStatus, setLocStatus]       = useState("idle"); // "idle"|"loading"|"ok"|"denied"
+  const [locError, setLocError]         = useState("");
   const [nearRadius, setNearRadius]     = useState(5);      // km
 
   const [favourites, setFavourites] = useState(() => {
@@ -222,16 +223,27 @@ export default function App() {
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setLocStatus("denied");
+      setLocError("Your browser doesn't support geolocation.");
       return;
     }
     setLocStatus("loading");
+    setLocError("");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         setLocStatus("ok");
         setTab("near");
       },
-      () => setLocStatus("denied"),
+      (err) => {
+        setLocStatus("denied");
+        if (err.code === 1) {
+          setLocError("Permission denied. On Mac: System Settings → Privacy & Security → Location Services → enable your browser.");
+        } else if (err.code === 2) {
+          setLocError("Location unavailable. Make sure Location Services is on in System Settings.");
+        } else {
+          setLocError(`Location timed out (${err.message}). Try again.`);
+        }
+      },
       { timeout: 10000 }
     );
   }, []);
@@ -357,7 +369,8 @@ export default function App() {
         {/* Location denied warning */}
         {locStatus === "denied" && (
           <div className="loc-error">
-            Location access denied. Enable it in your browser settings and try again.
+            {locError || "Location access denied."}{" "}
+            <button onClick={requestLocation}>Try again</button>
           </div>
         )}
 
