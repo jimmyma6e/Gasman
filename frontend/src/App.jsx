@@ -83,7 +83,14 @@ function ChartModal({ station, onClose }) {
         <div className="modal-header">
           <div>
             <h2 className="modal-title">{station.name}</h2>
-            <p className="modal-address">{station.address}</p>
+            <a
+              className="modal-address"
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {station.address}, {station._area}
+            </a>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -118,8 +125,14 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
       <div className="card-top">
         <div className="card-header">
           <div className="station-name">{station.name}</div>
-          <div className="station-address">{station.address}</div>
-          {showArea && <div className="station-area">{station._area}</div>}
+          <a
+            className="station-address"
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {station.address}, {station._area}
+          </a>
         </div>
         <button
           className={`btn-fav ${isFavourite ? "btn-fav-active" : ""}`}
