@@ -142,20 +142,23 @@ async def _graphql(query: str, variables: dict) -> dict:
             cookies=_state["cookies"],
         )
 
-    ct   = resp.headers.get("Content-Type", "")
     text = resp.text
+    ct   = resp.headers.get("Content-Type", "")
 
-    if "json" not in ct:
-        if "Just a moment" in text or "cf_chl" in text:
-            _state["fetched_at"] = None   # force cookie refresh on next call
-            raise RuntimeError("Cloudflare challenge on /graphql — will refresh cookies")
-        logger.error("Non-JSON /graphql response (status %s): %s", resp.status_code, text[:400])
-        raise RuntimeError(f"Non-JSON response (HTTP {resp.status_code})")
+    # Cloudflare challenge — refresh cookies next time
+    if "Just a moment" in text or "cf_chl" in text:
+        _state["fetched_at"] = None
+        raise RuntimeError("Cloudflare challenge on /graphql — will refresh cookies")
 
-    payload = json.loads(text)
+    # Try to parse as JSON regardless of Content-Type (GraphQL errors come back as JSON even on 4xx)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        logger.error("Non-JSON /graphql response (status %s):\n%s", resp.status_code, text[:800])
+        raise RuntimeError(f"Non-JSON response (HTTP {resp.status_code}): {text[:200]}")
 
     if "errors" in payload:
-        logger.warning("GraphQL errors: %s", payload["errors"])
+        logger.warning("GraphQL errors (status %s): %s", resp.status_code, payload["errors"])
 
     return payload
 
