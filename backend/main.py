@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -8,6 +9,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
+
+# Set FLARESOLVERR_URL env var to use FlareSolverr (bypasses Cloudflare).
+# Default: http://localhost:8191/v1
+FLARESOLVERR_URL = os.getenv("FLARESOLVERR_URL", "http://localhost:8191/v1")
 
 # Coverage points across Greater Vancouver
 SEARCH_COORDS = [
@@ -38,7 +43,7 @@ async def _fetch_prices(gb, lat: float, lon: float, limit: int = 20):
 
 
 async def fetch_all_vancouver() -> tuple[list, list]:
-    gb = py_gasbuddy.GasBuddy()
+    gb = py_gasbuddy.GasBuddy(solver_url=FLARESOLVERR_URL)
     info_results, price_results = await asyncio.gather(
         asyncio.gather(*[_fetch_station_info(gb, lat, lon) for lat, lon in SEARCH_COORDS]),
         asyncio.gather(*[_fetch_prices(gb, lat, lon) for lat, lon in SEARCH_COORDS]),
