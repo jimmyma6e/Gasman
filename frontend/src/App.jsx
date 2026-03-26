@@ -98,7 +98,7 @@ function ChartModal({ station, onClose }) {
             ) : null;
           })}
         </div>
-        <h3 className="modal-chart-title">Price Today</h3>
+        <h3 className="modal-chart-title">Price History</h3>
         <PriceChart stationId={station.station_id} />
       </div>
     </div>

@@ -11,6 +11,44 @@ const FUEL_CONFIG = {
   diesel:       { label: "Diesel",   color: "#22c55e" },
 };
 
+const RANGES = [
+  { label: "24h",  hours: 24  },
+  { label: "7d",   hours: 168 },
+  { label: "30d",  hours: 720 },
+];
+
+// Build a bucket key and display label for a date depending on the range
+function bucketKey(date, hours) {
+  if (hours <= 24) {
+    // Round to nearest hour
+    const d = new Date(date);
+    d.setMinutes(0, 0, 0);
+    return d.toISOString();
+  }
+  if (hours <= 168) {
+    // Round to 6-hour blocks
+    const d = new Date(date);
+    d.setHours(Math.floor(d.getHours() / 6) * 6, 0, 0, 0);
+    return d.toISOString();
+  }
+  // Round to day
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function formatBucketLabel(isoKey, hours) {
+  const d = new Date(isoKey);
+  if (hours <= 24) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  if (hours <= 168) {
+    return d.toLocaleDateString([], { month: "short", day: "numeric" }) +
+      " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -26,50 +64,86 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 export default function PriceChart({ stationId }) {
+  const [range, setRange]     = useState(24);
   const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/history/${stationId}`)
+    setHistory(null);
+    fetch(`/api/history/${stationId}?hours=${range}`)
       .then((r) => r.json())
       .then((data) => { setHistory(data.history); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [stationId]);
+  }, [stationId, range]);
+
+  const rangeBar = (
+    <div className="chart-range-row">
+      {RANGES.map(({ label, hours }) => (
+        <button
+          key={hours}
+          className={`chart-range-btn ${range === hours ? "chart-range-active" : ""}`}
+          onClick={() => setRange(hours)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
   if (loading) {
     return (
-      <div className="chart-state">
-        <div className="spinner" />
-        <p>Loading price history...</p>
+      <div>
+        {rangeBar}
+        <div className="chart-state">
+          <div className="spinner" />
+          <p>Loading price history...</p>
+        </div>
       </div>
     );
   }
 
   if (!history?.length) {
     return (
-      <div className="chart-state">
-        <p style={{ fontSize: "2rem" }}>📊</p>
-        <p><strong>No history yet</strong></p>
-        <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-          Price data is collected every 30 minutes.<br />Check back soon!
-        </p>
+      <div>
+        {rangeBar}
+        <div className="chart-state">
+          <p style={{ fontSize: "2rem" }}>📊</p>
+          <p><strong>No history yet for this range</strong></p>
+          <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
+            Price data is collected every 30 minutes.<br />Check back soon!
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Pivot: { time → { regular_gas: price, ... } }
-  const timeMap = {};
+  // Aggregate into buckets (average price per bucket per fuel type)
+  const bucketMap = {};
+  const bucketCount = {};
   for (const h of history) {
-    const d = new Date(h.recorded_at);
-    const key = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (!timeMap[key]) timeMap[key] = { time: key, _ts: d.getTime() };
-    timeMap[key][h.fuel_type] = h.price;
+    const key = bucketKey(new Date(h.recorded_at), range);
+    if (!bucketMap[key]) {
+      bucketMap[key] = { _ts: new Date(key).getTime(), time: formatBucketLabel(key, range) };
+      bucketCount[key] = {};
+    }
+    if (h.price != null) {
+      bucketMap[key][h.fuel_type] = (bucketMap[key][h.fuel_type] ?? 0) + h.price;
+      bucketCount[key][h.fuel_type] = (bucketCount[key][h.fuel_type] ?? 0) + 1;
+    }
   }
-  const chartData = Object.values(timeMap).sort((a, b) => a._ts - b._ts);
+  // Average the accumulated prices
+  for (const [key, bucket] of Object.entries(bucketMap)) {
+    for (const fuel of Object.keys(FUEL_CONFIG)) {
+      if (bucket[fuel] != null && bucketCount[key][fuel] > 1) {
+        bucket[fuel] = bucket[fuel] / bucketCount[key][fuel];
+      }
+    }
+  }
+  const chartData = Object.values(bucketMap).sort((a, b) => a._ts - b._ts);
 
   // Stats
-  const prices = history.map((h) => h.price).filter(Boolean);
+  const prices = history.map((h) => h.price).filter((p) => p != null);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const firstPrice = history[0]?.price;
@@ -80,21 +154,25 @@ export default function PriceChart({ stationId }) {
   const isPerLitre = unit.includes("litre") || unit.includes("liter");
   const unitLabel = isPerLitre ? "¢/L" : "$/gal";
 
+  const rangeLabel = RANGES.find((r) => r.hours === range)?.label ?? "";
+
   return (
     <div>
+      {rangeBar}
+
       {/* Summary stats */}
       <div className="chart-stats-row">
         <div className="chart-stat">
-          <span className="chart-stat-label">Today's Low</span>
+          <span className="chart-stat-label">{rangeLabel} Low</span>
           <span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span>
         </div>
         <div className="chart-stat">
-          <span className="chart-stat-label">Today's High</span>
+          <span className="chart-stat-label">{rangeLabel} High</span>
           <span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span>
         </div>
         {change !== null && (
           <div className="chart-stat">
-            <span className="chart-stat-label">Change Today</span>
+            <span className="chart-stat-label">Change ({rangeLabel})</span>
             <span className={`chart-stat-value ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>
               {change > 0 ? "+" : ""}{change.toFixed(1)}{unitLabel}
             </span>
@@ -110,7 +188,11 @@ export default function PriceChart({ stationId }) {
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2e3245" />
-          <XAxis dataKey="time" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+          <XAxis
+            dataKey="time"
+            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            interval="preserveStartEnd"
+          />
           <YAxis
             domain={["auto", "auto"]}
             tick={{ fill: "#94a3b8", fontSize: 11 }}
@@ -118,9 +200,7 @@ export default function PriceChart({ stationId }) {
             tickFormatter={(v) => v.toFixed(1)}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend
-            wrapperStyle={{ paddingTop: 8, fontSize: 12, color: "#94a3b8" }}
-          />
+          <Legend wrapperStyle={{ paddingTop: 8, fontSize: 12, color: "#94a3b8" }} />
           <ReferenceLine y={minPrice} stroke="#22c55e" strokeDasharray="4 4" strokeOpacity={0.5} />
           {Object.entries(FUEL_CONFIG).map(([key, { label, color }]) => (
             <Line
@@ -130,7 +210,7 @@ export default function PriceChart({ stationId }) {
               name={label}
               stroke={color}
               strokeWidth={2}
-              dot={chartData.length < 5}
+              dot={chartData.length < 10}
               activeDot={{ r: 4 }}
               connectNulls
             />

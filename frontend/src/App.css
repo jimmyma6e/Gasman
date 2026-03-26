@@ -145,6 +145,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .modal-chart-title { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
 
 /* ── Chart ── */
+.chart-range-row { display: flex; gap: 6px; margin-bottom: 16px; }
+.chart-range-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); padding: 5px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.chart-range-btn:hover { border-color: var(--accent); color: var(--text); }
+.chart-range-active { background: rgba(245,158,11,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .chart-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 20px; color: var(--text-dim); text-align: center; }
 .chart-stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .chart-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px; }
