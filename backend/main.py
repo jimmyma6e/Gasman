@@ -3,16 +3,12 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-import py_gasbuddy
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
-
-# Set FLARESOLVERR_URL env var to use FlareSolverr (bypasses Cloudflare).
-# Default: http://localhost:8191/v1
-FLARESOLVERR_URL = os.getenv("FLARESOLVERR_URL", "http://localhost:8191/v1")
+import gasbuddy_client as gb
 
 # Coverage points across Greater Vancouver
 SEARCH_COORDS = [
@@ -24,66 +20,39 @@ SEARCH_COORDS = [
 ]
 
 
-async def _fetch_station_info(gb, lat: float, lon: float) -> dict:
-    try:
-        result = await gb.location_search(lat=lat, lon=lon)
-        return {
-            s["id"]: {"name": s["name"], "address": s["address"]["line1"]}
-            for s in result["data"]["locationBySearchTerm"]["stations"]["results"]
-        }
-    except Exception:
-        return {}
-
-
-async def _fetch_prices(gb, lat: float, lon: float, limit: int = 20):
-    try:
-        return await gb.price_lookup_service(lat=lat, lon=lon, limit=limit)
-    except Exception:
-        return None
-
-
 async def fetch_all_vancouver() -> tuple[list, list]:
-    gb = py_gasbuddy.GasBuddy(solver_url=FLARESOLVERR_URL)
-    info_results, price_results = await asyncio.gather(
-        asyncio.gather(*[_fetch_station_info(gb, lat, lon) for lat, lon in SEARCH_COORDS]),
-        asyncio.gather(*[_fetch_prices(gb, lat, lon) for lat, lon in SEARCH_COORDS]),
-    )
+    """Query all coverage zones and merge results (deduplicated by station_id)."""
+    tasks = [gb.search_nearby(lat, lon) for lat, lon in SEARCH_COORDS]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    all_info: dict = {}
-    for info in info_results:
-        all_info.update(info)
-
-    all_prices: dict = {}
+    all_stations: dict[str, dict] = {}
     trend: list = []
-    for result in price_results:
-        if not result:
+
+    for r in results:
+        if isinstance(r, Exception):
+            print(f"  Zone error: {r}")
             continue
-        for station in result.get("results", []):
-            sid = station["station_id"]
-            if sid not in all_prices:
-                all_prices[sid] = station
-        if not trend:
-            trend = result.get("trend", [])
+        stations, trends = r
+        for s in stations:
+            sid = s["station_id"]
+            if sid and sid not in all_stations:
+                all_stations[sid] = s
+        if not trend and trends:
+            trend = trends
 
-    stations = []
-    for sid, price_data in all_prices.items():
-        info = all_info.get(sid, {})
-        stations.append({
-            **price_data,
-            "name": info.get("name", f"Station #{sid}"),
-            "address": info.get("address", "Vancouver, BC"),
-        })
+    stations_list = list(all_stations.values())
 
-    stations.sort(key=lambda x: (
-        not x.get("regular_gas") or x["regular_gas"].get("price") is None,
+    # Sort cheapest regular gas first; stations with no regular price go last
+    stations_list.sort(key=lambda x: (
+        x.get("regular_gas") is None or x["regular_gas"].get("price") is None,
         (x.get("regular_gas") or {}).get("price") or float("inf"),
     ))
 
-    return stations, trend
+    return stations_list, trend
 
 
-async def poll_and_store():
-    print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices...")
+async def poll_and_store() -> None:
+    print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices …")
     try:
         stations, _ = await fetch_all_vancouver()
         database.insert_prices(stations)
@@ -98,7 +67,7 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
-    await poll_and_store()                                    # seed on startup
+    await poll_and_store()
     scheduler.add_job(poll_and_store, "interval", minutes=30)
     scheduler.start()
     yield
