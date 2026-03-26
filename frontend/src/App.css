@@ -55,17 +55,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .tab-badge { background: var(--surface2); color: var(--text-dim); font-size: 0.72rem; padding: 1px 6px; border-radius: 10px; }
 .tab-nav-active .tab-badge { background: rgba(245,158,11,0.15); color: var(--accent); }
 
-/* ── Near Me ── */
-.radius-control { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-dim); padding: 6px 0; }
-.radius-control input[type=range] { accent-color: var(--accent); width: 100px; cursor: pointer; }
-.radius-label { color: var(--text); font-weight: 600; min-width: 38px; }
-.loc-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); padding: 12px 14px; border-radius: var(--radius); margin-bottom: 16px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px; }
-.loc-error button { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: underline; margin-left: 4px; }
-.manual-loc-form { display: flex; gap: 8px; }
-.manual-loc-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; }
-.manual-loc-input:focus { border-color: var(--accent); }
-.manual-loc-btn { background: var(--accent); color: #000; border: none; padding: 7px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
-.distance-badge { position: absolute; top: -1px; left: 12px; background: #1e3a5f; color: #7dd3fc; font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 0 0 6px 6px; }
 
 /* ── Fuel Type Tabs + Sort ── */
 .controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }

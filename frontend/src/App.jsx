@@ -1,22 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import PriceChart from "./components/PriceChart";
 
-// Haversine distance in km between two lat/lng points
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function fmtDist(km) {
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
-}
-
 // Map station coordinates to a neighbourhood name using nearest centroid
 const AREAS = [
   { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
@@ -31,7 +15,8 @@ function getArea(lat, lng) {
   let best = AREAS[0];
   let min = Infinity;
   for (const a of AREAS) {
-    const d = haversine(lat, lng, a.lat, a.lng);
+    const dlat = lat - a.lat, dlng = lng - a.lng;
+    const d = dlat * dlat + dlng * dlng;
     if (d < min) { min = d; best = a; }
   }
   return best.name;
@@ -122,14 +107,13 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, distance, showArea }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea }) {
   const fuelData = station[activeFuel];
   const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
 
   return (
     <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
       {isCheapest && <div className="cheapest-tag">Cheapest</div>}
-      {distance != null && <div className="distance-badge">📍 {fmtDist(distance)}</div>}
 
       <div className="card-top">
         <div className="card-header">
@@ -181,17 +165,11 @@ export default function App() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
-  const [tab, setTab]         = useState("all");        // "all" | "mine" | "near"
+  const [tab, setTab]         = useState("all");   // "all" | "mine"
   const [sortBy, setSortBy]   = useState("price");
   const [activeFuel, setActiveFuel] = useState("regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
-
-  const [userLocation, setUserLocation] = useState(null);   // {lat, lon}
-  const [locStatus, setLocStatus]       = useState("idle"); // "idle"|"loading"|"ok"|"denied"
-  const [locError, setLocError]         = useState("");
-  const [manualAddr, setManualAddr]     = useState("");
-  const [nearRadius, setNearRadius]     = useState(5);      // km
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -221,55 +199,6 @@ export default function App() {
     }
   }, []);
 
-  const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setLocStatus("denied");
-      setLocError("Your browser doesn't support geolocation.");
-      return;
-    }
-    setLocStatus("loading");
-    setLocError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        setLocStatus("ok");
-        setTab("near");
-      },
-      (err) => {
-        setLocStatus("denied");
-        if (err.code === 1) {
-          setLocError("Permission denied. On Mac: System Settings → Privacy & Security → Location Services → enable your browser.");
-        } else if (err.code === 2) {
-          setLocError("Location unavailable on this device.");
-        } else {
-          setLocError("Location timed out.");
-        }
-      },
-      { timeout: 10000 }
-    );
-  }, []);
-
-  const geocodeManual = useCallback(async (addr) => {
-    if (!addr.trim()) return;
-    setLocStatus("loading");
-    setLocError("");
-    try {
-      const q = encodeURIComponent(addr + ", Vancouver, BC");
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
-        { headers: { "Accept-Language": "en" } }
-      );
-      const results = await res.json();
-      if (!results.length) throw new Error("Address not found");
-      setUserLocation({ lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) });
-      setLocStatus("ok");
-      setTab("near");
-    } catch (e) {
-      setLocStatus("denied");
-      setLocError(`Could not find "${addr}". Try a street address or intersection.`);
-    }
-  }, []);
-
   useEffect(() => {
     fetchData();
     const id = setInterval(fetchData, REFRESH_INTERVAL);
@@ -278,12 +207,9 @@ export default function App() {
 
   const allStations = data?.stations ?? [];
 
-  // Attach distance + area to each station
-  const stationsWithDist = allStations.map((s) => ({
+  // Attach area to each station
+  const stationsWithArea = allStations.map((s) => ({
     ...s,
-    _dist: userLocation && s.latitude != null && s.longitude != null
-      ? haversine(userLocation.lat, userLocation.lon, s.latitude, s.longitude)
-      : null,
     _area: getArea(s.latitude, s.longitude),
   }));
 
@@ -295,16 +221,12 @@ export default function App() {
   }
 
   // Filter
-  let filtered = stationsWithDist;
-  if (tab === "mine") {
-    filtered = stationsWithDist.filter((s) => favourites.includes(s.station_id));
-  } else if (tab === "near") {
-    filtered = stationsWithDist.filter((s) => s._dist != null && s._dist <= nearRadius);
-  }
+  const filtered = tab === "mine"
+    ? stationsWithArea.filter((s) => favourites.includes(s.station_id))
+    : stationsWithArea;
 
   // Sort
   const sorted = [...filtered].sort((a, b) => {
-    if (tab === "near") return (a._dist ?? Infinity) - (b._dist ?? Infinity);
     if (sortBy === "price") {
       const pa = a[activeFuel]?.price ?? Infinity;
       const pb = b[activeFuel]?.price ?? Infinity;
@@ -313,7 +235,6 @@ export default function App() {
     if (sortBy === "city") {
       const cmp = a._area.localeCompare(b._area);
       if (cmp !== 0) return cmp;
-      // Within same area, sort cheapest first
       const pa = a[activeFuel]?.price ?? Infinity;
       const pb = b[activeFuel]?.price ?? Infinity;
       return pa - pb;
@@ -364,50 +285,8 @@ export default function App() {
               ★ My Stations
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
             </button>
-            <button
-              className={`tab-nav ${tab === "near" ? "tab-nav-active" : ""}`}
-              onClick={locStatus === "ok" ? () => setTab("near") : requestLocation}
-              disabled={locStatus === "loading"}
-            >
-              {locStatus === "loading" ? "Locating…" : "📍 Near Me"}
-              {tab === "near" && sorted.length > 0 && <span className="tab-badge">{sorted.length}</span>}
-            </button>
           </div>
-
-          {/* Radius slider — only shown on Near Me tab */}
-          {tab === "near" && locStatus === "ok" && (
-            <div className="radius-control">
-              <span>Within</span>
-              <input
-                type="range" min="1" max="20" step="1"
-                value={nearRadius}
-                onChange={(e) => setNearRadius(Number(e.target.value))}
-              />
-              <span className="radius-label">{nearRadius} km</span>
-            </div>
-          )}
         </div>
-
-        {/* Location denied warning */}
-        {locStatus === "denied" && (
-          <div className="loc-error">
-            <div>{locError || "Location access denied."}{" "}
-              <button onClick={requestLocation}>Try GPS</button>
-            </div>
-            <form
-              className="manual-loc-form"
-              onSubmit={(e) => { e.preventDefault(); geocodeManual(manualAddr); }}
-            >
-              <input
-                className="manual-loc-input"
-                placeholder="Or enter your address (e.g. 123 Main St)"
-                value={manualAddr}
-                onChange={(e) => setManualAddr(e.target.value)}
-              />
-              <button type="submit" className="manual-loc-btn">Go</button>
-            </form>
-          </div>
-        )}
 
         {/* Controls */}
         <div className="controls">
@@ -459,14 +338,6 @@ export default function App() {
           </div>
         )}
 
-        {tab === "near" && locStatus === "ok" && sorted.length === 0 && (
-          <div className="empty-state">
-            <p style={{ fontSize: "2.5rem" }}>📍</p>
-            <p><strong>No stations within {nearRadius} km</strong></p>
-            <p>Try increasing the radius above.</p>
-          </div>
-        )}
-
         {data && sorted.length > 0 && (
           <>
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
@@ -480,7 +351,6 @@ export default function App() {
                   isFavourite={favourites.includes(station.station_id)}
                   onToggleFavourite={toggleFavourite}
                   onOpenChart={setChartStation}
-                  distance={station._dist}
                   showArea={sortBy === "city"}
                 />
               ))}
