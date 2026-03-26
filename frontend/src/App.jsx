@@ -190,6 +190,7 @@ export default function App() {
   const [userLocation, setUserLocation] = useState(null);   // {lat, lon}
   const [locStatus, setLocStatus]       = useState("idle"); // "idle"|"loading"|"ok"|"denied"
   const [locError, setLocError]         = useState("");
+  const [manualAddr, setManualAddr]     = useState("");
   const [nearRadius, setNearRadius]     = useState(5);      // km
 
   const [favourites, setFavourites] = useState(() => {
@@ -239,13 +240,34 @@ export default function App() {
         if (err.code === 1) {
           setLocError("Permission denied. On Mac: System Settings → Privacy & Security → Location Services → enable your browser.");
         } else if (err.code === 2) {
-          setLocError("Location unavailable. Make sure Location Services is on in System Settings.");
+          setLocError("Location unavailable on this device.");
         } else {
-          setLocError(`Location timed out (${err.message}). Try again.`);
+          setLocError("Location timed out.");
         }
       },
       { timeout: 10000 }
     );
+  }, []);
+
+  const geocodeManual = useCallback(async (addr) => {
+    if (!addr.trim()) return;
+    setLocStatus("loading");
+    setLocError("");
+    try {
+      const q = encodeURIComponent(addr + ", Vancouver, BC");
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      const results = await res.json();
+      if (!results.length) throw new Error("Address not found");
+      setUserLocation({ lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) });
+      setLocStatus("ok");
+      setTab("near");
+    } catch (e) {
+      setLocStatus("denied");
+      setLocError(`Could not find "${addr}". Try a street address or intersection.`);
+    }
   }, []);
 
   useEffect(() => {
@@ -369,8 +391,21 @@ export default function App() {
         {/* Location denied warning */}
         {locStatus === "denied" && (
           <div className="loc-error">
-            {locError || "Location access denied."}{" "}
-            <button onClick={requestLocation}>Try again</button>
+            <div>{locError || "Location access denied."}{" "}
+              <button onClick={requestLocation}>Try GPS</button>
+            </div>
+            <form
+              className="manual-loc-form"
+              onSubmit={(e) => { e.preventDefault(); geocodeManual(manualAddr); }}
+            >
+              <input
+                className="manual-loc-input"
+                placeholder="Or enter your address (e.g. 123 Main St)"
+                value={manualAddr}
+                onChange={(e) => setManualAddr(e.target.value)}
+              />
+              <button type="submit" className="manual-loc-btn">Go</button>
+            </form>
           </div>
         )}
 
