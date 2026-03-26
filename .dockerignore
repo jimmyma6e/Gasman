@@ -1,0 +1,11 @@
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/node_modules
+frontend/dist
+backend/static
+backend/*.db
+backend/*.sqlite
+.git
+.gitignore
+*.md

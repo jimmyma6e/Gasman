@@ -1,13 +1,18 @@
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 import database
 import gasbuddy_client as gb
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 async def poll_and_store() -> None:
@@ -68,3 +73,12 @@ async def get_history(station_id: str, hours: int = 24):
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+
+
+# Serve the built React SPA — must be mounted AFTER all /api routes
+if STATIC_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        return FileResponse(STATIC_DIR / "index.html")
