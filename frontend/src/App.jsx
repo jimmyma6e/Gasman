@@ -239,10 +239,11 @@ export default function App() {
 
   const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))].sort();
 
-  const cheapestPrices = {};
+  // Global cheapest — used for tab price hints only
+  const globalCheapest = {};
   for (const { key } of FUEL_TYPES) {
     const prices = allStations.map((s) => s[key]?.price).filter((p) => p != null);
-    cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
+    globalCheapest[key] = prices.length ? Math.min(...prices) : null;
   }
 
   const q = search.trim().toLowerCase();
@@ -254,6 +255,17 @@ export default function App() {
     return true;
   });
 
+  // Cheapest within the filtered set — used for "Cheapest" badge on cards
+  const cheapestPrices = {};
+  for (const { key } of FUEL_TYPES) {
+    const prices = filtered.map((s) => s[key]?.price).filter((p) => p != null);
+    cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
+  }
+
+  function latestUpdate(s) {
+    return FUEL_TYPES.map((f) => s[f.key]?.last_updated).filter(Boolean).sort().at(-1) ?? "";
+  }
+
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "price") {
       return (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
@@ -261,6 +273,9 @@ export default function App() {
     if (sortBy === "city") {
       const cmp = a._area.localeCompare(b._area);
       return cmp !== 0 ? cmp : (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
+    }
+    if (sortBy === "updated") {
+      return latestUpdate(b).localeCompare(latestUpdate(a)); // newest first
     }
     return a.name.localeCompare(b.name);
   });
@@ -364,8 +379,8 @@ export default function App() {
                 onClick={() => setActiveFuel(key)}
               >
                 {label}
-                {cheapestPrices[key] != null && (
-                  <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
+                {globalCheapest[key] != null && (
+                  <span className="tab-price">{formatPrice(globalCheapest[key], allStations[0]?.unit_of_measure)}</span>
                 )}
               </button>
             ))}
@@ -376,6 +391,7 @@ export default function App() {
                 <label>Sort by</label>
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                   <option value="price">Price</option>
+                  <option value="updated">Latest Update</option>
                   <option value="name">Name</option>
                   <option value="city">City / Area</option>
                 </select>
