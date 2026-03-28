@@ -35,13 +35,8 @@ function bucketKey(date, hours) {
 
 function formatBucketLabel(isoKey, hours) {
   const d = new Date(isoKey);
-  if (hours <= 24) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  if (hours <= 168) {
-    return d.toLocaleDateString([], { month: "short", day: "numeric" }) +
-      " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
+  if (hours <= 24) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (hours <= 168) return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
@@ -76,103 +71,48 @@ export default function PriceChart({ stationId }) {
   const rangeBar = (
     <div className="chart-range-row">
       {RANGES.map(({ label, hours }) => (
-        <button
-          key={hours}
-          className={`chart-range-btn ${range === hours ? "chart-range-active" : ""}`}
-          onClick={() => setRange(hours)}
-        >
+        <button key={hours} className={`chart-range-btn ${range === hours ? "chart-range-active" : ""}`} onClick={() => setRange(hours)}>
           {label}
         </button>
       ))}
     </div>
   );
 
-  if (loading) {
-    return (
-      <div>
-        {rangeBar}
-        <div className="chart-state">
-          <div className="spinner" />
-          <p>Loading price history...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div>{rangeBar}<div className="chart-state"><div className="spinner" /><p>Loading price history...</p></div></div>;
 
-  if (!history?.length) {
-    return (
-      <div>
-        {rangeBar}
-        <div className="chart-state">
-          <p style={{ fontSize: "2rem" }}>&#x1F4CA;</p>
-          <p><strong>No history yet for this range</strong></p>
-          <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-            Price data is collected every 30 minutes.<br />Check back soon!
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (!history?.length) return (
+    <div>{rangeBar}<div className="chart-state"><p style={{ fontSize: "2rem" }}>📊</p><p><strong>No history yet for this range</strong></p><p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Price data is collected every 30 minutes.<br />Check back soon!</p></div></div>
+  );
 
   const bucketMap = {};
   const bucketCount = {};
   for (const h of history) {
     const key = bucketKey(new Date(h.recorded_at), range);
-    if (!bucketMap[key]) {
-      bucketMap[key] = { _ts: new Date(key).getTime(), time: formatBucketLabel(key, range) };
-      bucketCount[key] = {};
-    }
-    if (h.price != null) {
-      bucketMap[key][h.fuel_type] = (bucketMap[key][h.fuel_type] ?? 0) + h.price;
-      bucketCount[key][h.fuel_type] = (bucketCount[key][h.fuel_type] ?? 0) + 1;
-    }
+    if (!bucketMap[key]) { bucketMap[key] = { _ts: new Date(key).getTime(), time: formatBucketLabel(key, range) }; bucketCount[key] = {}; }
+    if (h.price != null) { bucketMap[key][h.fuel_type] = (bucketMap[key][h.fuel_type] ?? 0) + h.price; bucketCount[key][h.fuel_type] = (bucketCount[key][h.fuel_type] ?? 0) + 1; }
   }
   for (const [key, bucket] of Object.entries(bucketMap)) {
     for (const fuel of Object.keys(FUEL_CONFIG)) {
-      if (bucket[fuel] != null && bucketCount[key][fuel] > 1) {
-        bucket[fuel] = bucket[fuel] / bucketCount[key][fuel];
-      }
+      if (bucket[fuel] != null && bucketCount[key][fuel] > 1) bucket[fuel] = bucket[fuel] / bucketCount[key][fuel];
     }
   }
   const chartData = Object.values(bucketMap).sort((a, b) => a._ts - b._ts);
-
   const prices = history.map((h) => h.price).filter((p) => p != null);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  const firstPrice = history[0]?.price;
-  const lastPrice  = history[history.length - 1]?.price;
-  const change = lastPrice && firstPrice ? lastPrice - firstPrice : null;
-
+  const change = history[history.length-1]?.price && history[0]?.price ? history[history.length-1].price - history[0].price : null;
   const unit = history[0]?.unit ?? "";
-  const isPerLitre = unit.includes("litre") || unit.includes("liter");
-  const unitLabel = isPerLitre ? "\u00a2/L" : "$/gal";
-
+  const unitLabel = (unit.includes("litre") || unit.includes("liter")) ? "¢/L" : "$/gal";
   const rangeLabel = RANGES.find((r) => r.hours === range)?.label ?? "";
 
   return (
     <div>
       {rangeBar}
       <div className="chart-stats-row">
-        <div className="chart-stat">
-          <span className="chart-stat-label">{rangeLabel} Low</span>
-          <span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span>
-        </div>
-        <div className="chart-stat">
-          <span className="chart-stat-label">{rangeLabel} High</span>
-          <span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span>
-        </div>
-        {change !== null && (
-          <div className="chart-stat">
-            <span className="chart-stat-label">Change ({rangeLabel})</span>
-            <span className={`chart-stat-value ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>
-              {change > 0 ? "+" : ""}{change.toFixed(1)}{unitLabel}
-            </span>
-          </div>
-        )}
-        <div className="chart-stat">
-          <span className="chart-stat-label">Data Points</span>
-          <span className="chart-stat-value">{chartData.length}</span>
-        </div>
+        <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} Low</span><span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span></div>
+        <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} High</span><span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span></div>
+        {change !== null && <div className="chart-stat"><span className="chart-stat-label">Change ({rangeLabel})</span><span className={`chart-stat-value ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>{change > 0 ? "+" : ""}{change.toFixed(1)}{unitLabel}</span></div>}
+        <div className="chart-stat"><span className="chart-stat-label">Data Points</span><span className="chart-stat-value">{chartData.length}</span></div>
       </div>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>

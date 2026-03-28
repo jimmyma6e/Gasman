@@ -16,7 +16,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 async def poll_and_store() -> None:
-    print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices …")
+    print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices ...")
     try:
         stations, _ = await gb.get_all_vancouver()
         database.insert_prices(stations)
@@ -70,12 +70,20 @@ async def get_history(station_id: str, hours: int = 24):
     return {"station_id": station_id, "history": history}
 
 
+@app.get("/api/insights")
+async def get_insights(fuel_type: str = "regular_gas"):
+    return {
+        "area_averages": database.get_area_averages(fuel_type),
+        "ytd_vs_today":  database.get_ytd_vs_today(fuel_type),
+    }
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
 
 
-# Serve the built React SPA — must be mounted AFTER all /api routes
+# Serve the built React SPA - must be mounted AFTER all /api routes
 if STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 

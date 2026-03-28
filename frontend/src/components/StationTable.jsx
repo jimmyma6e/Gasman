@@ -10,11 +10,11 @@ const FUEL_TYPES = [
 function formatPrice(price, unit) {
   if (price == null) return null;
   const perLitre = unit?.includes("litre") || unit?.includes("liter");
-  return `${price.toFixed(perLitre ? 1 : 2)}${perLitre ? "\u00a2/L" : "$/gal"}`;
+  return `${price.toFixed(perLitre ? 1 : 2)}${perLitre ? "¢/L" : "$/gal"}`;
 }
 
 function timeAgo(isoString) {
-  if (!isoString) return "\u2014";
+  if (!isoString) return "—";
   const diff = Math.floor((Date.now() - new Date(isoString)) / 60000);
   if (diff < 1) return "just now";
   if (diff < 60) return `${diff}m ago`;
@@ -27,7 +27,7 @@ function DeltaBadge({ delta }) {
   if (delta == null) return null;
   return (
     <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
-      {delta > 0 ? "\u2191" : "\u2193"}{Math.abs(delta).toFixed(1)}
+      {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
     </span>
   );
 }
@@ -53,8 +53,7 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
     const active = sortCol === col;
     return (
       <th className={`tbl-th tbl-sortable ${active ? "tbl-th-active" : ""}`} onClick={() => handleColClick(col)}>
-        {label}
-        <span className="tbl-sort-icon">{active ? (sortDir === 1 ? " \u2191" : " \u2193") : " \u2195"}</span>
+        {label}<span className="tbl-sort-icon">{active ? (sortDir === 1 ? " ↑" : " ↓") : " ↕"}</span>
       </th>
     );
   }
@@ -64,7 +63,7 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
       <table className="station-table">
         <thead>
           <tr>
-            <th className="tbl-th tbl-fav-col" title="Favourites">\u2605</th>
+            <th className="tbl-th tbl-fav-col" title="Favourites">★</th>
             <ColHeader col="name" label="Station" />
             <th className="tbl-th">Address</th>
             <ColHeader col="area" label="Area" />
@@ -82,14 +81,12 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
               <tr key={s.station_id} className="tbl-row">
                 <td className="tbl-td tbl-fav-col">
                   <button className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`} onClick={() => onToggleFavourite(s.station_id)}>
-                    {isFav ? "\u2605" : "\u2606"}
+                    {isFav ? "★" : "☆"}
                   </button>
                 </td>
                 <td className="tbl-td tbl-name">{s.name}</td>
                 <td className="tbl-td tbl-addr">
-                  <a className="tbl-addr-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.address}, ${s._area}, BC`)}`} target="_blank" rel="noreferrer">
-                    {s.address}
-                  </a>
+                  <a className="tbl-addr-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.address}, ${s._area}, BC`)}`} target="_blank" rel="noreferrer">{s.address}</a>
                 </td>
                 <td className="tbl-td tbl-area">{s._area}</td>
                 {FUEL_TYPES.map(({ key }) => {
@@ -97,16 +94,12 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
                   const isCheap = price != null && price === cheapestPrices[key];
                   return (
                     <td key={key} className={`tbl-td tbl-price ${isCheap ? "tbl-cheapest" : ""}`}>
-                      {price != null ? (
-                        <span className="tbl-price-inner">{formatPrice(price, s.unit_of_measure)}<DeltaBadge delta={deltas[key]} /></span>
-                      ) : <span className="tbl-empty">\u2014</span>}
+                      {price != null ? <span className="tbl-price-inner">{formatPrice(price, s.unit_of_measure)}<DeltaBadge delta={deltas[key]} /></span> : <span className="tbl-empty">—</span>}
                     </td>
                   );
                 })}
                 <td className="tbl-td tbl-updated">{timeAgo(updated)}</td>
-                <td className="tbl-td">
-                  <button className="btn-chart btn-chart-sm" onClick={() => onOpenChart(s)} title="Price history">&#x1F4C8;</button>
-                </td>
+                <td className="tbl-td"><button className="btn-chart btn-chart-sm" onClick={() => onOpenChart(s)} title="Price history">📈</button></td>
               </tr>
             );
           })}
