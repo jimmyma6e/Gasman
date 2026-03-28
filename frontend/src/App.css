@@ -31,6 +31,24 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Main ── */
 .main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
+/* ── Insights Panel ── */
+.insights-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
+.insights-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.insights-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 600; }
+.insights-summary-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.insight-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 0.78rem; color: var(--text-dim); }
+.insight-pill strong { color: var(--text); }
+.pill-up { border-color: rgba(239,68,68,0.4); color: var(--red); }
+.pill-up strong { color: var(--red); }
+.pill-down { border-color: rgba(34,197,94,0.4); color: var(--green); }
+.pill-down strong { color: var(--green); }
+.insights-areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.insight-area-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.insight-area-name { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.insight-area-today { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+.insight-area-change { font-size: 0.72rem; font-weight: 600; margin-top: 2px; }
+.insight-area-ytd { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+
 /* ── Trend Banner ── */
 .trend-banner { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: var(--radius); margin-bottom: 20px; font-size: 0.9rem; flex-wrap: wrap; }
 .trend-up    { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.3); }

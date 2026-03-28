@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
+import InsightsPanel from "./components/InsightsPanel";
 
 const AREAS = [
   { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
@@ -304,6 +305,7 @@ export default function App() {
 
       <main className="main">
         {data?.trend && <TrendBanner trend={data.trend} />}
+        <InsightsPanel activeFuel={activeFuel} />
 
         {/* Tabs */}
         <div className="tabs-row">

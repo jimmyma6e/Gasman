@@ -5,6 +5,25 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "prices.db"
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
+AREA_CENTROIDS = [
+    ("Downtown Vancouver", 49.2827, -123.1207),
+    ("East Vancouver",     49.2640, -123.0586),
+    ("North Vancouver",    49.3163, -123.0724),
+    ("Richmond",           49.2045, -123.1116),
+    ("Burnaby",            49.2488, -122.9805),
+]
+
+def _assign_area(lat, lng):
+    if lat is None or lng is None:
+        return "Other"
+    best, min_d = AREA_CENTROIDS[0][0], float("inf")
+    for name, clat, clng in AREA_CENTROIDS:
+        d = (lat - clat) ** 2 + (lng - clng) ** 2
+        if d < min_d:
+            min_d = d
+            best = name
+    return best
+
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -95,6 +114,67 @@ def get_price_deltas() -> dict:
             if delta != 0:
                 result.setdefault(sid, {})[fuel] = delta
     return result
+
+
+def get_area_averages(fuel_type: str = "regular_gas") -> list:
+    """Average price per area for today (last 24h) and YTD."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        today_rows = conn.execute("""
+            SELECT latitude, longitude, AVG(price) as avg_price
+            FROM price_history
+            WHERE fuel_type = ?
+              AND recorded_at >= datetime('now', '-24 hours')
+              AND price IS NOT NULL
+            GROUP BY station_id
+        """, (fuel_type,)).fetchall()
+
+        ytd_rows = conn.execute("""
+            SELECT latitude, longitude, AVG(price) as avg_price
+            FROM price_history
+            WHERE fuel_type = ?
+              AND recorded_at >= strftime('%Y-01-01', 'now')
+              AND price IS NOT NULL
+            GROUP BY station_id
+        """, (fuel_type,)).fetchall()
+
+    def group_by_area(rows):
+        buckets: dict = {}
+        for r in rows:
+            area = _assign_area(r["latitude"], r["longitude"])
+            buckets.setdefault(area, []).append(r["avg_price"])
+        return {a: round(sum(p) / len(p), 1) for a, p in buckets.items()}
+
+    today_map = group_by_area(today_rows)
+    ytd_map   = group_by_area(ytd_rows)
+
+    result = []
+    for name, _, _ in AREA_CENTROIDS:
+        avg_today = today_map.get(name)
+        avg_ytd   = ytd_map.get(name)
+        change    = round(avg_today - avg_ytd, 1) if avg_today and avg_ytd else None
+        result.append({"area": name, "avg_today": avg_today, "avg_ytd": avg_ytd, "change": change})
+    return result
+
+
+def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
+    """Overall average: today (last 24h) vs year-to-date."""
+    with sqlite3.connect(DB_PATH) as conn:
+        r_today = conn.execute("""
+            SELECT AVG(price) FROM price_history
+            WHERE fuel_type = ? AND recorded_at >= datetime('now', '-24 hours') AND price IS NOT NULL
+        """, (fuel_type,)).fetchone()
+        r_ytd = conn.execute("""
+            SELECT AVG(price) FROM price_history
+            WHERE fuel_type = ? AND recorded_at >= strftime('%Y-01-01', 'now') AND price IS NOT NULL
+        """, (fuel_type,)).fetchone()
+
+    today_avg = round(r_today[0], 1) if r_today and r_today[0] else None
+    ytd_avg   = round(r_ytd[0],   1) if r_ytd   and r_ytd[0]   else None
+    change_pct = None
+    if today_avg and ytd_avg and ytd_avg > 0:
+        change_pct = round((today_avg - ytd_avg) / ytd_avg * 100, 1)
+    return {"today_avg": today_avg, "ytd_avg": ytd_avg, "change_pct": change_pct}
 
 
 def get_station_history(station_id: str, hours: int = 24) -> list:
