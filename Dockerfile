@@ -1,10 +1,10 @@
 # Stage 1: Build the React frontend
 FROM node:20-alpine AS frontend-build
-WORKDIR /app
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
-COPY frontend ./frontend
-RUN cd frontend && npm run build
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend .
+RUN npm run build
 
 # Stage 2: Python backend with Playwright Chromium
 FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
