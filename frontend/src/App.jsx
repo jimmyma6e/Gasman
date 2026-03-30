@@ -21,8 +21,8 @@ function getArea(lat, lng) {
   if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
   // North Vancouver: north of Burrard Inlet
   if (lat >= 49.305) return "North Vancouver";
-  // Coquitlam: east of Burnaby
-  if (lng > -122.82) return "Coquitlam";
+  // Coquitlam: east of Burnaby AND north of Fraser River (lat >= 49.20)
+  if (lng > -122.82 && lat >= 49.20) return "Coquitlam";
   // Surrey / Delta: south of Fraser main arm AND east of Richmond's eastern boundary (Fraser main arm ~lng -122.97)
   if (lat < 49.20 && lng > -122.97) return "Surrey";
   // Richmond: south of North Arm of Fraser, west of main arm
