@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
+import MapView from "./components/MapView";
 
 const AREAS = [
   { name: "Downtown Vancouver" },
@@ -16,23 +17,23 @@ const AREAS = [
 
 function getArea(lat, lng) {
   if (lat == null || lng == null) return "Other";
-  // West Vancouver: north of Burrard Inlet, west of Capilano
+  // West Vancouver: north of Burrard Inlet, west of Capilano River
   if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
   // North Vancouver: north of Burrard Inlet
   if (lat >= 49.305) return "North Vancouver";
-  // Surrey / Delta: south of Fraser River, east of Richmond
-  if (lat < 49.195 && lng > -123.04) return "Surrey";
-  // Richmond: south of Fraser River
-  if (lat < 49.215) return "Richmond";
   // Coquitlam: east of Burnaby
   if (lng > -122.82) return "Coquitlam";
+  // Surrey / Delta: south of Fraser main arm AND east of Richmond's eastern boundary (Fraser main arm ~lng -122.97)
+  if (lat < 49.20 && lng > -122.97) return "Surrey";
+  // Richmond: south of North Arm of Fraser, west of main arm
+  if (lat < 49.20) return "Richmond";
   // New Westminster: south Burnaby / New West corridor
   if (lng > -123.027 && lat < 49.225) return "New Westminster";
-  // Burnaby: east of Boundary Road
+  // Burnaby: east of Boundary Road (~lng -123.026)
   if (lng > -123.027) return "Burnaby";
-  // East Vancouver: east of Main St area
-  if (lng >= -123.09) return "East Vancouver";
-  // Everything else is Downtown Vancouver
+  // East Vancouver: east of Cambie/Main corridor
+  if (lng >= -123.10) return "East Vancouver";
+  // Downtown Vancouver / West Side
   return "Downtown Vancouver";
 }
 
@@ -68,18 +69,32 @@ function toggleSet(set, value) {
 }
 
 // ---------- Trend Banner ----------
-function TrendBanner({ trend }) {
-  if (!trend?.length) return null;
-  const bc = trend.find((t) => t.country === "CA") || trend[0];
-  if (!bc) return null;
-  const arrow = bc.trend === 1 ? "\u2191" : bc.trend === -1 ? "\u2193" : "\u2192";
-  const cls   = bc.trend === 1 ? "trend-up" : bc.trend === -1 ? "trend-down" : "trend-stable";
+function TrendBanner({ trend, stations, activeFuel }) {
+  const bc = trend?.find((t) => t.country === "CA") || trend?.[0];
+
+  const fuelLabel = FUEL_TYPES.find((f) => f.key === activeFuel)?.label ?? "Regular (87)";
+  const prices    = stations.map((s) => s[activeFuel]?.price).filter((p) => p != null && p > 0);
+  const avg       = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
+  const low       = prices.length ? Math.min(...prices) : null;
+
+  // For regular gas use GasBuddy trend; for others compare avg to regular avg
+  let trendDir = bc?.trend ?? 0;
+  if (activeFuel !== "regular_gas") {
+    const regPrices = stations.map((s) => s.regular_gas?.price).filter((p) => p != null && p > 0);
+    const regAvg    = regPrices.length ? regPrices.reduce((a, b) => a + b, 0) / regPrices.length : null;
+    trendDir = avg != null && regAvg != null ? (avg > regAvg ? 1 : avg < regAvg ? -1 : 0) : 0;
+  }
+  const arrow = trendDir === 1 ? "↑" : trendDir === -1 ? "↓" : "→";
+  const cls   = trendDir === 1 ? "trend-up" : trendDir === -1 ? "trend-down" : "trend-stable";
+
+  if (avg == null) return null;
+
   return (
     <div className={`trend-banner ${cls}`}>
-      <span className="trend-area">{bc.areaName}</span>
+      <span className="trend-area">{bc?.areaName ?? "Vancouver"}</span>
       <span className="trend-price">
-        {arrow} Avg today: <strong>{bc.today?.toFixed(1)}</strong>
-        {bc.todayLow ? ` \u00b7 Low: ${bc.todayLow.toFixed(1)}` : ""}
+        {fuelLabel} {arrow} Avg: <strong>{avg.toFixed(1)}¢/L</strong>
+        {low != null ? ` · Low: ${low.toFixed(1)}¢/L` : ""}
       </span>
     </div>
   );
@@ -129,13 +144,13 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea, isSelected, onSelect }) {
   const fuelData  = station[activeFuel];
   const isCheapest = fuelData?.price != null && fuelData.price > 0 && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
 
   return (
-    <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
+    <div className={`card ${isCheapest ? "card-cheapest" : ""} ${isSelected ? "card-selected" : ""}`} onClick={() => onSelect?.(station)}>
       {isCheapest && <div className="cheapest-tag">Cheapest</div>}
 
       <div className="card-top">
@@ -152,7 +167,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         </div>
         <button
           className={`btn-fav ${isFavourite ? "btn-fav-active" : ""}`}
-          onClick={() => onToggleFavourite(station.station_id)}
+          onClick={(e) => { e.stopPropagation(); onToggleFavourite(station.station_id); }}
           title={isFavourite ? "Remove from My Stations" : "Add to My Stations"}
         >
           {isFavourite ? "\u2605" : "\u2606"}
@@ -189,7 +204,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         {fuelData?.last_updated && (
           <span className="last-updated">Updated {timeAgo(fuelData.last_updated)}</span>
         )}
-        <button className="btn-chart" onClick={() => onOpenChart(station)}>
+        <button className="btn-chart" onClick={(e) => { e.stopPropagation(); onOpenChart(station); }}>
           📈 Price History
         </button>
       </div>
@@ -211,6 +226,8 @@ export default function App() {
   const [areaFilter, setAreaFilter]   = useState(new Set());
   const [brandFilter, setBrandFilter] = useState(new Set());
   const [viewMode, setViewMode]       = useState("card");
+  const [mapPanelOpen, setMapPanelOpen] = useState(false);
+  const [selectedStation, setSelectedStation] = useState(null);
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -252,7 +269,12 @@ export default function App() {
     _area: getArea(s.latitude, s.longitude),
   }));
 
-  const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))].sort();
+  const BRAND_ORDER = ["Chevron", "Shell", "Petro-Canada", "Esso"];
+  const allBrands = [...new Set(allStations.map((s) => s.name).filter(Boolean))];
+  const brands = [
+    ...BRAND_ORDER.filter((b) => allBrands.includes(b)),
+    ...allBrands.filter((b) => !BRAND_ORDER.includes(b)).sort(),
+  ];
 
   // Global cheapest — used for fuel tab price hints only
   const globalCheapest = {};
@@ -323,7 +345,7 @@ export default function App() {
       </header>
 
       <main className="main">
-        {data?.trend && <TrendBanner trend={data.trend} />}
+        {allStations.length > 0 && <TrendBanner trend={data?.trend} stations={allStations} activeFuel={activeFuel} />}
 
         <div className="tabs-row">
           <div className="tabs">
@@ -401,6 +423,14 @@ export default function App() {
             ))}
           </div>
           <div className="controls-right">
+            {viewMode !== "map" && (
+              <button
+                className={`btn-map-toggle ${mapPanelOpen ? "btn-map-toggle-active" : ""}`}
+                onClick={() => setMapPanelOpen((v) => !v)}
+              >
+                🗺 {mapPanelOpen ? "Hide Map" : "Show Map"}
+              </button>
+            )}
             {viewMode !== "table" && (
               <div className="sort-controls">
                 <label>Sort by</label>
@@ -417,11 +447,12 @@ export default function App() {
                 { id: "card",    icon: "\u229e", title: "Card view"    },
                 { id: "compact", icon: "\u2630", title: "Compact view" },
                 { id: "table",   icon: "\u229f", title: "Table view"   },
+                { id: "map",     icon: "🗺",     title: "Map view"     },
               ].map(({ id, icon, title }) => (
                 <button
                   key={id}
                   className={`view-btn ${viewMode === id ? "view-btn-active" : ""}`}
-                  onClick={() => setViewMode(id)}
+                  onClick={() => { setViewMode(id); if (id === "map") setMapPanelOpen(false); }}
                   title={title}
                 >
                   {icon}
@@ -449,81 +480,121 @@ export default function App() {
 
         {data && sorted.length > 0 && (
           <>
-            <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
+            <p className="station-count">
+              {sorted.length} station{sorted.length !== 1 ? "s" : ""}
+              {" · "}
+              {[...new Set(sorted.map((s) => s._area))].length} {[...new Set(sorted.map((s) => s._area))].length === 1 ? "city" : "cities"}
+            </p>
 
-            {viewMode === "card" && (
-              <div className="grid">
-                {sorted.map((station) => (
-                  <StationCard
-                    key={station.station_id}
-                    station={station}
-                    activeFuel={activeFuel}
+            <div className={mapPanelOpen && viewMode !== "map" ? "split-view" : ""}>
+              <div className="split-list">
+                {viewMode === "card" && (
+                  <div className="grid">
+                    {sorted.map((station) => (
+                      <StationCard
+                        key={station.station_id}
+                        station={station}
+                        activeFuel={activeFuel}
+                        cheapestPrices={cheapestPrices}
+                        isFavourite={favourites.includes(station.station_id)}
+                        onToggleFavourite={toggleFavourite}
+                        onOpenChart={setChartStation}
+                        showArea={sortBy === "city"}
+                        isSelected={selectedStation?.station_id === station.station_id}
+                        onSelect={setSelectedStation}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {viewMode === "compact" && (
+                  <div className="compact-list">
+                    {sorted.map((station) => {
+                      const fuelData = station[activeFuel];
+                      const isCheapest = fuelData?.price != null && fuelData.price > 0 && fuelData.price === cheapestPrices[activeFuel];
+                      const delta = station.price_delta?.[activeFuel];
+                      const isFav = favourites.includes(station.station_id);
+                      const isSelected = selectedStation?.station_id === station.station_id;
+                      return (
+                        <div
+                          key={station.station_id}
+                          className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`}
+                          onClick={() => setSelectedStation(station)}
+                        >
+                          <button
+                            className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
+                            onClick={(e) => { e.stopPropagation(); toggleFavourite(station.station_id); }}
+                          >
+                            {isFav ? "\u2605" : "\u2606"}
+                          </button>
+                          <div className="compact-info">
+                            <span className="compact-name">{station.name}</span>
+                            <a
+                              className="compact-addr"
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {station.address}, {station._area}
+                            </a>
+                          </div>
+                          <div className="compact-price">
+                            {fuelData?.price != null && fuelData.price > 0 ? (
+                              <>
+                                <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
+                                  {formatPrice(fuelData.price, station.unit_of_measure)}
+                                </span>
+                                {delta != null && (
+                                  <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
+                                    {delta > 0 ? "\u2191" : "\u2193"}{Math.abs(delta).toFixed(1)}
+                                  </span>
+                                )}
+                              </>
+                            ) : <span className="tbl-empty">—</span>}
+                          </div>
+                          <button className="btn-chart btn-chart-sm" onClick={(e) => { e.stopPropagation(); setChartStation(station); }} title="Price history">📈</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {viewMode === "table" && (
+                  <StationTable
+                    stations={sorted}
                     cheapestPrices={cheapestPrices}
-                    isFavourite={favourites.includes(station.station_id)}
+                    favourites={favourites}
                     onToggleFavourite={toggleFavourite}
                     onOpenChart={setChartStation}
-                    showArea={sortBy === "city"}
+                    selectedStation={selectedStation}
+                    onSelectStation={setSelectedStation}
                   />
-                ))}
-              </div>
-            )}
+                )}
 
-            {viewMode === "compact" && (
-              <div className="compact-list">
-                {sorted.map((station) => {
-                  const fuelData = station[activeFuel];
-                  const isCheapest = fuelData?.price != null && fuelData.price > 0 && fuelData.price === cheapestPrices[activeFuel];
-                  const delta = station.price_delta?.[activeFuel];
-                  const isFav = favourites.includes(station.station_id);
-                  return (
-                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""}`}>
-                      <button
-                        className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
-                        onClick={() => toggleFavourite(station.station_id)}
-                      >
-                        {isFav ? "\u2605" : "\u2606"}
-                      </button>
-                      <div className="compact-info">
-                        <span className="compact-name">{station.name}</span>
-                        <a
-                          className="compact-addr"
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {station.address}, {station._area}
-                        </a>
-                      </div>
-                      <div className="compact-price">
-                        {fuelData?.price != null && fuelData.price > 0 ? (
-                          <>
-                            <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
-                              {formatPrice(fuelData.price, station.unit_of_measure)}
-                            </span>
-                            {delta != null && (
-                              <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
-                                {delta > 0 ? "\u2191" : "\u2193"}{Math.abs(delta).toFixed(1)}
-                              </span>
-                            )}
-                          </>
-                        ) : <span className="tbl-empty">—</span>}
-                      </div>
-                      <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
-                    </div>
-                  );
-                })}
+                {viewMode === "map" && (
+                  <MapView
+                    stations={sorted}
+                    activeFuel={activeFuel}
+                    onOpenChart={setChartStation}
+                    selectedStation={selectedStation}
+                    onSelectStation={setSelectedStation}
+                  />
+                )}
               </div>
-            )}
 
-            {viewMode === "table" && (
-              <StationTable
-                stations={sorted}
-                cheapestPrices={cheapestPrices}
-                favourites={favourites}
-                onToggleFavourite={toggleFavourite}
-                onOpenChart={setChartStation}
-              />
-            )}
+              {mapPanelOpen && viewMode !== "map" && (
+                <div className="split-map">
+                  <MapView
+                    stations={sorted}
+                    activeFuel={activeFuel}
+                    onOpenChart={setChartStation}
+                    selectedStation={selectedStation}
+                    onSelectStation={setSelectedStation}
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
       </main>

@@ -1,15 +1,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d26;
-  --surface2: #22263a;
-  --border: #2e3245;
-  --accent: #f59e0b;
-  --green: #22c55e;
-  --red: #ef4444;
-  --text: #e2e8f0;
-  --text-dim: #94a3b8;
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface2: #eef1f6;
+  --border: #dde3ed;
+  --accent: #f97316;
+  --green: #16a34a;
+  --red: #dc2626;
+  --text: #1e293b;
+  --text-dim: #64748b;
   --radius: 12px;
 }
 
@@ -90,6 +90,11 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .sort-controls { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim); }
 .sort-controls select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
 
+/* ── Map toggle button ── */
+.btn-map-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 6px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-map-toggle:hover { border-color: var(--accent); color: var(--text); }
+.btn-map-toggle-active { background: rgba(245,158,11,0.15); border-color: var(--accent); color: var(--accent); }
+
 /* ── View toggle ── */
 .view-toggle { display: flex; gap: 4px; }
 .view-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); width: 34px; height: 34px; border-radius: 8px; font-size: 1.1rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
@@ -99,8 +104,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Compact list view ── */
 .compact-list { display: flex; flex-direction: column; gap: 6px; }
 .compact-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; transition: border-color 0.15s; }
-.compact-row:hover { border-color: #4a5280; }
-.compact-cheapest { border-color: var(--accent) !important; background: linear-gradient(90deg, #1a1d26, #1e2010); }
+.compact-row:hover { border-color: var(--accent); }
+.compact-cheapest { border-color: var(--accent) !important; background: linear-gradient(90deg, var(--surface), #fff8f0); }
 .compact-info { flex: 1; min-width: 0; }
 .compact-name { font-weight: 600; font-size: 0.9rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .compact-addr { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; text-decoration: none; }
@@ -119,8 +124,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Card ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; }
-.card:hover { border-color: #4a5280; transform: translateY(-1px); }
-.card-cheapest { border-color: var(--accent) !important; background: linear-gradient(135deg, #1a1d26, #1e2010); }
+.card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.card-cheapest { border-color: var(--accent) !important; background: linear-gradient(135deg, var(--surface), #fff8f0); }
 .cheapest-tag { position: absolute; top: -1px; right: 12px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 0 0 6px 6px; text-transform: uppercase; letter-spacing: 0.05em; }
 
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -181,7 +186,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .chart-stat-value { font-size: 1rem; font-weight: 700; }
 .chart-stat-value.green { color: var(--green); }
 .chart-stat-value.red   { color: var(--red); }
-.chart-tooltip { background: #1a1d26; border: 1px solid #2e3245; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; }
+.chart-tooltip { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .chart-tooltip-time { color: var(--text-dim); margin-bottom: 6px; font-size: 0.78rem; }
 
 /* ── States ── */
@@ -218,6 +223,24 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .tbl-empty { color: var(--text-dim); }
 .tbl-updated { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
 
+/* ── Split view (list + map panel) ── */
+.split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.split-list { min-width: 0; }
+.split-map { position: sticky; top: 76px; height: calc(100vh - 96px); }
+.split-map > div { height: 100%; }
+.split-map .leaflet-container { height: 100% !important; border-radius: var(--radius); }
+
+/* Selected states */
+.card-selected { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(249,115,22,0.2); }
+.compact-selected { border-color: var(--accent) !important; background: #fff8f0; }
+.compact-row { cursor: pointer; }
+
+@media (max-width: 900px) {
+  .split-view { grid-template-columns: 1fr; }
+  .split-map { position: static; height: 350px; order: -1; }
+  .split-map .leaflet-container { height: 100% !important; }
+}
+
 @media (max-width: 600px) {
   /* Header */
   .header-inner { padding: 10px 14px; gap: 8px; }
@@ -233,10 +256,12 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .btn-clear-filters { padding: 8px 10px; font-size: 0.78rem; }
 
   /* Filter chips — scrollable row, no wrap */
-  .filter-section { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: 6px; }
+  .filter-section { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: 6px; position: relative; }
   .filter-section::-webkit-scrollbar { display: none; }
   .filter-label { display: none; }
   .chip-row { flex-wrap: nowrap; }
+  /* Scroll fade indicator */
+  .filter-section::after { content: ''; position: sticky; right: 0; flex-shrink: 0; width: 40px; background: linear-gradient(to right, transparent, var(--bg) 80%); pointer-events: none; align-self: stretch; margin-left: -40px; }
   .brand-chip { font-size: 0.75rem; padding: 4px 10px; white-space: nowrap; }
 
   /* Fuel tabs — horizontal scroll */
@@ -263,6 +288,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .compact-row { padding: 8px 10px; gap: 8px; }
   .compact-name { font-size: 0.85rem; }
   .compact-badge { font-size: 0.92rem; }
+  .compact-row .btn-chart-sm { display: none; }
+  .compact-price { min-width: 70px; }
 
   /* Table */
   .tbl-area, .tbl-updated-col, .tbl-updated { display: none; }
