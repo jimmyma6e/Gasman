@@ -3,27 +3,43 @@ import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
 
 const AREAS = [
-  { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
-  { name: "East Vancouver",     lat: 49.2640, lng: -123.0586 },
-  { name: "North Vancouver",    lat: 49.3163, lng: -123.0724 },
-  { name: "Richmond",           lat: 49.2045, lng: -123.1116 },
-  { name: "Burnaby",            lat: 49.2488, lng: -122.9805 },
+  { name: "Downtown Vancouver" },
+  { name: "East Vancouver"     },
+  { name: "North Vancouver"    },
+  { name: "West Vancouver"     },
+  { name: "Richmond"           },
+  { name: "Burnaby"            },
+  { name: "New Westminster"    },
+  { name: "Coquitlam"         },
+  { name: "Surrey"             },
 ];
 
 function getArea(lat, lng) {
   if (lat == null || lng == null) return "Other";
-  let best = AREAS[0], min = Infinity;
-  for (const a of AREAS) {
-    const d = (lat - a.lat) ** 2 + (lng - a.lng) ** 2;
-    if (d < min) { min = d; best = a; }
-  }
-  return best.name;
+  // West Vancouver: north of Burrard Inlet, west of Capilano
+  if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
+  // North Vancouver: north of Burrard Inlet
+  if (lat >= 49.305) return "North Vancouver";
+  // Surrey / Delta: south of Fraser River, east of Richmond
+  if (lat < 49.195 && lng > -123.04) return "Surrey";
+  // Richmond: south of Fraser River
+  if (lat < 49.215) return "Richmond";
+  // Coquitlam: east of Burnaby
+  if (lng > -122.82) return "Coquitlam";
+  // New Westminster: south Burnaby / New West corridor
+  if (lng > -123.027 && lat < 49.225) return "New Westminster";
+  // Burnaby: east of Boundary Road
+  if (lng > -123.027) return "Burnaby";
+  // East Vancouver: east of Main St area
+  if (lng >= -123.09) return "East Vancouver";
+  // Everything else is Downtown Vancouver
+  return "Downtown Vancouver";
 }
 
 const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular" },
-  { key: "midgrade_gas", label: "Mid" },
-  { key: "premium_gas",  label: "Premium" },
+  { key: "regular_gas",  label: "Regular (87)" },
+  { key: "midgrade_gas", label: "Mid (89)" },
+  { key: "premium_gas",  label: "Premium (91)" },
   { key: "diesel",       label: "Diesel" },
 ];
 
@@ -92,7 +108,7 @@ function ChartModal({ station, onClose }) {
               {station.address}, {station._area}
             </a>
           </div>
-          <button className="modal-close" onClick={onClose}>\u2715</button>
+          <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-prices">
           {FUEL_TYPES.map(({ key, label }) => {
@@ -115,7 +131,7 @@ function ChartModal({ station, onClose }) {
 // ---------- Station Card ----------
 function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea }) {
   const fuelData  = station[activeFuel];
-  const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
+  const isCheapest = fuelData?.price != null && fuelData.price > 0 && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
 
   return (
@@ -150,7 +166,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
           return (
             <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
               <span className="fuel-label">{label}</span>
-              {price != null ? (
+              {price != null && price > 0 ? (
                 <div className="fuel-price-row">
                   <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
                     {formatPrice(price, station.unit_of_measure)}
@@ -162,7 +178,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
                   )}
                 </div>
               ) : (
-                <span className="badge badge-empty">\u2014</span>
+                <span className="badge badge-empty">—</span>
               )}
             </div>
           );
@@ -174,7 +190,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
           <span className="last-updated">Updated {timeAgo(fuelData.last_updated)}</span>
         )}
         <button className="btn-chart" onClick={() => onOpenChart(station)}>
-          \ud83d\udcc8 Price History
+          📈 Price History
         </button>
       </div>
     </div>
@@ -241,7 +257,7 @@ export default function App() {
   // Global cheapest — used for fuel tab price hints only
   const globalCheapest = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = allStations.map((s) => s[key]?.price).filter((p) => p != null);
+    const prices = allStations.map((s) => s[key]?.price).filter((p) => p != null && p > 0);
     globalCheapest[key] = prices.length ? Math.min(...prices) : null;
   }
 
@@ -257,7 +273,7 @@ export default function App() {
   // Cheapest within filtered set — drives "Cheapest" badge on cards
   const cheapestPrices = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = filtered.map((s) => s[key]?.price).filter((p) => p != null);
+    const prices = filtered.map((s) => s[key]?.price).filter((p) => p != null && p > 0);
     cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
   }
 
@@ -265,13 +281,18 @@ export default function App() {
     return FUEL_TYPES.map((f) => s[f.key]?.last_updated).filter(Boolean).sort().at(-1) ?? "";
   }
 
+  function sortPrice(s) {
+    const p = s[activeFuel]?.price;
+    return p != null && p > 0 ? p : Infinity;
+  }
+
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "price") {
-      return (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
+      return sortPrice(a) - sortPrice(b);
     }
     if (sortBy === "city") {
       const cmp = a._area.localeCompare(b._area);
-      return cmp !== 0 ? cmp : (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
+      return cmp !== 0 ? cmp : sortPrice(a) - sortPrice(b);
     }
     if (sortBy === "updated") {
       return latestUpdate(b).localeCompare(latestUpdate(a));
@@ -286,7 +307,7 @@ export default function App() {
       <header className="header">
         <div className="header-inner">
           <div className="header-title">
-            <span className="header-icon">\u26fd</span>
+            <span className="header-icon">⛽</span>
             <div>
               <h1>Vancouver Gas Prices</h1>
               <p className="header-sub">Greater Vancouver Area</p>
@@ -311,7 +332,7 @@ export default function App() {
               {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
             </button>
             <button className={`tab-nav ${tab === "mine" ? "tab-nav-active" : ""}`} onClick={() => setTab("mine")}>
-              \u2605 My Stations
+              ★ My Stations
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
             </button>
           </div>
@@ -321,7 +342,7 @@ export default function App() {
           <input
             className="search-input"
             type="search"
-            placeholder="Search stations or address\u2026"
+            placeholder="Search stations or address…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -420,9 +441,9 @@ export default function App() {
 
         {tab === "mine" && favourites.length === 0 && (
           <div className="empty-state">
-            <p style={{ fontSize: "2.5rem" }}>\u2606</p>
+            <p style={{ fontSize: "2.5rem" }}>☆</p>
             <p><strong>No favourite stations yet</strong></p>
-            <p>Click the \u2606 on any station to add it here.</p>
+            <p>Click the ☆ on any station to add it here.</p>
           </div>
         )}
 
@@ -451,7 +472,7 @@ export default function App() {
               <div className="compact-list">
                 {sorted.map((station) => {
                   const fuelData = station[activeFuel];
-                  const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
+                  const isCheapest = fuelData?.price != null && fuelData.price > 0 && fuelData.price === cheapestPrices[activeFuel];
                   const delta = station.price_delta?.[activeFuel];
                   const isFav = favourites.includes(station.station_id);
                   return (
@@ -474,7 +495,7 @@ export default function App() {
                         </a>
                       </div>
                       <div className="compact-price">
-                        {fuelData?.price != null ? (
+                        {fuelData?.price != null && fuelData.price > 0 ? (
                           <>
                             <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
                               {formatPrice(fuelData.price, station.unit_of_measure)}
@@ -485,9 +506,9 @@ export default function App() {
                               </span>
                             )}
                           </>
-                        ) : <span className="tbl-empty">\u2014</span>}
+                        ) : <span className="tbl-empty">—</span>}
                       </div>
-                      <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">\ud83d\udcc8</button>
+                      <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
                     </div>
                   );
                 })}

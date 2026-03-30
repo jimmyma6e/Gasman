@@ -31,8 +31,14 @@ SEARCH_COORDS = [
     (49.2827, -123.1207),  # Downtown Vancouver
     (49.2640, -123.0586),  # East Vancouver
     (49.3163, -123.0724),  # North Vancouver
-    (49.2045, -123.1116),  # Richmond / South Van
-    (49.2488, -122.9805),  # Burnaby
+    (49.2045, -123.1116),  # Richmond North
+    (49.1700, -123.1380),  # Richmond Central
+    (49.2488, -122.9805),  # Burnaby West
+    (49.2650, -122.9200),  # Burnaby East
+    (49.3667, -123.1670),  # West Vancouver
+    (49.2837, -122.8310),  # Coquitlam
+    (49.2057, -122.9110),  # New Westminster
+    (49.1045, -122.8490),  # Surrey / Delta
 ]
 
 CACHE_TTL = timedelta(minutes=30)

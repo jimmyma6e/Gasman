@@ -1,10 +1,10 @@
 import { useState } from "react";
 
 const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular" },
-  { key: "midgrade_gas", label: "Mid"     },
-  { key: "premium_gas",  label: "Premium" },
-  { key: "diesel",       label: "Diesel"  },
+  { key: "regular_gas",  label: "Regular (87)" },
+  { key: "midgrade_gas", label: "Mid (89)"     },
+  { key: "premium_gas",  label: "Premium (91)" },
+  { key: "diesel",       label: "Diesel"       },
 ];
 
 function formatPrice(price, unit) {
@@ -44,8 +44,8 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
   const sorted = [...stations].sort((a, b) => {
     if (sortCol === "name") return sortDir * a.name.localeCompare(b.name);
     if (sortCol === "area") return sortDir * (a._area ?? "").localeCompare(b._area ?? "");
-    const av = a[sortCol]?.price ?? Infinity;
-    const bv = b[sortCol]?.price ?? Infinity;
+    const av = a[sortCol]?.price > 0 ? a[sortCol].price : Infinity;
+    const bv = b[sortCol]?.price > 0 ? b[sortCol].price : Infinity;
     return sortDir * (av - bv);
   });
 
@@ -91,10 +91,10 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
                 <td className="tbl-td tbl-area">{s._area}</td>
                 {FUEL_TYPES.map(({ key }) => {
                   const price = s[key]?.price;
-                  const isCheap = price != null && price === cheapestPrices[key];
+                  const isCheap = price != null && price > 0 && price === cheapestPrices[key];
                   return (
                     <td key={key} className={`tbl-td tbl-price ${isCheap ? "tbl-cheapest" : ""}`}>
-                      {price != null ? <span className="tbl-price-inner">{formatPrice(price, s.unit_of_measure)}<DeltaBadge delta={deltas[key]} /></span> : <span className="tbl-empty">—</span>}
+                      {price != null && price > 0 ? <span className="tbl-price-inner">{formatPrice(price, s.unit_of_measure)}<DeltaBadge delta={deltas[key]} /></span> : <span className="tbl-empty">—</span>}
                     </td>
                   );
                 })}
