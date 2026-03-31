@@ -6,6 +6,7 @@ import MapView from "./components/MapView";
 
 const AREAS = [
   { name: "Downtown Vancouver" },
+  { name: "Vancouver"          },
   { name: "East Vancouver"     },
   { name: "North Vancouver"    },
   { name: "West Vancouver"     },
@@ -34,8 +35,10 @@ function getArea(lat, lng) {
   if (lng > -123.027) return "Burnaby";
   // East Vancouver: east of Cambie/Main corridor
   if (lng >= -123.10) return "East Vancouver";
-  // Downtown Vancouver / West Side
-  return "Downtown Vancouver";
+  // Downtown Vancouver: the peninsula north of False Creek (lat >= 49.265)
+  if (lat >= 49.265) return "Downtown Vancouver";
+  // Vancouver: Kitsilano, South Granville, Marpole, Fairview, etc.
+  return "Vancouver";
 }
 
 const FUEL_TYPES = [
