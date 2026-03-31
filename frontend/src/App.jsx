@@ -6,6 +6,7 @@ import MapView from "./components/MapView";
 
 const AREAS = [
   { name: "Downtown Vancouver" },
+  { name: "East Vancouver"     },
   { name: "Vancouver"          },
   { name: "Surrey"             },
   { name: "Burnaby"            },
@@ -54,8 +55,9 @@ function getArea(lat, lng) {
   if (lng > -123.027)                return "Burnaby";
 
   // ── City of Vancouver (lat 49.20–49.305, west of Boundary Rd) ──
-  if (lat >= 49.265) return "Downtown Vancouver";  // peninsula / West End
-  if (lat >= 49.20)  return "Vancouver";           // Kitsilano, Marpole, South Granville…
+  if (lng >= -123.10) return "East Vancouver";     // east of Main St / Ontario St
+  if (lat >= 49.265)  return "Downtown Vancouver"; // peninsula / West End / Yaletown
+  if (lat >= 49.20)   return "Vancouver";          // Kitsilano, Marpole, South Granville…
 
   return "Other";
 }
