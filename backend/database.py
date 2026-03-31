@@ -1,8 +1,10 @@
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "prices.db"
+# Use $DB_PATH env var if set (Railway volume), otherwise fall back to local file
+DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent / "prices.db"))
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
 AREA_CENTROIDS = [
