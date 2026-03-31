@@ -1,59 +1,51 @@
 import os
-import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 
-# Use $DB_PATH env var if set (Railway volume), otherwise fall back to local file
-DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent / "prices.db"))
+import psycopg2
+import psycopg2.extras
+
+# Railway injects DATABASE_URL automatically when a Postgres service is linked.
+# Falls back to SQLite-style path warning so local dev fails fast with a clear message.
+_DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if _DATABASE_URL.startswith("postgres://"):
+    # psycopg2 requires postgresql:// scheme
+    _DATABASE_URL = _DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
-AREA_CENTROIDS = [
-    ("Downtown Vancouver", 49.2827, -123.1207),
-    ("East Vancouver",     49.2640, -123.0586),
-    ("North Vancouver",    49.3163, -123.0724),
-    ("Richmond",           49.2045, -123.1116),
-    ("Burnaby",            49.2488, -122.9805),
-]
 
-def _assign_area(lat, lng):
-    if lat is None or lng is None:
-        return "Other"
-    best, min_d = AREA_CENTROIDS[0][0], float("inf")
-    for name, clat, clng in AREA_CENTROIDS:
-        d = (lat - clat) ** 2 + (lng - clng) ** 2
-        if d < min_d:
-            min_d = d
-            best = name
-    return best
+def _conn():
+    if not _DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+    return psycopg2.connect(_DATABASE_URL)
 
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS price_history (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            station_id  TEXT NOT NULL,
-            name        TEXT,
-            address     TEXT,
-            latitude    REAL,
-            longitude   REAL,
-            fuel_type   TEXT NOT NULL,
-            price       REAL,
-            currency    TEXT,
-            unit        TEXT,
-            recorded_at TEXT NOT NULL
-        )
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_station_fuel_time
-        ON price_history (station_id, fuel_type, recorded_at)
-    """)
-    conn.commit()
-    conn.close()
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id          SERIAL PRIMARY KEY,
+                    station_id  TEXT NOT NULL,
+                    name        TEXT,
+                    address     TEXT,
+                    latitude    DOUBLE PRECISION,
+                    longitude   DOUBLE PRECISION,
+                    fuel_type   TEXT NOT NULL,
+                    price       DOUBLE PRECISION,
+                    currency    TEXT,
+                    unit        TEXT,
+                    recorded_at TIMESTAMPTZ NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_station_fuel_time
+                ON price_history (station_id, fuel_type, recorded_at)
+            """)
 
 
 def insert_prices(stations: list):
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
     rows = []
     for station in stations:
         for fuel_type in FUEL_TYPES:
@@ -72,30 +64,33 @@ def insert_prices(stations: list):
                     now,
                 ))
     if rows:
-        conn = sqlite3.connect(DB_PATH)
-        conn.executemany("""
-            INSERT INTO price_history
-            (station_id, name, address, latitude, longitude,
-             fuel_type, price, currency, unit, recorded_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, rows)
-        conn.commit()
-        conn.close()
+        with _conn() as conn:
+            with conn.cursor() as cur:
+                psycopg2.extras.execute_values(cur, """
+                    INSERT INTO price_history
+                    (station_id, name, address, latitude, longitude,
+                     fuel_type, price, currency, unit, recorded_at)
+                    VALUES %s
+                """, rows)
 
 
 def get_price_deltas() -> dict:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        times = conn.execute(
-            "SELECT DISTINCT recorded_at FROM price_history ORDER BY recorded_at DESC LIMIT 2"
-        ).fetchall()
-        if len(times) < 2:
-            return {}
-        t_now, t_prev = times[0]["recorded_at"], times[1]["recorded_at"]
-        rows = conn.execute(
-            "SELECT station_id, fuel_type, price, recorded_at FROM price_history WHERE recorded_at IN (?, ?)",
-            (t_now, t_prev),
-        ).fetchall()
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT DISTINCT recorded_at FROM price_history
+                ORDER BY recorded_at DESC LIMIT 2
+            """)
+            times = cur.fetchall()
+            if len(times) < 2:
+                return {}
+            t_now, t_prev = times[0]["recorded_at"], times[1]["recorded_at"]
+            cur.execute("""
+                SELECT station_id, fuel_type, price, recorded_at
+                FROM price_history
+                WHERE recorded_at IN (%s, %s)
+            """, (t_now, t_prev))
+            rows = cur.fetchall()
 
     current, previous = {}, {}
     for r in rows:
@@ -115,58 +110,52 @@ def get_price_deltas() -> dict:
 
 
 def get_area_averages(fuel_type: str = "regular_gas") -> list:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        today_rows = conn.execute("""
-            SELECT latitude, longitude, AVG(price) as avg_price
-            FROM price_history
-            WHERE fuel_type = ?
-              AND recorded_at >= datetime('now', '-24 hours')
-              AND price IS NOT NULL
-            GROUP BY station_id
-        """, (fuel_type,)).fetchall()
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT latitude, longitude, AVG(price) as avg_price
+                FROM price_history
+                WHERE fuel_type = %s
+                  AND recorded_at >= NOW() - INTERVAL '24 hours'
+                  AND price IS NOT NULL
+                GROUP BY station_id, latitude, longitude
+            """, (fuel_type,))
+            today_rows = cur.fetchall()
 
-        ytd_rows = conn.execute("""
-            SELECT latitude, longitude, AVG(price) as avg_price
-            FROM price_history
-            WHERE fuel_type = ?
-              AND recorded_at >= strftime('%Y-01-01', 'now')
-              AND price IS NOT NULL
-            GROUP BY station_id
-        """, (fuel_type,)).fetchall()
+            cur.execute("""
+                SELECT latitude, longitude, AVG(price) as avg_price
+                FROM price_history
+                WHERE fuel_type = %s
+                  AND recorded_at >= date_trunc('year', NOW())
+                  AND price IS NOT NULL
+                GROUP BY station_id, latitude, longitude
+            """, (fuel_type,))
+            ytd_rows = cur.fetchall()
 
-    def group_by_area(rows):
-        buckets: dict = {}
-        for r in rows:
-            area = _assign_area(r["latitude"], r["longitude"])
-            buckets.setdefault(area, []).append(r["avg_price"])
-        return {a: round(sum(p) / len(p), 1) for a, p in buckets.items()}
-
-    today_map = group_by_area(today_rows)
-    ytd_map   = group_by_area(ytd_rows)
-
-    result = []
-    for name, _, _ in AREA_CENTROIDS:
-        avg_today = today_map.get(name)
-        avg_ytd   = ytd_map.get(name)
-        change    = round(avg_today - avg_ytd, 1) if avg_today and avg_ytd else None
-        result.append({"area": name, "avg_today": avg_today, "avg_ytd": avg_ytd, "change": change})
-    return result
+    return {"today": today_rows, "ytd": ytd_rows}
 
 
 def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
-    with sqlite3.connect(DB_PATH) as conn:
-        r_today = conn.execute("""
-            SELECT AVG(price) FROM price_history
-            WHERE fuel_type = ? AND recorded_at >= datetime('now', '-24 hours') AND price IS NOT NULL
-        """, (fuel_type,)).fetchone()
-        r_ytd = conn.execute("""
-            SELECT AVG(price) FROM price_history
-            WHERE fuel_type = ? AND recorded_at >= strftime('%Y-01-01', 'now') AND price IS NOT NULL
-        """, (fuel_type,)).fetchone()
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT AVG(price) FROM price_history
+                WHERE fuel_type = %s
+                  AND recorded_at >= NOW() - INTERVAL '24 hours'
+                  AND price IS NOT NULL
+            """, (fuel_type,))
+            today_avg = cur.fetchone()[0]
 
-    today_avg = round(r_today[0], 1) if r_today and r_today[0] else None
-    ytd_avg   = round(r_ytd[0],   1) if r_ytd   and r_ytd[0]   else None
+            cur.execute("""
+                SELECT AVG(price) FROM price_history
+                WHERE fuel_type = %s
+                  AND recorded_at >= date_trunc('year', NOW())
+                  AND price IS NOT NULL
+            """, (fuel_type,))
+            ytd_avg = cur.fetchone()[0]
+
+    today_avg = round(today_avg, 1) if today_avg else None
+    ytd_avg   = round(ytd_avg,   1) if ytd_avg   else None
     change_pct = None
     if today_avg and ytd_avg and ytd_avg > 0:
         change_pct = round((today_avg - ytd_avg) / ytd_avg * 100, 1)
@@ -174,14 +163,13 @@ def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
 
 
 def get_station_history(station_id: str, hours: int = 24) -> list:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("""
-        SELECT fuel_type, price, currency, unit, recorded_at
-        FROM price_history
-        WHERE station_id = ?
-          AND recorded_at >= datetime('now', ?)
-        ORDER BY recorded_at ASC
-    """, (station_id, f"-{hours} hours")).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT fuel_type, price, currency, unit, recorded_at
+                FROM price_history
+                WHERE station_id = %s
+                  AND recorded_at >= NOW() - make_interval(hours => %s)
+                ORDER BY recorded_at ASC
+            """, (station_id, hours))
+            return [dict(r) for r in cur.fetchall()]
