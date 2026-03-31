@@ -1,3 +1,4 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -31,7 +32,7 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
-    await poll_and_store()
+    asyncio.create_task(poll_and_store())  # run in background so healthcheck passes immediately
     scheduler.add_job(poll_and_store, "interval", minutes=30)
     scheduler.start()
     yield
