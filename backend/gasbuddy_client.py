@@ -28,17 +28,34 @@ logger = logging.getLogger(__name__)
 
 # search zones covering Greater Vancouver
 SEARCH_COORDS = [
+    # Vancouver
     (49.2827, -123.1207),  # Downtown Vancouver
-    (49.2640, -123.0586),  # East Vancouver
+    (49.2640, -123.0586),  # East Vancouver / Mount Pleasant
+    (49.2300, -123.1500),  # Vancouver West Side (Kitsilano, Marpole)
+    # North Shore
     (49.3163, -123.0724),  # North Vancouver
-    (49.2045, -123.1116),  # Richmond North
-    (49.1700, -123.1380),  # Richmond Central
+    (49.3667, -123.1670),  # West Vancouver
+    # Burnaby / New Westminster
     (49.2488, -122.9805),  # Burnaby West
     (49.2650, -122.9200),  # Burnaby East
-    (49.3667, -123.1670),  # West Vancouver
-    (49.2837, -122.8310),  # Coquitlam
     (49.2057, -122.9110),  # New Westminster
-    (49.1045, -122.8490),  # Surrey / Delta
+    # Richmond / Delta
+    (49.2045, -123.1116),  # Richmond North
+    (49.1700, -123.1380),  # Richmond Central
+    (49.0900, -123.0800),  # Delta (Ladner / Tsawwassen)
+    # Surrey / White Rock / Langley
+    (49.1045, -122.8490),  # Surrey Central
+    (49.1600, -122.8450),  # Surrey North
+    (49.0253, -122.8027),  # White Rock
+    (49.1050, -122.6604),  # Langley City
+    (49.1900, -122.6800),  # Langley Township
+    # Tri-Cities
+    (49.2837, -122.8310),  # Coquitlam
+    (49.2607, -122.7800),  # Port Coquitlam
+    (49.2834, -122.8319),  # Port Moody
+    # Pitt Meadows / Maple Ridge
+    (49.2320, -122.6890),  # Pitt Meadows
+    (49.2200, -122.5980),  # Maple Ridge
 ]
 
 CACHE_TTL = timedelta(minutes=30)

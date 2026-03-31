@@ -7,38 +7,55 @@ import MapView from "./components/MapView";
 const AREAS = [
   { name: "Downtown Vancouver" },
   { name: "Vancouver"          },
-  { name: "East Vancouver"     },
+  { name: "Surrey"             },
+  { name: "Burnaby"            },
+  { name: "Richmond"           },
+  { name: "Coquitlam"         },
+  { name: "New Westminster"    },
   { name: "North Vancouver"    },
   { name: "West Vancouver"     },
-  { name: "Richmond"           },
-  { name: "Burnaby"            },
-  { name: "New Westminster"    },
-  { name: "Coquitlam"         },
-  { name: "Surrey"             },
+  { name: "Port Coquitlam"    },
+  { name: "Port Moody"         },
+  { name: "Maple Ridge"        },
+  { name: "White Rock"         },
+  { name: "Langley"            },
+  { name: "Pitt Meadows"       },
+  { name: "Delta"              },
 ];
 
 function getArea(lat, lng) {
   if (lat == null || lng == null) return "Other";
-  // West Vancouver: north of Burrard Inlet, west of Capilano River
+
+  // ── North Shore ──────────────────────────────────────────────
   if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
-  // North Vancouver: north of Burrard Inlet
   if (lat >= 49.305) return "North Vancouver";
-  // Coquitlam: east of Burnaby AND north of Fraser River (lat >= 49.20)
-  if (lng > -122.82 && lat >= 49.20) return "Coquitlam";
-  // Surrey / Delta: south of Fraser main arm AND east of Richmond's eastern boundary (Fraser main arm ~lng -122.97)
-  if (lat < 49.20 && lng > -122.97) return "Surrey";
-  // Richmond: south of North Arm of Fraser, west of main arm
-  if (lat < 49.20) return "Richmond";
-  // New Westminster: south Burnaby / New West corridor
-  if (lng > -123.027 && lat < 49.225) return "New Westminster";
-  // Burnaby: east of Boundary Road (~lng -123.026)
-  if (lng > -123.027) return "Burnaby";
-  // East Vancouver: east of Cambie/Main corridor
-  if (lng >= -123.10) return "East Vancouver";
-  // Downtown Vancouver: the peninsula north of False Creek (lat >= 49.265)
-  if (lat >= 49.265) return "Downtown Vancouver";
-  // Vancouver: Kitsilano, South Granville, Marpole, Fairview, etc.
-  return "Vancouver";
+
+  // ── Port Moody: east end of Burrard Inlet ────────────────────
+  if (lat >= 49.27 && lng >= -122.88 && lng <= -122.77) return "Port Moody";
+
+  // ── Northeast (most-east first) ──────────────────────────────
+  if (lat >= 49.20 && lng >= -122.64) return "Maple Ridge";
+  if (lat >= 49.20 && lng >= -122.73) return "Pitt Meadows";
+  if (lat >= 49.20 && lng >= -122.79) return "Port Coquitlam";
+  if (lat >= 49.20 && lng >  -122.87) return "Coquitlam";
+
+  // ── South of Fraser River ────────────────────────────────────
+  if (lat < 49.20) {
+    if (lng >= -122.65)                        return "Langley";
+    if (lat < 49.06 && lng >= -122.85)         return "White Rock";
+    if (lng >= -122.97)                        return "Surrey";
+    if (lat < 49.12)                           return "Delta";   // Tsawwassen / Ladner
+    if (lat < 49.16 && lng >= -123.02)         return "Delta";   // North Delta
+    return "Richmond";
+  }
+
+  // ── Inner Metro ──────────────────────────────────────────────
+  if (lng > -122.97 && lat < 49.225) return "New Westminster";
+  if (lng > -123.027)                return "Burnaby";
+
+  // ── City of Vancouver ────────────────────────────────────────
+  if (lat >= 49.265) return "Downtown Vancouver";  // peninsula / West End
+  return "Vancouver";                              // Kitsilano, Marpole, South Granville…
 }
 
 const FUEL_TYPES = [
