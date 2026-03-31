@@ -206,7 +206,7 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         for i, (lat, lng) in enumerate(SEARCH_COORDS):
             if i > 0:
-                await asyncio.sleep(2.5)  # avoid 429 rate limiting
+                await asyncio.sleep(8)  # avoid 429 rate limiting
 
             logger.info("  /graphql for (%.4f, %.4f) …", lat, lng)
             try:
