@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
 import MapView from "./components/MapView";
@@ -226,6 +227,8 @@ export default function App() {
   const [areaFilter, setAreaFilter]   = useState(new Set());
   const [brandFilter, setBrandFilter] = useState(new Set());
   const [brandMenuOpen, setBrandMenuOpen] = useState(false);
+  const [brandMenuPos, setBrandMenuPos] = useState({ top: 0, left: 0 });
+  const brandBtnRef = useRef(null);
   const [viewMode, setViewMode]       = useState("card");
   const [mapPanelOpen, setMapPanelOpen] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
@@ -415,15 +418,25 @@ export default function App() {
               {overflowBrands.length > 0 && (
                 <div className="brand-more-wrap">
                   <button
+                    ref={brandBtnRef}
                     className={`brand-chip brand-more-btn ${overflowBrands.some(b => brandFilter.has(b)) ? "brand-chip-active" : ""}`}
-                    onClick={() => setBrandMenuOpen((o) => !o)}
+                    onClick={() => {
+                      if (!brandMenuOpen && brandBtnRef.current) {
+                        const r = brandBtnRef.current.getBoundingClientRect();
+                        setBrandMenuPos({ top: r.bottom + window.scrollY + 6, left: r.left + window.scrollX });
+                      }
+                      setBrandMenuOpen((o) => !o);
+                    }}
                   >
                     {overflowBrands.some(b => brandFilter.has(b))
                       ? `${overflowBrands.filter(b => brandFilter.has(b)).length} more selected ▾`
                       : `+ ${overflowBrands.length} more ▾`}
                   </button>
-                  {brandMenuOpen && (
-                    <div className="brand-dropdown">
+                  {brandMenuOpen && createPortal(
+                    <div
+                      className="brand-dropdown"
+                      style={{ top: brandMenuPos.top, left: brandMenuPos.left }}
+                    >
                       {overflowBrands.map((b) => (
                         <button
                           key={b}
@@ -433,7 +446,8 @@ export default function App() {
                           {brandFilter.has(b) ? "✓ " : ""}{b}
                         </button>
                       ))}
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
               )}
