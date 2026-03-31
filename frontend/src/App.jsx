@@ -225,6 +225,7 @@ export default function App() {
   const [search, setSearch]     = useState("");
   const [areaFilter, setAreaFilter]   = useState(new Set());
   const [brandFilter, setBrandFilter] = useState(new Set());
+  const [brandMenuOpen, setBrandMenuOpen] = useState(false);
   const [viewMode, setViewMode]       = useState("card");
   const [mapPanelOpen, setMapPanelOpen] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
@@ -262,6 +263,15 @@ export default function App() {
     return () => clearInterval(id);
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!brandMenuOpen) return;
+    const handler = (e) => {
+      if (!e.target.closest(".brand-more-wrap")) setBrandMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [brandMenuOpen]);
+
   const allStations = data?.stations ?? [];
 
   const stationsWithArea = allStations.map((s) => ({
@@ -269,12 +279,11 @@ export default function App() {
     _area: getArea(s.latitude, s.longitude),
   }));
 
-  const BRAND_ORDER = ["Chevron", "Shell", "Petro-Canada", "Esso"];
+  const TOP_BRANDS = ["Chevron", "Shell", "Petro-Canada", "Esso", "Costco"];
   const allBrands = [...new Set(allStations.map((s) => s.name).filter(Boolean))];
-  const brands = [
-    ...BRAND_ORDER.filter((b) => allBrands.includes(b)),
-    ...allBrands.filter((b) => !BRAND_ORDER.includes(b)).sort(),
-  ];
+  const pinnedBrands = TOP_BRANDS.filter((b) => allBrands.includes(b));
+  const overflowBrands = allBrands.filter((b) => !TOP_BRANDS.includes(b)).sort();
+  const brands = [...pinnedBrands, ...overflowBrands];
 
   // Global cheapest — used for fuel tab price hints only
   const globalCheapest = {};
@@ -394,7 +403,7 @@ export default function App() {
           <div className="filter-section">
             <span className="filter-label">Brand</span>
             <div className="chip-row">
-              {brands.map((b) => (
+              {pinnedBrands.map((b) => (
                 <button
                   key={b}
                   className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
@@ -403,6 +412,31 @@ export default function App() {
                   {b}
                 </button>
               ))}
+              {overflowBrands.length > 0 && (
+                <div className="brand-more-wrap">
+                  <button
+                    className={`brand-chip brand-more-btn ${overflowBrands.some(b => brandFilter.has(b)) ? "brand-chip-active" : ""}`}
+                    onClick={() => setBrandMenuOpen((o) => !o)}
+                  >
+                    {overflowBrands.some(b => brandFilter.has(b))
+                      ? `${overflowBrands.filter(b => brandFilter.has(b)).length} more selected ▾`
+                      : `+ ${overflowBrands.length} more ▾`}
+                  </button>
+                  {brandMenuOpen && (
+                    <div className="brand-dropdown">
+                      {overflowBrands.map((b) => (
+                        <button
+                          key={b}
+                          className={`brand-dropdown-item ${brandFilter.has(b) ? "brand-dropdown-item-active" : ""}`}
+                          onClick={() => setBrandFilter(toggleSet(brandFilter, b))}
+                        >
+                          {brandFilter.has(b) ? "✓ " : ""}{b}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

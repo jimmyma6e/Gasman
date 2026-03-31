@@ -75,6 +75,41 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .brand-chip:hover { border-color: var(--accent); color: var(--text); }
 .brand-chip-active { background: rgba(245,158,11,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
+/* ── Brand overflow dropdown ── */
+.brand-more-wrap { position: relative; }
+.brand-more-btn { display: flex; align-items: center; gap: 4px; }
+.brand-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.brand-dropdown-item {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.brand-dropdown-item:hover { background: var(--surface2); }
+.brand-dropdown-item-active { color: var(--accent); font-weight: 600; background: rgba(245,158,11,0.08); }
+
 /* ── Clear filters button ── */
 .btn-clear-filters { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .btn-clear-filters:hover { border-color: var(--red); color: var(--red); }
