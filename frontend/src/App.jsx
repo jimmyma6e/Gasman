@@ -53,9 +53,11 @@ function getArea(lat, lng) {
   if (lng > -122.97 && lat < 49.225) return "New Westminster";
   if (lng > -123.027)                return "Burnaby";
 
-  // ── City of Vancouver ────────────────────────────────────────
+  // ── City of Vancouver (lat 49.20–49.305, west of Boundary Rd) ──
   if (lat >= 49.265) return "Downtown Vancouver";  // peninsula / West End
-  return "Vancouver";                              // Kitsilano, Marpole, South Granville…
+  if (lat >= 49.20)  return "Vancouver";           // Kitsilano, Marpole, South Granville…
+
+  return "Other";
 }
 
 const FUEL_TYPES = [
