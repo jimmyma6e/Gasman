@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
+import MapView from "./components/MapView";
 
 const AREAS = [
   "Downtown Vancouver", "East Vancouver", "Vancouver",
@@ -258,6 +259,8 @@ export default function App() {
   const [viewMode, setViewMode]         = useState("card");
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [showMap, setShowMap] = useState(false);
+  const [selectedStation, setSelectedStation] = useState(null);
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -499,6 +502,12 @@ export default function App() {
             ))}
           </div>
           <div className="controls-right">
+            <button
+              className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
+              onClick={() => setShowMap((v) => !v)}
+            >
+              🗺 Map
+            </button>
             {viewMode !== "table" && (
               <div className="sort-controls">
                 <label>Sort by</label>
@@ -549,11 +558,18 @@ export default function App() {
           <>
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
 
+            <div className={showMap ? "split-view" : ""}>
+              <div className={showMap ? "split-list" : ""}>
+
             {viewMode === "card" && (
               <div className="grid">
                 {sorted.map((station) => (
-                  <StationCard
+                  <div
                     key={station.station_id}
+                    className={selectedStation?.station_id === station.station_id ? "card-selected" : ""}
+                    onClick={() => setSelectedStation(station)}
+                  >
+                  <StationCard
                     station={station}
                     activeFuel={activeFuel}
                     cheapestPrices={cheapestPrices}
@@ -562,6 +578,7 @@ export default function App() {
                     onOpenChart={setChartStation}
                     showArea={sortBy === "city"}
                   />
+                  </div>
                 ))}
               </div>
             )}
@@ -573,8 +590,9 @@ export default function App() {
                   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
                   const delta = station.price_delta?.[activeFuel];
                   const isFav = favourites.includes(station.station_id);
+                  const isSelected = selectedStation?.station_id === station.station_id;
                   return (
-                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""}`}>
+                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => setSelectedStation(station)}>
                       <button
                         className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
                         onClick={() => toggleFavourite(station.station_id)}
@@ -622,6 +640,21 @@ export default function App() {
                 onOpenChart={setChartStation}
               />
             )}
+
+              </div>{/* end split-list */}
+
+              {showMap && (
+                <div className="split-map">
+                  <MapView
+                    stations={sorted}
+                    activeFuel={activeFuel}
+                    onOpenChart={setChartStation}
+                    selectedStation={selectedStation}
+                    onSelectStation={setSelectedStation}
+                  />
+                </div>
+              )}
+            </div>{/* end split-view */}
           </>
         )}
       </main>
