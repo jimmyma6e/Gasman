@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -71,12 +72,49 @@ async def get_history(station_id: str, hours: int = 24):
     return {"station_id": station_id, "history": history}
 
 
+def _nearest_area(lat, lng):
+    best, best_d = "Other", float("inf")
+    for name, clat, clng in database.AREA_CENTROIDS:
+        d = math.hypot(lat - clat, lng - clng)
+        if d < best_d:
+            best_d, best = d, name
+    return best
+
+
 @app.get("/api/insights")
 async def get_insights(fuel_type: str = "regular_gas"):
-    return {
-        "area_averages": database.get_area_averages(fuel_type),
-        "ytd_vs_today":  database.get_ytd_vs_today(fuel_type),
-    }
+    raw          = database.get_area_averages(fuel_type)
+    ytd_vs_today = database.get_ytd_vs_today(fuel_type)
+
+    today_by_area: dict = {}
+    for row in raw["today"]:
+        if row["latitude"] and row["longitude"]:
+            area = _nearest_area(row["latitude"], row["longitude"])
+            today_by_area.setdefault(area, []).append(row["avg_price"])
+
+    ytd_by_area: dict = {}
+    for row in raw["ytd"]:
+        if row["latitude"] and row["longitude"]:
+            area = _nearest_area(row["latitude"], row["longitude"])
+            ytd_by_area.setdefault(area, []).append(row["avg_price"])
+
+    area_averages = []
+    for name, _, _ in database.AREA_CENTROIDS:
+        today_prices = today_by_area.get(name, [])
+        if not today_prices:
+            continue
+        avg_today = round(sum(today_prices) / len(today_prices), 1)
+        ytd_prices = ytd_by_area.get(name, [])
+        avg_ytd   = round(sum(ytd_prices) / len(ytd_prices), 1) if ytd_prices else None
+        change    = round(avg_today - avg_ytd, 1) if avg_ytd is not None else None
+        area_averages.append({
+            "area":      name,
+            "avg_today": avg_today,
+            "avg_ytd":   avg_ytd,
+            "change":    change,
+        })
+
+    return {"area_averages": area_averages, "ytd_vs_today": ytd_vs_today}
 
 
 @app.get("/api/health")
