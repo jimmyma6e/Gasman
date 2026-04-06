@@ -1,31 +1,80 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
 
 const AREAS = [
-  { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
-  { name: "East Vancouver",     lat: 49.2488, lng: -122.9805 },
-  { name: "North Vancouver",    lat: 49.3163, lng: -123.0724 },
-  { name: "Richmond / Delta",   lat: 49.2045, lng: -123.1116 },
-  { name: "Surrey / Langley",   lat: 49.1044, lng: -122.8000 },
-  { name: "Fraser Valley",      lat: 49.1200, lng: -122.0500 },
-  { name: "Vancouver Island",   lat: 48.9000, lng: -124.0000 },
-  { name: "Okanagan",           lat: 49.8880, lng: -119.4960 },
-  { name: "Kamloops",           lat: 50.6745, lng: -120.3273 },
-  { name: "Kootenays",          lat: 49.4926, lng: -117.2948 },
-  { name: "Prince George",      lat: 53.9166, lng: -122.7497 },
-  { name: "Northern BC",        lat: 56.2518, lng: -120.8476 },
+  "Downtown Vancouver", "East Vancouver", "Vancouver",
+  "North Vancouver", "West Vancouver",
+  "Burnaby", "New Westminster",
+  "Richmond", "Delta",
+  "Surrey", "White Rock", "Langley",
+  "Coquitlam", "Port Coquitlam", "Port Moody",
+  "Maple Ridge", "Pitt Meadows",
+  "Abbotsford", "Chilliwack",
+  "Victoria", "Nanaimo",
+  "Kelowna", "Kamloops",
+  "Prince George", "Kootenays", "Northern BC",
+];
+
+const POPULAR_AREAS = [
+  "Downtown Vancouver", "North Vancouver", "Burnaby",
+  "Richmond", "Surrey", "Coquitlam", "Langley", "Abbotsford",
+];
+
+const MORE_AREAS = AREAS.filter((a) => !POPULAR_AREAS.includes(a));
+
+const POPULAR_BRANDS = [
+  "Petro-Canada", "Shell", "Chevron", "Esso", "Husky",
+  "Costco", "Canadian Tire", "7-Eleven", "Fas Gas", "Co-op",
 ];
 
 function getArea(lat, lng) {
   if (lat == null || lng == null) return "Other";
-  let best = AREAS[0], min = Infinity;
-  for (const a of AREAS) {
-    const d = (lat - a.lat) ** 2 + (lng - a.lng) ** 2;
-    if (d < min) { min = d; best = a; }
+
+  // North Shore
+  if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
+  if (lat >= 49.305) return "North Vancouver";
+
+  // Port Moody
+  if (lat >= 49.27 && lng >= -122.88 && lng <= -122.77) return "Port Moody";
+
+  // Northeast Metro Van (east-first)
+  if (lat >= 49.20 && lng >= -122.64) return "Maple Ridge";
+  if (lat >= 49.20 && lng >= -122.73) return "Pitt Meadows";
+  if (lat >= 49.20 && lng >= -122.79) return "Port Coquitlam";
+  if (lat >= 49.20 && lng >  -122.87) return "Coquitlam";
+
+  // South of Fraser River
+  if (lat < 49.20) {
+    if (lng >= -122.65)                 return "Langley";
+    if (lat < 49.06 && lng >= -122.85) return "White Rock";
+    if (lng >= -122.97)                 return "Surrey";
+    if (lat < 49.16 && lng >= -123.02) return "Delta";
+    return "Richmond";
   }
-  return best.name;
+
+  // Inner Metro
+  if (lng > -122.97 && lat < 49.225) return "New Westminster";
+  if (lng > -123.027)                return "Burnaby";
+
+  // City of Vancouver
+  if (lng >= -123.10) return "East Vancouver";
+  if (lat >= 49.265)  return "Downtown Vancouver";
+  if (lat >= 49.20)   return "Vancouver";
+
+  // BC-wide fallback
+  if (lat >= 49.0 && lat <= 49.25 && lng >= -122.4 && lng <= -121.7) return "Abbotsford";
+  if (lat >= 49.1 && lat <= 49.2  && lng >= -121.7 && lng <= -121.5) return "Chilliwack";
+  if (lat < 48.7) return "Victoria";
+  if (lat >= 48.7 && lat < 49.4 && lng <= -123.8) return "Nanaimo";
+  if (lng >= -120.0 && lng <= -119.0 && lat >= 49.5 && lat <= 50.1) return "Kelowna";
+  if (lat >= 50.5 && lat <= 51.0 && lng >= -121.0 && lng <= -119.5) return "Kamloops";
+  if (lat >= 53.5 && lat <= 54.5) return "Prince George";
+  if (lat >= 54.5) return "Northern BC";
+  if (lng >= -118.0 && lng <= -115.0) return "Kootenays";
+
+  return "Other";
 }
 
 const FUEL_TYPES = [
@@ -36,6 +85,9 @@ const FUEL_TYPES = [
 ];
 
 const REFRESH_INTERVAL = 5 * 60 * 1000;
+
+// Valid price range for BC gas in cents/litre
+const VALID_PRICE = (p) => p != null && p >= 80 && p <= 350;
 
 function formatPrice(price, unit) {
   if (price == null) return null;
@@ -124,7 +176,7 @@ function ChartModal({ station, onClose }) {
 // ---------- Station Card ----------
 function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea }) {
   const fuelData  = station[activeFuel];
-  const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
+  const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
 
   return (
@@ -159,7 +211,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
           return (
             <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
               <span className="fuel-label">{label}</span>
-              {price != null ? (
+              {VALID_PRICE(price) ? (
                 <div className="fuel-price-row">
                   <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
                     {formatPrice(price, station.unit_of_measure)}
@@ -201,9 +253,11 @@ export default function App() {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
   const [search, setSearch]     = useState("");
-  const [areaFilter, setAreaFilter]   = useState(new Set());   // empty = all
-  const [brandFilter, setBrandFilter] = useState(new Set());   // empty = all
-  const [viewMode, setViewMode]       = useState("card");      // "card" | "table" | "compact"
+  const [areaFilter, setAreaFilter]     = useState(new Set());
+  const [brandFilter, setBrandFilter]   = useState(new Set());
+  const [viewMode, setViewMode]         = useState("card");
+  const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const [favourites, setFavourites] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-favourites") || "[]"); }
@@ -238,6 +292,18 @@ export default function App() {
     return () => clearInterval(id);
   }, [fetchData]);
 
+  // Close area dropdown on outside click
+  useEffect(() => {
+    if (!areaDropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setAreaDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [areaDropdownOpen]);
+
   const allStations = data?.stations ?? [];
 
   const stationsWithArea = allStations.map((s) => ({
@@ -245,12 +311,20 @@ export default function App() {
     _area: getArea(s.latitude, s.longitude),
   }));
 
-  const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))].sort();
+  const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))];
+  brands.sort((a, b) => {
+    const ai = POPULAR_BRANDS.indexOf(a);
+    const bi = POPULAR_BRANDS.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
 
-  // Global cheapest — used for tab price hints only
+  // Global cheapest (valid prices only) — used for tab price hints
   const globalCheapest = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = allStations.map((s) => s[key]?.price).filter((p) => p != null);
+    const prices = allStations.map((s) => s[key]?.price).filter(VALID_PRICE);
     globalCheapest[key] = prices.length ? Math.min(...prices) : null;
   }
 
@@ -263,10 +337,10 @@ export default function App() {
     return true;
   });
 
-  // Cheapest within the filtered set — used for "Cheapest" badge on cards
+  // Cheapest within filtered set (valid prices only) — drives "Cheapest" badge
   const cheapestPrices = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = filtered.map((s) => s[key]?.price).filter((p) => p != null);
+    const prices = filtered.map((s) => s[key]?.price).filter(VALID_PRICE);
     cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
   }
 
@@ -275,11 +349,11 @@ export default function App() {
   }
 
   const sorted = [...filtered].sort((a, b) => {
-    // Always push stations with no active fuel price to the bottom
+    // Always push stations with no valid price to the bottom
     const aPrice = a[activeFuel]?.price;
     const bPrice = b[activeFuel]?.price;
-    const aHas = aPrice != null && aPrice > 0;
-    const bHas = bPrice != null && bPrice > 0;
+    const aHas = VALID_PRICE(aPrice);
+    const bHas = VALID_PRICE(bPrice);
     if (aHas !== bHas) return aHas ? -1 : 1;
 
     if (sortBy === "price") {
@@ -351,19 +425,42 @@ export default function App() {
           )}
         </div>
 
-        {/* Area chips */}
+        {/* Area filter — popular chips + "More areas" dropdown */}
         <div className="filter-section">
           <span className="filter-label">Area</span>
           <div className="chip-row">
-            {AREAS.map((a) => (
+            {POPULAR_AREAS.map((name) => (
               <button
-                key={a.name}
-                className={`brand-chip ${areaFilter.has(a.name) ? "brand-chip-active" : ""}`}
-                onClick={() => setAreaFilter(toggleSet(areaFilter, a.name))}
+                key={name}
+                className={`brand-chip ${areaFilter.has(name) ? "brand-chip-active" : ""}`}
+                onClick={() => setAreaFilter(toggleSet(areaFilter, name))}
               >
-                {a.name}
+                {name}
               </button>
             ))}
+            {/* "More areas" dropdown */}
+            <div className="area-more-wrap" ref={dropdownRef}>
+              <button
+                className={`area-more-btn ${MORE_AREAS.some((n) => areaFilter.has(n)) ? "brand-chip-active" : ""}`}
+                onClick={() => setAreaDropdownOpen((o) => !o)}
+              >
+                More areas {areaDropdownOpen ? "▴" : "▾"}
+              </button>
+              {areaDropdownOpen && (
+                <div className="area-dropdown">
+                  {MORE_AREAS.map((name) => (
+                    <label key={name} className="area-dropdown-item">
+                      <input
+                        type="checkbox"
+                        checked={areaFilter.has(name)}
+                        onChange={() => setAreaFilter(toggleSet(areaFilter, name))}
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -473,7 +570,7 @@ export default function App() {
               <div className="compact-list">
                 {sorted.map((station) => {
                   const fuelData = station[activeFuel];
-                  const isCheapest = fuelData?.price != null && fuelData.price === cheapestPrices[activeFuel];
+                  const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
                   const delta = station.price_delta?.[activeFuel];
                   const isFav = favourites.includes(station.station_id);
                   return (
@@ -496,7 +593,7 @@ export default function App() {
                         </a>
                       </div>
                       <div className="compact-price">
-                        {fuelData?.price != null ? (
+                        {VALID_PRICE(fuelData?.price) ? (
                           <>
                             <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
                               {formatPrice(fuelData.price, station.unit_of_measure)}
