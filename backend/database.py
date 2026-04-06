@@ -13,6 +13,35 @@ if _DATABASE_URL.startswith("postgres://"):
 
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
+AREA_CENTROIDS = [
+    ("Downtown Vancouver", 49.2827, -123.1207),
+    ("East Vancouver",     49.2622, -123.0680),
+    ("Vancouver",          49.2300, -123.1200),
+    ("North Vancouver",    49.3163, -123.0724),
+    ("West Vancouver",     49.3500, -123.2000),
+    ("Burnaby",            49.2488, -122.9805),
+    ("New Westminster",    49.2060, -122.9110),
+    ("Richmond",           49.1666, -123.1336),
+    ("Delta",              49.1000, -123.0500),
+    ("Surrey",             49.1044, -122.8000),
+    ("White Rock",         49.0225, -122.8025),
+    ("Langley",            49.1044, -122.6500),
+    ("Coquitlam",          49.2840, -122.7932),
+    ("Port Coquitlam",     49.2625, -122.7811),
+    ("Port Moody",         49.2840, -122.8320),
+    ("Maple Ridge",        49.2190, -122.5980),
+    ("Pitt Meadows",       49.2290, -122.6890),
+    ("Abbotsford",         49.0504, -122.3045),
+    ("Chilliwack",         49.1579, -121.9514),
+    ("Victoria",           48.4284, -123.3656),
+    ("Nanaimo",            49.1659, -123.9401),
+    ("Kelowna",            49.8880, -119.4960),
+    ("Kamloops",           50.6745, -120.3273),
+    ("Kootenays",          49.4926, -117.2948),
+    ("Prince George",      53.9166, -122.7497),
+    ("Northern BC",        56.2518, -120.8476),
+]
+
 
 def _conn():
     if not _DATABASE_URL:
@@ -117,7 +146,7 @@ def get_area_averages(fuel_type: str = "regular_gas") -> list:
                 FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= NOW() - INTERVAL '24 hours'
-                  AND price IS NOT NULL
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
                 GROUP BY station_id, latitude, longitude
             """, (fuel_type,))
             today_rows = cur.fetchall()
@@ -127,7 +156,7 @@ def get_area_averages(fuel_type: str = "regular_gas") -> list:
                 FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= date_trunc('year', NOW())
-                  AND price IS NOT NULL
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
                 GROUP BY station_id, latitude, longitude
             """, (fuel_type,))
             ytd_rows = cur.fetchall()
@@ -142,7 +171,7 @@ def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
                 SELECT AVG(price) FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= NOW() - INTERVAL '24 hours'
-                  AND price IS NOT NULL
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
             """, (fuel_type,))
             today_avg = cur.fetchone()[0]
 
@@ -150,7 +179,7 @@ def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
                 SELECT AVG(price) FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= date_trunc('year', NOW())
-                  AND price IS NOT NULL
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
             """, (fuel_type,))
             ytd_avg = cur.fetchone()[0]
 
