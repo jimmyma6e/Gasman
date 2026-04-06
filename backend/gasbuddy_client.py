@@ -123,12 +123,21 @@ async ({ query, lat, lng, gbcsrf }) => {
 
 
 def _is_bc_station(lat, lng) -> bool:
-    """Return True only if coordinates fall within British Columbia."""
+    """Return True only if coordinates fall within British Columbia.
+
+    BC mainland border with Washington State is at 49°N.
+    Vancouver Island/Gulf Islands extend south to ~48.2°N but are west of -123.3°W.
+    """
     if lat is None or lng is None:
         return False
-    # BC bounding box: roughly 48.2–60.0°N, 139.1–114.0°W
-    # Southern edge dips below 49° for Victoria/Vancouver Island
-    return 48.2 <= lat <= 60.0 and -139.1 <= lng <= -114.0
+    if lat > 60.0 or lat < 48.2:
+        return False
+    if lng < -139.1 or lng > -114.0:
+        return False
+    # Below 49°N only allow Vancouver Island / Gulf Islands (west of Strait of Georgia)
+    if lat < 49.0 and lng > -123.3:
+        return False
+    return True
 
 
 def _parse_station(raw: dict) -> dict:
