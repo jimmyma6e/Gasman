@@ -122,6 +122,15 @@ async ({ query, lat, lng, gbcsrf }) => {
 """
 
 
+def _is_bc_station(lat, lng) -> bool:
+    """Return True only if coordinates fall within British Columbia."""
+    if lat is None or lng is None:
+        return False
+    # BC bounding box: roughly 48.2–60.0°N, 139.1–114.0°W
+    # Southern edge dips below 49° for Victoria/Vancouver Island
+    return 48.2 <= lat <= 60.0 and -139.1 <= lng <= -114.0
+
+
 def _parse_station(raw: dict) -> dict:
     fuels  = raw.get("fuels") or []
     prices = raw.get("prices") or []
@@ -228,7 +237,9 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
             for s in raw_stations:
                 sid = str(s.get("id", ""))
                 if sid and sid not in stations_map:
-                    stations_map[sid] = _parse_station(s)
+                    parsed = _parse_station(s)
+                    if _is_bc_station(parsed["latitude"], parsed["longitude"]):
+                        stations_map[sid] = parsed
 
             if not trends and raw_trends:
                 trends.extend(_parse_trend(t) for t in raw_trends)
