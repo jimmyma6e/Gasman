@@ -45,12 +45,10 @@ export default function InsightsPanel({ activeFuel }) {
       </div>
 
       <div className="insights-areas">
-        {area_averages.map((a) => (
+        {area_averages.filter((a) => a.avg_today != null).map((a) => (
           <div key={a.area} className="insight-area-card">
             <div className="insight-area-name">{a.area}</div>
-            <div className="insight-area-today">
-              {a.avg_today != null ? `${a.avg_today}¢` : "—"}
-            </div>
+            <div className="insight-area-today">{a.avg_today}¢</div>
             {a.change != null && (
               <div className={`insight-area-change ${a.change > 0 ? "delta-up" : "delta-down"}`}>
                 {a.change > 0 ? "↑" : "↓"}{Math.abs(a.change)}¢ vs YTD

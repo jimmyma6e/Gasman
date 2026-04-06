@@ -275,12 +275,19 @@ export default function App() {
   }
 
   const sorted = [...filtered].sort((a, b) => {
+    // Always push stations with no active fuel price to the bottom
+    const aPrice = a[activeFuel]?.price;
+    const bPrice = b[activeFuel]?.price;
+    const aHas = aPrice != null && aPrice > 0;
+    const bHas = bPrice != null && bPrice > 0;
+    if (aHas !== bHas) return aHas ? -1 : 1;
+
     if (sortBy === "price") {
-      return (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
+      return (aPrice ?? Infinity) - (bPrice ?? Infinity);
     }
     if (sortBy === "city") {
       const cmp = a._area.localeCompare(b._area);
-      return cmp !== 0 ? cmp : (a[activeFuel]?.price ?? Infinity) - (b[activeFuel]?.price ?? Infinity);
+      return cmp !== 0 ? cmp : (aPrice ?? Infinity) - (bPrice ?? Infinity);
     }
     if (sortBy === "updated") {
       return latestUpdate(b).localeCompare(latestUpdate(a)); // newest first
