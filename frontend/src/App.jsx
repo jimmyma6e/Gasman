@@ -5,10 +5,17 @@ import InsightsPanel from "./components/InsightsPanel";
 
 const AREAS = [
   { name: "Downtown Vancouver", lat: 49.2827, lng: -123.1207 },
-  { name: "East Vancouver",     lat: 49.2640, lng: -123.0586 },
+  { name: "East Vancouver",     lat: 49.2488, lng: -122.9805 },
   { name: "North Vancouver",    lat: 49.3163, lng: -123.0724 },
-  { name: "Richmond",           lat: 49.2045, lng: -123.1116 },
-  { name: "Burnaby",            lat: 49.2488, lng: -122.9805 },
+  { name: "Richmond / Delta",   lat: 49.2045, lng: -123.1116 },
+  { name: "Surrey / Langley",   lat: 49.1044, lng: -122.8000 },
+  { name: "Fraser Valley",      lat: 49.1200, lng: -122.0500 },
+  { name: "Vancouver Island",   lat: 48.9000, lng: -124.0000 },
+  { name: "Okanagan",           lat: 49.8880, lng: -119.4960 },
+  { name: "Kamloops",           lat: 50.6745, lng: -120.3273 },
+  { name: "Kootenays",          lat: 49.4926, lng: -117.2948 },
+  { name: "Prince George",      lat: 53.9166, lng: -122.7497 },
+  { name: "Northern BC",        lat: 56.2518, lng: -120.8476 },
 ];
 
 function getArea(lat, lng) {
@@ -290,8 +297,8 @@ export default function App() {
           <div className="header-title">
             <span className="header-icon">⛽</span>
             <div>
-              <h1>Vancouver Gas Prices</h1>
-              <p className="header-sub">Greater Vancouver Area</p>
+              <h1>BC Gas Prices</h1>
+              <p className="header-sub">British Columbia</p>
             </div>
           </div>
           <div className="header-actions">
@@ -423,7 +430,7 @@ export default function App() {
         )}
 
         {loading && !data && (
-          <div className="loading-box"><div className="spinner" /><p>Fetching gas prices across Vancouver...</p></div>
+          <div className="loading-box"><div className="spinner" /><p>Fetching gas prices across British Columbia...</p></div>
         )}
 
         {tab === "mine" && favourites.length === 0 && (

@@ -18,7 +18,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 async def poll_and_store() -> None:
     print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices …")
     try:
-        stations, _ = await gb.get_all_vancouver()
+        stations, _ = await gb.get_all_bc()
         database.insert_prices(stations)
         print(f"  Stored {len(stations)} stations.")
     except Exception as e:
@@ -50,7 +50,7 @@ app.add_middleware(
 
 @app.get("/api/stations")
 async def get_stations():
-    stations, trend = await gb.get_all_vancouver()
+    stations, trend = await gb.get_all_bc()
     deltas = database.get_price_deltas()
     for s in stations:
         d = deltas.get(s["station_id"])

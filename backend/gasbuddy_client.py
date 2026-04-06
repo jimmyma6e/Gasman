@@ -26,14 +26,66 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
-# ── search zones covering Greater Vancouver ───────────────────────────────────
+# ── search zones covering all of British Columbia ────────────────────────────
 SEARCH_COORDS = [
+    # Greater Vancouver
     (49.2827, -123.1207),  # Downtown Vancouver
     (49.2640, -123.0586),  # East Vancouver
     (49.3163, -123.0724),  # North Vancouver
-    (49.2045, -123.1116),  # Richmond / South Van
-    (49.2488, -122.9805),  # Burnaby
+    (49.2045, -123.1116),  # Richmond
+    (49.2488, -122.9805),  # Burnaby / New Westminster
+    # Lower Mainland extensions
+    (49.1913, -122.8490),  # Surrey
+    (49.1044, -122.6604),  # Langley
+    (49.0504, -122.3045),  # Abbotsford
+    (49.1579, -121.9514),  # Chilliwack
+    (49.3828, -121.4455),  # Hope
+    # Vancouver Island
+    (48.4284, -123.3656),  # Victoria
+    (49.1659, -123.9401),  # Nanaimo
+    (49.6878, -124.9944),  # Courtenay / Comox
+    (50.0162, -125.2477),  # Campbell River
+    # Sea-to-Sky / Sunshine Coast
+    (49.7016, -123.1558),  # Squamish
+    (50.1163, -122.9574),  # Whistler
+    (49.8326, -124.5248),  # Powell River
+    # Okanagan
+    (49.8880, -119.4960),  # Kelowna
+    (49.4988, -119.5869),  # Penticton
+    (50.2674, -119.2720),  # Vernon
+    # Thompson / Interior
+    (50.6745, -120.3273),  # Kamloops
+    (50.1115, -120.7862),  # Merritt
+    # Kootenays
+    (49.4926, -117.2948),  # Nelson
+    (49.5122, -115.7697),  # Cranbrook
+    (49.0960, -117.7122),  # Trail / Castlegar
+    # Central BC
+    (52.1396, -122.1414),  # Williams Lake
+    (52.9784, -122.4927),  # Quesnel
+    (53.9166, -122.7497),  # Prince George
+    # Northern BC
+    (54.7825, -127.1776),  # Smithers
+    (54.5149, -128.5989),  # Terrace
+    (54.3150, -130.3208),  # Prince Rupert
+    (56.2518, -120.8476),  # Fort St. John
+    (58.8044, -122.6980),  # Fort Nelson
 ]
+
+
+def _is_bc_station(lat, lng) -> bool:
+    """Return True if coordinates fall within British Columbia, Canada."""
+    if lat is None or lng is None:
+        return True  # keep if no coords
+    if not (48.2 <= lat <= 60.1):
+        return False
+    if not (-139.5 <= lng <= -114.0):
+        return False
+    # Exclude US Pacific Northwest near the border (Bellingham, Blaine, etc.)
+    # Victoria BC (48.43, -123.37) must pass: it's west of -123.1 so it's fine
+    if lat < 49.0 and lng > -123.1:
+        return False
+    return True
 
 CACHE_TTL = timedelta(minutes=30)
 
@@ -210,7 +262,9 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
             for s in raw_stations:
                 sid = str(s.get("id", ""))
                 if sid and sid not in stations_map:
-                    stations_map[sid] = _parse_station(s)
+                    parsed = _parse_station(s)
+                    if _is_bc_station(parsed.get("latitude"), parsed.get("longitude")):
+                        stations_map[sid] = parsed
 
             if not trends and raw_trends:
                 trends.extend(_parse_trend(t) for t in raw_trends)
@@ -250,8 +304,12 @@ async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]
     return _cache["stations"], _cache["trends"]
 
 
-async def get_all_vancouver() -> tuple[list[dict], list[dict]]:
-    """Return (stations, trends) for Greater Vancouver, cached 30 min."""
+async def get_all_bc() -> tuple[list[dict], list[dict]]:
+    """Return (stations, trends) for all of British Columbia, cached 30 min."""
     async with _lock:
         await _ensure_fresh()
     return _cache["stations"], _cache["trends"]
+
+
+# backward-compat alias
+get_all_vancouver = get_all_bc

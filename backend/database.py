@@ -6,11 +6,23 @@ DB_PATH = Path(__file__).parent / "prices.db"
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
 AREA_CENTROIDS = [
+    # Greater Vancouver
     ("Downtown Vancouver", 49.2827, -123.1207),
-    ("East Vancouver",     49.2640, -123.0586),
+    ("East Vancouver",     49.2488, -122.9805),  # Burnaby / East Van
     ("North Vancouver",    49.3163, -123.0724),
-    ("Richmond",           49.2045, -123.1116),
-    ("Burnaby",            49.2488, -122.9805),
+    ("Richmond / Delta",   49.2045, -123.1116),
+    ("Surrey / Langley",   49.1044, -122.8000),
+    # Fraser Valley
+    ("Fraser Valley",      49.1200, -122.0500),  # Abbotsford / Chilliwack
+    # Vancouver Island
+    ("Vancouver Island",   48.9000, -124.0000),  # Victoria / Nanaimo
+    # Interior
+    ("Okanagan",           49.8880, -119.4960),  # Kelowna / Penticton / Vernon
+    ("Kamloops",           50.6745, -120.3273),
+    ("Kootenays",          49.4926, -117.2948),  # Nelson / Cranbrook / Trail
+    # Northern BC
+    ("Prince George",      53.9166, -122.7497),
+    ("Northern BC",        56.2518, -120.8476),  # Fort St. John / Terrace / Prince Rupert
 ]
 
 def _assign_area(lat, lng):
