@@ -26,43 +26,74 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
-# search zones covering Greater Vancouver
+# ── search zones covering all of British Columbia ────────────────────────────
 SEARCH_COORDS = [
-    # Vancouver
+    # Greater Vancouver
     (49.2827, -123.1207),  # Downtown Vancouver
-    (49.2640, -123.0586),  # East Vancouver / Mount Pleasant
-    (49.2300, -123.1500),  # Vancouver West Side (Kitsilano, Marpole)
-    # North Shore
+    (49.2640, -123.0586),  # East Vancouver
     (49.3163, -123.0724),  # North Vancouver
-    (49.3667, -123.1670),  # West Vancouver
-    # Burnaby / New Westminster
-    (49.2488, -122.9805),  # Burnaby West
-    (49.2650, -122.9200),  # Burnaby East
-    (49.2057, -122.9110),  # New Westminster
-    # Richmond / Delta
-    (49.2045, -123.1116),  # Richmond North
-    (49.1700, -123.1380),  # Richmond Central
-    (49.0900, -123.0800),  # Delta (Ladner / Tsawwassen)
-    # Surrey / White Rock / Langley
-    (49.1045, -122.8490),  # Surrey Central
-    (49.1600, -122.8450),  # Surrey North
-    (49.0253, -122.8027),  # White Rock
-    (49.1050, -122.6604),  # Langley City
-    (49.1900, -122.6800),  # Langley Township
-    # Tri-Cities
-    (49.2837, -122.8310),  # Coquitlam
-    (49.2607, -122.7800),  # Port Coquitlam
-    (49.2834, -122.8319),  # Port Moody
-    # Pitt Meadows / Maple Ridge
-    (49.2320, -122.6890),  # Pitt Meadows
-    (49.2200, -122.5980),  # Maple Ridge
+    (49.2045, -123.1116),  # Richmond
+    (49.2488, -122.9805),  # Burnaby / New Westminster
+    # Lower Mainland extensions
+    (49.1913, -122.8490),  # Surrey
+    (49.1044, -122.6604),  # Langley
+    (49.0504, -122.3045),  # Abbotsford
+    (49.1579, -121.9514),  # Chilliwack
+    (49.3828, -121.4455),  # Hope
+    # Vancouver Island
+    (48.4284, -123.3656),  # Victoria
+    (49.1659, -123.9401),  # Nanaimo
+    (49.6878, -124.9944),  # Courtenay / Comox
+    (50.0162, -125.2477),  # Campbell River
+    # Sea-to-Sky / Sunshine Coast
+    (49.7016, -123.1558),  # Squamish
+    (50.1163, -122.9574),  # Whistler
+    (49.8326, -124.5248),  # Powell River
+    # Okanagan
+    (49.8880, -119.4960),  # Kelowna
+    (49.4988, -119.5869),  # Penticton
+    (50.2674, -119.2720),  # Vernon
+    # Thompson / Interior
+    (50.6745, -120.3273),  # Kamloops
+    (50.1115, -120.7862),  # Merritt
+    # Kootenays
+    (49.4926, -117.2948),  # Nelson
+    (49.5122, -115.7697),  # Cranbrook
+    (49.0960, -117.7122),  # Trail / Castlegar
+    # Central BC
+    (52.1396, -122.1414),  # Williams Lake
+    (52.9784, -122.4927),  # Quesnel
+    (53.9166, -122.7497),  # Prince George
+    # Northern BC
+    (54.7825, -127.1776),  # Smithers
+    (54.5149, -128.5989),  # Terrace
+    (54.3150, -130.3208),  # Prince Rupert
+    (56.2518, -120.8476),  # Fort St. John
+    (58.8044, -122.6980),  # Fort Nelson
 ]
+
+
+def _is_bc_station(lat, lng) -> bool:
+    """Return True if coordinates fall within British Columbia, Canada."""
+    if lat is None or lng is None:
+        return True  # keep if no coords
+    if not (48.2 <= lat <= 60.1):
+        return False
+    if not (-139.5 <= lng <= -114.0):
+        return False
+    # Exclude US Pacific Northwest near the border (Bellingham, Blaine, etc.)
+    # Victoria BC (48.43, -123.37) must pass: it's west of -123.1 so it's fine
+    if lat < 49.0 and lng > -123.1:
+        return False
+    return True
 
 CACHE_TTL = timedelta(minutes=30)
 
+# ── in-memory cache ───────────────────────────────────────────────────────────
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 _lock = asyncio.Lock()
 
+# ── browser config ────────────────────────────────────────────────────────────
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -73,6 +104,7 @@ _STEALTH_HEADERS = {
     "Sec-CH-UA-Platform": '"macOS"',
 }
 
+# ── GraphQL query ─────────────────────────────────────────────────────────────
 _GQL = """
 query locationBySearchTerm($lat: Float, $lng: Float) {
   locationBySearchTerm(lat: $lat, lng: $lng) {
@@ -95,6 +127,7 @@ query locationBySearchTerm($lat: Float, $lng: Float) {
 }
 """
 
+# JS runs inside the browser — same-origin fetch avoids Cloudflare WAF
 _JS_FETCH = """
 async ({ query, lat, lng, gbcsrf }) => {
     try {
@@ -122,6 +155,7 @@ async ({ query, lat, lng, gbcsrf }) => {
 """
 
 
+# ── station parser ────────────────────────────────────────────────────────────
 def _parse_station(raw: dict) -> dict:
     fuels  = raw.get("fuels") or []
     prices = raw.get("prices") or []
@@ -168,6 +202,7 @@ def _parse_trend(raw: dict) -> dict:
     }
 
 
+# ── main fetch ────────────────────────────────────────────────────────────────
 async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
@@ -189,6 +224,7 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
         )
         page = await context.new_page()
 
+        # Capture the gbcsrf CSRF token from GasBuddy's own first /graphql call
         async def on_request(req):
             nonlocal gbcsrf_token
             if "/graphql" in req.url and not gbcsrf_token:
@@ -204,10 +240,8 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
 
-        for i, (lat, lng) in enumerate(SEARCH_COORDS):
-            if i > 0:
-                await asyncio.sleep(8)  # avoid 429 rate limiting
-
+        # Query each zone
+        for lat, lng in SEARCH_COORDS:
             logger.info("  /graphql for (%.4f, %.4f) …", lat, lng)
             try:
                 result = await page.evaluate(
@@ -228,12 +262,14 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
             for s in raw_stations:
                 sid = str(s.get("id", ""))
                 if sid and sid not in stations_map:
-                    stations_map[sid] = _parse_station(s)
+                    parsed = _parse_station(s)
+                    if _is_bc_station(parsed.get("latitude"), parsed.get("longitude")):
+                        stations_map[sid] = parsed
 
             if not trends and raw_trends:
                 trends.extend(_parse_trend(t) for t in raw_trends)
 
-            logger.info("  -> %d stations, total unique: %d", len(raw_stations), len(stations_map))
+            logger.info("  → %d stations, total unique: %d", len(raw_stations), len(stations_map))
 
         await browser.close()
 
@@ -246,6 +282,7 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
     return stations, trends
 
 
+# ── cache ─────────────────────────────────────────────────────────────────────
 async def _ensure_fresh() -> None:
     now = datetime.now(timezone.utc)
     if (
@@ -259,13 +296,20 @@ async def _ensure_fresh() -> None:
         _cache["fetched_at"] = now
 
 
+# ── public API ────────────────────────────────────────────────────────────────
 async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]:
+    """API-compat shim — lat/lon ignored, full Vancouver fetched in one pass."""
     async with _lock:
         await _ensure_fresh()
     return _cache["stations"], _cache["trends"]
 
 
-async def get_all_vancouver() -> tuple[list[dict], list[dict]]:
+async def get_all_bc() -> tuple[list[dict], list[dict]]:
+    """Return (stations, trends) for all of British Columbia, cached 30 min."""
     async with _lock:
         await _ensure_fresh()
     return _cache["stations"], _cache["trends"]
+
+
+# backward-compat alias
+get_all_vancouver = get_all_bc

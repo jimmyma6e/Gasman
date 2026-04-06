@@ -1,18 +1,28 @@
-import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Use $DB_PATH env var if set (Railway volume), otherwise fall back to local file
-DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent / "prices.db"))
+DB_PATH = Path(__file__).parent / "prices.db"
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
 AREA_CENTROIDS = [
+    # Greater Vancouver
     ("Downtown Vancouver", 49.2827, -123.1207),
-    ("East Vancouver",     49.2640, -123.0586),
+    ("East Vancouver",     49.2488, -122.9805),  # Burnaby / East Van
     ("North Vancouver",    49.3163, -123.0724),
-    ("Richmond",           49.2045, -123.1116),
-    ("Burnaby",            49.2488, -122.9805),
+    ("Richmond / Delta",   49.2045, -123.1116),
+    ("Surrey / Langley",   49.1044, -122.8000),
+    # Fraser Valley
+    ("Fraser Valley",      49.1200, -122.0500),  # Abbotsford / Chilliwack
+    # Vancouver Island
+    ("Vancouver Island",   48.9000, -124.0000),  # Victoria / Nanaimo
+    # Interior
+    ("Okanagan",           49.8880, -119.4960),  # Kelowna / Penticton / Vernon
+    ("Kamloops",           50.6745, -120.3273),
+    ("Kootenays",          49.4926, -117.2948),  # Nelson / Cranbrook / Trail
+    # Northern BC
+    ("Prince George",      53.9166, -122.7497),
+    ("Northern BC",        56.2518, -120.8476),  # Fort St. John / Terrace / Prince Rupert
 ]
 
 def _assign_area(lat, lng):
@@ -84,6 +94,10 @@ def insert_prices(stations: list):
 
 
 def get_price_deltas() -> dict:
+    """
+    Compare the two most recent poll snapshots.
+    Returns {station_id: {fuel_type: delta}} — only entries where price changed.
+    """
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         times = conn.execute(
@@ -115,6 +129,7 @@ def get_price_deltas() -> dict:
 
 
 def get_area_averages(fuel_type: str = "regular_gas") -> list:
+    """Average price per area for today (last 24h) and YTD."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         today_rows = conn.execute("""
@@ -155,6 +170,7 @@ def get_area_averages(fuel_type: str = "regular_gas") -> list:
 
 
 def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
+    """Overall average: today (last 24h) vs year-to-date."""
     with sqlite3.connect(DB_PATH) as conn:
         r_today = conn.execute("""
             SELECT AVG(price) FROM price_history
