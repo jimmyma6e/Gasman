@@ -18,11 +18,20 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 async def poll_and_store() -> None:
-    print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices ...")
+    start = datetime.now(timezone.utc)
+    print(f"[{start.strftime('%H:%M')}] Polling gas prices across {len(gb.SEARCH_COORDS)} zones ...")
+    flushed_ids: set = set()
+
+    def on_flush(stations: list):
+        new = [s for s in stations if s["station_id"] not in flushed_ids]
+        if new:
+            database.insert_prices(new)
+            flushed_ids.update(s["station_id"] for s in new)
+
     try:
-        stations, _ = await gb.get_all_vancouver()
-        database.insert_prices(stations)
-        print(f"  Stored {len(stations)} stations.")
+        await gb._fetch_via_playwright(on_flush=on_flush)
+        elapsed = (datetime.now(timezone.utc) - start).seconds // 60
+        print(f"  Poll complete: {len(flushed_ids)} stations stored in {elapsed}m.")
     except Exception as e:
         print(f"  Poll failed: {e}")
 
@@ -39,7 +48,7 @@ async def lifespan(app: FastAPI):
         gb.warm_cache_from_db(cached)
         print(f"[startup] Warmed cache with {len(cached)} stations from DB.")
     asyncio.create_task(poll_and_store())  # refresh in background
-    scheduler.add_job(poll_and_store, "interval", minutes=90)
+    scheduler.add_job(poll_and_store, "interval", minutes=120)
     scheduler.start()
     yield
     scheduler.shutdown()

@@ -41,11 +41,11 @@ def _build_search_coords() -> list:
                 lng += lng_step
             lat += lat_step
 
-    # Metro Vancouver — 1.5 km grid (comprehensive, ~1300 points)
+    # Metro Vancouver — 1.5 km grid (comprehensive, ~1440 points)
     grid(49.00, 49.42, -123.35, -122.45, 1.5)
 
-    # Fraser Valley — 4 km grid
-    grid(49.00, 49.45, -122.45, -121.00, 4.0)
+    # Fraser Valley — 8 km grid (~90 points)
+    grid(49.00, 49.45, -122.45, -121.00, 8.0)
 
     # Sea to Sky corridor — targeted
     coords += [
@@ -54,8 +54,8 @@ def _build_search_coords() -> list:
         (50.1163, -122.9574),  # Whistler
     ]
 
-    # Vancouver Island — 8 km grid for south island, targeted for north
-    grid(48.30, 49.00, -124.50, -123.25, 8.0)
+    # Vancouver Island — 10 km grid for south island, targeted for north
+    grid(48.30, 49.00, -124.50, -123.25, 10.0)
     coords += [
         (49.1659, -123.9401),  # Nanaimo
         (49.3000, -124.3100),  # Parksville / Qualicum
@@ -63,8 +63,8 @@ def _build_search_coords() -> list:
         (50.0163, -125.2445),  # Campbell River
     ]
 
-    # Okanagan — 5 km grid
-    grid(49.00, 50.40, -119.80, -119.10, 5.0)
+    # Okanagan — 10 km grid (~35 points)
+    grid(49.00, 50.40, -119.80, -119.10, 10.0)
     coords += [
         (49.1783, -119.5919),  # Oliver / Osoyoos
     ]
@@ -198,7 +198,7 @@ _DUMMY = [
     (58.8050, -122.6978),  # Fort Nelson
 ]
 
-CACHE_TTL = timedelta(minutes=90)
+CACHE_TTL = timedelta(minutes=120)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
@@ -335,7 +335,7 @@ def _parse_trend(raw: dict) -> dict:
     }
 
 
-async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
+async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
     gbcsrf_token: str = ""
@@ -396,11 +396,12 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
 
+        FLUSH_EVERY = 50  # update cache + DB every N zones
+
         for i, (lat, lng) in enumerate(SEARCH_COORDS):
             if i > 0:
                 await asyncio.sleep(2)  # avoid 429 rate limiting
 
-            logger.info("  /graphql for (%.4f, %.4f) …", lat, lng)
             try:
                 result = await page.evaluate(
                     _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
@@ -433,17 +434,24 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
                 trends.extend(_parse_trend(t) for t in raw_trends)
 
             added = len(stations_map) - before
-            print(f"  zone {i+1}/{len(SEARCH_COORDS)} ({lat:.2f},{lng:.2f}): {len(raw_stations)} raw, +{added} new, total={len(stations_map)}")
+            pct   = (i + 1) / len(SEARCH_COORDS) * 100
+            if added > 0 or (i + 1) % FLUSH_EVERY == 0:
+                print(f"  [{pct:5.1f}%] zone {i+1}/{len(SEARCH_COORDS)}: +{added} new → {len(stations_map)} total")
+
+            # Progressive flush: update cache + DB so users see live results
+            if (i + 1) % FLUSH_EVERY == 0 or (i + 1) == len(SEARCH_COORDS):
+                snapshot = list(stations_map.values())
+                _cache["stations"]   = snapshot
+                _cache["trends"]     = trends or []
+                _cache["fetched_at"] = datetime.now(timezone.utc)
+                if on_flush:
+                    on_flush(snapshot)
+                print(f"  [flush] {len(snapshot)} stations pushed to cache + DB")
 
         await browser.close()
 
-    stations = list(stations_map.values())
-    stations.sort(key=lambda x: (
-        x.get("regular_gas") is None or (x["regular_gas"] or {}).get("price") is None,
-        (x.get("regular_gas") or {}).get("price") or float("inf"),
-    ))
-    logger.info("Done: %d stations, %d trends", len(stations), len(trends))
-    return stations, trends
+    logger.info("Done: %d stations, %d trends", len(stations_map), len(trends))
+    return list(stations_map.values()), trends
 
 
 async def _ensure_fresh() -> None:
@@ -453,10 +461,7 @@ async def _ensure_fresh() -> None:
         or _cache["fetched_at"] is None
         or now - _cache["fetched_at"] > CACHE_TTL
     ):
-        stations, trends = await _fetch_via_playwright()
-        _cache["stations"]   = stations
-        _cache["trends"]     = trends
-        _cache["fetched_at"] = now
+        await _fetch_via_playwright()
 
 
 async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]:
