@@ -331,6 +331,11 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-result-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; transition: border-color 0.15s; }
 .route-result-row:hover { border-color: var(--accent); }
 .route-result-best { border-color: var(--accent) !important; background: linear-gradient(90deg, var(--surface), #fff8f0); }
+.route-result-selected { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(249,115,22,0.25); }
+.route-result-row { cursor: pointer; }
+.route-brand-filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.route-brand-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.route-brand-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .route-result-rank { color: #fff; font-weight: 700; font-size: 0.82rem; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .route-result-info { flex: 1; min-width: 0; }
 .route-result-name { display: block; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
