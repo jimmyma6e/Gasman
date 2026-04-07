@@ -139,7 +139,7 @@ _STEALTH_HEADERS = {
 _GQL = """
 query locationBySearchTerm($lat: Float, $lng: Float) {
   locationBySearchTerm(lat: $lat, lng: $lng) {
-    stations {
+    stations(maxCount: 50) {
       results {
         id
         name
@@ -332,11 +332,11 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
             raw_stations = (loc.get("stations") or {}).get("results") or []
             raw_trends   = loc.get("trends") or []
 
+            before = len(stations_map)
             for s in raw_stations:
                 sid = str(s.get("id", ""))
                 if sid and sid not in stations_map:
                     parsed = _parse_station(s)
-                    # Filter by country if available, fall back to coordinate check
                     country = parsed.get("country", "")
                     if country and country.upper() not in ("CA", "CAN", "CANADA"):
                         continue
@@ -347,7 +347,8 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
             if not trends and raw_trends:
                 trends.extend(_parse_trend(t) for t in raw_trends)
 
-            logger.info("  -> %d stations, total unique: %d", len(raw_stations), len(stations_map))
+            logger.info("  -> %d raw, +%d new, total unique: %d",
+                        len(raw_stations), len(stations_map) - before, len(stations_map))
 
         await browser.close()
 
