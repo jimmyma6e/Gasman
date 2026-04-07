@@ -86,6 +86,14 @@ SEARCH_COORDS = [
 CACHE_TTL = timedelta(minutes=30)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
+
+
+def warm_cache_from_db(stations: list):
+    """Pre-populate the in-memory cache with DB data so startup is instant."""
+    if stations:
+        _cache["stations"]   = stations
+        _cache["trends"]     = []
+        _cache["fetched_at"] = datetime.now(timezone.utc) - timedelta(minutes=29)
 _lock = asyncio.Lock()
 
 _UA = (

@@ -205,6 +205,50 @@ def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
     return {"today_avg": today_avg, "ytd_avg": ytd_avg, "change_pct": change_pct}
 
 
+def get_latest_stations() -> list:
+    """Return the most recent price snapshot for every station, reconstructed
+    into the same dict format that gasbuddy_client produces."""
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Latest batch timestamp
+            cur.execute("""
+                SELECT recorded_at FROM price_history
+                ORDER BY recorded_at DESC LIMIT 1
+            """)
+            row = cur.fetchone()
+            if not row:
+                return []
+            latest_time = row["recorded_at"]
+
+            # All rows from that batch
+            cur.execute("""
+                SELECT station_id, name, address, latitude, longitude,
+                       fuel_type, price, currency, unit, recorded_at
+                FROM price_history
+                WHERE recorded_at = %s
+            """, (latest_time,))
+            rows = cur.fetchall()
+
+    stations: dict = {}
+    for r in rows:
+        sid = r["station_id"]
+        if sid not in stations:
+            stations[sid] = {
+                "station_id":      sid,
+                "name":            r["name"],
+                "address":         r["address"],
+                "latitude":        r["latitude"],
+                "longitude":       r["longitude"],
+                "unit_of_measure": r["unit"],
+                "currency":        r["currency"],
+            }
+        stations[sid][r["fuel_type"]] = {
+            "price":        r["price"],
+            "last_updated": r["recorded_at"].isoformat(),
+        }
+    return list(stations.values())
+
+
 def get_station_history(station_id: str, hours: int = 24) -> list:
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
