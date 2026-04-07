@@ -247,9 +247,9 @@ def _parse_trend(raw: dict) -> dict:
     }
 
 
-BATCH_SIZE     = 200   # zones per browser session before restarting
-SESSION_BREAK  = 60    # seconds to wait between browser sessions
-ZONE_SLEEP     = 6     # seconds between zone requests within a session
+BATCH_SIZE     = 300   # zones per browser session before restarting
+SESSION_BREAK  = 30    # seconds to wait between browser sessions
+ZONE_SLEEP     = 4     # seconds between zone requests within a session
 FLUSH_EVERY    = 50    # flush cache + DB every N zones
 
 
