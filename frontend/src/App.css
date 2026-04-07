@@ -306,7 +306,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-tab { display: flex; flex-direction: column; gap: 16px; }
 
 .route-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-.route-place-wrap { position: relative; flex: 1; min-width: 180px; }
+.route-place-wrap { position: relative; flex: 1; min-width: 0; }
 .route-place-label { display: block; font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
 .route-place-input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
 .route-place-input:focus { border-color: var(--accent); }
@@ -344,6 +344,73 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-result-price { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
 .route-result-detour { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
 .route-results-note { font-size: 0.75rem; color: var(--text-dim); padding-top: 4px; }
+
+/* ── Saved places ── */
+.route-place-with-save { position: relative; flex: 1; min-width: 180px; }
+.btn-save-place { position: absolute; top: 0; right: 0; background: none; border: none;
+  font-size: 0.9rem; cursor: pointer; color: var(--text-dim); padding: 0 2px; transition: color 0.15s; }
+.btn-save-place:hover { color: var(--accent); }
+.save-place-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 9998;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.save-place-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.save-place-preset { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.save-place-preset:hover { border-color: var(--accent); }
+.save-place-preset-active { background: rgba(245,158,11,0.15); border-color: var(--accent);
+  color: var(--accent); font-weight: 600; }
+.save-place-custom { width: 100%; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 10px; border-radius: 8px; font-size: 0.85rem;
+  outline: none; transition: border-color 0.15s; box-sizing: border-box; }
+.save-place-custom:focus { border-color: var(--accent); }
+.save-place-actions { display: flex; gap: 8px; }
+.save-place-save { padding: 7px 16px; }
+.route-saved-section-header { padding: 5px 10px 3px; font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--surface2); }
+.route-saved-item { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.route-saved-item:last-of-type { border-bottom: none; }
+.route-saved-pick { flex: 1; display: flex; align-items: center; gap: 6px; text-align: left;
+  background: none; border: none; padding: 8px 10px; cursor: pointer; min-width: 0; transition: background 0.1s; }
+.route-saved-pick:hover { background: var(--surface2); }
+.route-saved-emoji { font-size: 1rem; flex-shrink: 0; }
+.route-saved-label { font-weight: 600; font-size: 0.82rem; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+.route-saved-addr { font-size: 0.76rem; color: var(--text-dim); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.route-saved-delete { background: none; border: none; color: var(--text-dim); font-size: 1rem;
+  cursor: pointer; padding: 0 10px; flex-shrink: 0; transition: color 0.15s; line-height: 1; }
+.route-saved-delete:hover { color: var(--red); }
+
+/* ── Vehicle consumption + helper ── */
+.route-consumption-row { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.route-consumption-input-wrap { display: flex; align-items: center; gap: 6px; }
+.route-consumption-input { width: 72px; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 9px 10px; border-radius: 8px; font-size: 0.88rem;
+  outline: none; transition: border-color 0.15s; -moz-appearance: textfield; }
+.route-consumption-input:focus { border-color: var(--accent); }
+.route-consumption-input::-webkit-outer-spin-button,
+.route-consumption-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.route-consumption-unit { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.btn-consumption-help { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  width: 22px; height: 22px; border-radius: 50%; font-size: 0.75rem; font-weight: 700; cursor: pointer;
+  transition: all 0.15s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.btn-consumption-help:hover { border-color: var(--accent); color: var(--accent); }
+.consumption-helper { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.consumption-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.consumption-preset { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;
+  display: flex; align-items: center; gap: 5px; transition: all 0.15s; }
+.consumption-preset:hover { border-color: var(--accent); }
+.consumption-preset-active { background: rgba(245,158,11,0.15); border-color: var(--accent);
+  color: var(--accent); font-weight: 600; }
+.consumption-preset-val { font-size: 0.72rem; color: var(--text-dim); margin-left: 2px; }
+.consumption-calc { display: flex; flex-direction: column; gap: 6px; }
+.consumption-calc-label { font-size: 0.75rem; color: var(--text-dim); }
+.consumption-calc-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.consumption-calc-input { width: 90px !important; }
+
+/* ── Trip cost in result rows ── */
+.route-result-tripcost { font-size: 0.72rem; color: var(--green); font-weight: 600; white-space: nowrap; }
 
 .route-empty-prompt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 60px 20px; color: var(--text-dim); text-align: center; }
 .route-empty-prompt strong { color: var(--text); }

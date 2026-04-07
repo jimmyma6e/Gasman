@@ -10,6 +10,23 @@ const FUEL_TYPES = [
   { key: "diesel",       label: "Diesel"       },
 ];
 
+const SAVE_PRESETS = [
+  { emoji: "🏠", label: "Home"   },
+  { emoji: "💼", label: "Office" },
+  { emoji: "🎓", label: "School" },
+];
+
+const VEHICLE_PRESETS = [
+  { icon: "🚗", label: "Compact",  l100km: 7  },
+  { icon: "🚙", label: "Sedan",    l100km: 9  },
+  { icon: "🚐", label: "SUV/Van",  l100km: 12 },
+  { icon: "🛻", label: "Truck",    l100km: 14 },
+];
+
+function calcTripCost(distanceKm, consumption, priceCents) {
+  return distanceKm * (consumption / 100) * (priceCents / 100);
+}
+
 // ── Geo helpers ─────────────────────────────────────────────────────────────
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -25,8 +42,7 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 function distToSegmentKm(pLat, pLng, aLat, aLng, bLat, bLng) {
-  const dx = bLng - aLng;
-  const dy = bLat - aLat;
+  const dx = bLng - aLng, dy = bLat - aLat;
   const len2 = dx * dx + dy * dy;
   if (len2 === 0) return haversineKm(pLat, pLng, aLat, aLng);
   const t = Math.max(0, Math.min(1, ((pLng - aLng) * dx + (pLat - aLat) * dy) / len2));
@@ -51,9 +67,7 @@ async function nominatimSearch(q) {
     `https://nominatim.openstreetmap.org/search` +
     `?q=${encodeURIComponent(q + " BC Canada")}` +
     `&format=json&limit=5&addressdetails=0&countrycodes=ca`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Gasman/1.0 (gasman-app)" },
-  });
+  const res = await fetch(url, { headers: { "User-Agent": "Gasman/1.0 (gasman-app)" } });
   return res.json();
 }
 
@@ -73,20 +87,16 @@ async function getOsrmRoute(from, to) {
 
 function makeIcon(label, color, selected) {
   const size = selected ? 34 : 28;
-  const border = selected ? "3px solid #fff" : "2px solid #fff";
   const shadow = selected
     ? "0 0 0 3px rgba(249,115,22,0.6), 0 3px 10px rgba(0,0,0,0.3)"
     : "0 2px 6px rgba(0,0,0,0.3)";
   return L.divIcon({
     className: "",
-    html: `<div style="
-      background:${color};color:#fff;font-weight:700;font-size:0.7rem;
-      border-radius:50%;width:${size}px;height:${size}px;display:flex;
-      align-items:center;justify-content:center;
-      border:${border};box-shadow:${shadow};
-      transition:all 0.2s;">${label}</div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    html: `<div style="background:${color};color:#fff;font-weight:700;font-size:0.7rem;
+      border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;
+      justify-content:center;border:${selected ? "3px" : "2px"} solid #fff;
+      box-shadow:${shadow};">${label}</div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -115,7 +125,6 @@ function RouteMapFit({ polyline }) {
   return null;
 }
 
-// Flies to selected station and opens its popup
 function StationFocuser({ station, markerRefs }) {
   const map = useMap();
   useEffect(() => {
@@ -127,9 +136,37 @@ function StationFocuser({ station, markerRefs }) {
   return null;
 }
 
-// ── Address autocomplete input ───────────────────────────────────────────────
+// ── SavePlacePanel ────────────────────────────────────────────────────────────
 
-function PlaceInput({ label, value, onSelect, placeholder }) {
+function SavePlacePanel({ onSave, onCancel, saveLabel, setSaveLabel }) {
+  const [selectedEmoji, setSelectedEmoji] = useState("📍");
+  return (
+    <div className="save-place-panel">
+      <div className="save-place-presets">
+        {SAVE_PRESETS.map((p) => (
+          <button key={p.label}
+            className={`save-place-preset ${saveLabel === p.label && selectedEmoji === p.emoji ? "save-place-preset-active" : ""}`}
+            onClick={() => { setSaveLabel(p.label); setSelectedEmoji(p.emoji); }}>
+            {p.emoji} {p.label}
+          </button>
+        ))}
+      </div>
+      <input className="save-place-custom" placeholder="Custom label…"
+        value={saveLabel} maxLength={32} autoFocus
+        onChange={(e) => { setSaveLabel(e.target.value); setSelectedEmoji("📍"); }} />
+      <div className="save-place-actions">
+        <button className="btn-refresh save-place-save"
+          onClick={() => onSave(selectedEmoji, saveLabel)}
+          disabled={!saveLabel.trim()}>Save</button>
+        <button className="btn-clear-filters" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── PlaceInput ────────────────────────────────────────────────────────────────
+
+function PlaceInput({ label, value, onSelect, placeholder, savedPlaces = [], onDelete }) {
   const [query, setQuery] = useState(value?.display_name || "");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
@@ -148,16 +185,22 @@ function PlaceInput({ label, value, onSelect, placeholder }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const filteredSaved = savedPlaces.filter((p) =>
+    query.length < 2 ||
+    p.label.toLowerCase().includes(query.toLowerCase()) ||
+    p.display_name.toLowerCase().includes(query.toLowerCase())
+  );
+
   function handleChange(e) {
     const q = e.target.value;
     setQuery(q);
     clearTimeout(timer.current);
-    if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
+    if (q.length < 2) { setSuggestions([]); setOpen(true); return; }
     timer.current = setTimeout(async () => {
       try {
         const results = await nominatimSearch(q);
         setSuggestions(results);
-        setOpen(results.length > 0);
+        setOpen(true);
       } catch { /* ignore */ }
     }, 400);
   }
@@ -177,12 +220,38 @@ function PlaceInput({ label, value, onSelect, placeholder }) {
         type="text"
         value={query}
         onChange={handleChange}
-        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onFocus={() => setOpen(true)}
         placeholder={placeholder}
         autoComplete="off"
       />
-      {open && (
+      {open && (filteredSaved.length > 0 || suggestions.length > 0) && (
         <div className="route-suggestions">
+          {filteredSaved.length > 0 && (
+            <>
+              <div className="route-saved-section-header">Saved</div>
+              {filteredSaved.map((p) => (
+                <div key={p.id} className="route-saved-item">
+                  <button className="route-saved-pick"
+                    onMouseDown={() => {
+                      setQuery(p.display_name);
+                      setSuggestions([]);
+                      setOpen(false);
+                      onSelect({ lat: p.lat, lng: p.lng, display_name: p.display_name });
+                    }}>
+                    <span className="route-saved-emoji">{p.emoji}</span>
+                    <span className="route-saved-label">{p.label}</span>
+                    <span className="route-saved-addr">{p.display_name}</span>
+                  </button>
+                  <button className="route-saved-delete"
+                    onMouseDown={(e) => { e.preventDefault(); onDelete(p.id); }}
+                    title="Remove">×</button>
+                </div>
+              ))}
+              {suggestions.length > 0 && (
+                <div className="route-saved-section-header">Results</div>
+              )}
+            </>
+          )}
           {suggestions.map((s, i) => (
             <button key={i} className="route-suggestion-item" onMouseDown={() => handleSelect(s)}>
               {s.display_name}
@@ -201,17 +270,42 @@ const DETOUR_PENALTY_PER_KM = 0.4;
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
 export default function RouteTab({ stations }) {
-  const [fromPlace, setFromPlace]         = useState(null);
-  const [toPlace, setToPlace]             = useState(null);
-  const [fuelType, setFuelType]           = useState("regular_gas");
-  const [routeCoords, setRouteCoords]     = useState(null);
-  const [results, setResults]             = useState(null);   // all stations near route
-  const [loading, setLoading]             = useState(false);
-  const [error, setError]                 = useState(null);
-  const [routeInfo, setRouteInfo]         = useState(null);
+  const [fromPlace, setFromPlace]           = useState(null);
+  const [toPlace, setToPlace]               = useState(null);
+  const [fuelType, setFuelType]             = useState("regular_gas");
+  const [routeCoords, setRouteCoords]       = useState(null);
+  const [results, setResults]               = useState(null);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState(null);
+  const [routeInfo, setRouteInfo]           = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
-  const [brandFilter, setBrandFilter]     = useState(new Set());
+  const [brandFilter, setBrandFilter]       = useState(new Set());
+
+  // Saved places
+  const [savedPlaces, setSavedPlaces] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-saved-places") || "[]"); }
+    catch { return []; }
+  });
+  const [savingFor, setSavingFor]   = useState(null);  // "from" | "to" | null
+  const [saveLabel, setSaveLabel]   = useState("");
+
+  // Vehicle consumption
+  const [consumption, setConsumption] = useState(() => {
+    const v = parseFloat(localStorage.getItem("gasman-consumption"));
+    return isNaN(v) || v <= 0 ? 10 : v;
+  });
+  const [showConsumptionHelper, setShowConsumptionHelper] = useState(false);
+  const [calcKm, setCalcKm]         = useState("");
+  const [calcLitres, setCalcLitres] = useState("");
+
   const markerRefs = useRef({});
+
+  function applyConsumption(v) {
+    setConsumption(v);
+    localStorage.setItem("gasman-consumption", String(v));
+    setShowConsumptionHelper(false);
+    setCalcKm(""); setCalcLitres("");
+  }
 
   const handleFind = useCallback(async () => {
     if (!fromPlace || !toPlace) return;
@@ -222,6 +316,8 @@ export default function RouteTab({ stations }) {
     setRouteInfo(null);
     setSelectedStation(null);
     setBrandFilter(new Set());
+    setSavingFor(null);
+    setSaveLabel("");
 
     try {
       const polyline = await getOsrmRoute(fromPlace, toPlace);
@@ -258,19 +354,32 @@ export default function RouteTab({ stations }) {
     }
   }, [fromPlace, toPlace, fuelType, stations]);
 
-  // Available brands from current results
-  const availableBrands = results
-    ? [...new Set(results.map((s) => s._brand || s.name).filter(Boolean))].sort()
-    : [];
+  const handleSavePlace = useCallback((place, emoji, label) => {
+    if (!place || !label.trim()) return;
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      label: label.trim(), emoji,
+      lat: place.lat, lng: place.lng, display_name: place.display_name,
+    };
+    setSavedPlaces((prev) => {
+      const next = [...prev, entry];
+      localStorage.setItem("gasman-saved-places", JSON.stringify(next));
+      return next;
+    });
+    setSavingFor(null); setSaveLabel("");
+  }, []);
 
-  // Apply brand filter to list (map always shows all results)
-  const displayedResults = results
-    ? (brandFilter.size > 0
-        ? results.filter((s) => brandFilter.has(s._brand || s.name))
-        : results)
-    : null;
+  const handleDeletePlace = useCallback((id) => {
+    setSavedPlaces((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      localStorage.setItem("gasman-saved-places", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
-  const fuelLabel = FUEL_TYPES.find((f) => f.key === fuelType)?.label || "";
+  function handleSelectStation(s) {
+    setSelectedStation((prev) => prev?.station_id === s.station_id ? null : s);
+  }
 
   function toggleBrand(b) {
     setBrandFilter((prev) => {
@@ -280,19 +389,61 @@ export default function RouteTab({ stations }) {
     });
   }
 
-  function handleSelectStation(s) {
-    setSelectedStation((prev) => prev?.station_id === s.station_id ? null : s);
-  }
+  const availableBrands = results
+    ? [...new Set(results.map((s) => s._brand || s.name).filter(Boolean))].sort()
+    : [];
+
+  const displayedResults = results
+    ? (brandFilter.size > 0
+        ? results.filter((s) => brandFilter.has(s._brand || s.name))
+        : results)
+    : null;
+
+  const fuelLabel = FUEL_TYPES.find((f) => f.key === fuelType)?.label || "";
 
   return (
     <div className="route-tab">
+
       {/* ── Input form ── */}
       <div className="route-form">
-        <PlaceInput label="From" value={fromPlace} onSelect={setFromPlace} placeholder="e.g. Vancouver, BC" />
-        <PlaceInput label="To"   value={toPlace}   onSelect={setToPlace}   placeholder="e.g. Whistler, BC" />
+        {/* From */}
+        <div className="route-place-with-save">
+          <PlaceInput label="From" value={fromPlace} onSelect={setFromPlace}
+            placeholder="e.g. Vancouver, BC"
+            savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+          {fromPlace && (
+            <button className="btn-save-place" title="Save this location"
+              onClick={() => setSavingFor(savingFor === "from" ? null : "from")}>💾</button>
+          )}
+          {savingFor === "from" && (
+            <SavePlacePanel
+              onSave={(emoji, label) => handleSavePlace(fromPlace, emoji, label)}
+              onCancel={() => { setSavingFor(null); setSaveLabel(""); }}
+              saveLabel={saveLabel} setSaveLabel={setSaveLabel} />
+          )}
+        </div>
+
+        {/* To */}
+        <div className="route-place-with-save">
+          <PlaceInput label="To" value={toPlace} onSelect={setToPlace}
+            placeholder="e.g. Whistler, BC"
+            savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+          {toPlace && (
+            <button className="btn-save-place" title="Save this location"
+              onClick={() => setSavingFor(savingFor === "to" ? null : "to")}>💾</button>
+          )}
+          {savingFor === "to" && (
+            <SavePlacePanel
+              onSave={(emoji, label) => handleSavePlace(toPlace, emoji, label)}
+              onCancel={() => { setSavingFor(null); setSaveLabel(""); }}
+              saveLabel={saveLabel} setSaveLabel={setSaveLabel} />
+          )}
+        </div>
+
         <div className="route-fuel-wrap">
           <label className="route-place-label">Fuel</label>
-          <select className="route-fuel-select" value={fuelType} onChange={(e) => setFuelType(e.target.value)}>
+          <select className="route-fuel-select" value={fuelType}
+            onChange={(e) => setFuelType(e.target.value)}>
             {FUEL_TYPES.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </div>
@@ -300,6 +451,60 @@ export default function RouteTab({ stations }) {
           disabled={!fromPlace || !toPlace || loading}>
           {loading ? "Finding…" : "Find Stations"}
         </button>
+      </div>
+
+      {/* ── Vehicle consumption ── */}
+      <div className="route-consumption-row">
+        <label className="route-place-label" htmlFor="route-consumption">Your vehicle</label>
+        <div className="route-consumption-input-wrap">
+          <input id="route-consumption" className="route-consumption-input"
+            type="number" min="1" max="40" step="0.5" value={consumption}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (!isNaN(v) && v > 0) {
+                setConsumption(v);
+                localStorage.setItem("gasman-consumption", String(v));
+              }
+            }} />
+          <span className="route-consumption-unit">L/100km</span>
+          <button className="btn-consumption-help"
+            onClick={() => setShowConsumptionHelper((o) => !o)}
+            title="Help me find my fuel consumption">?</button>
+        </div>
+
+        {showConsumptionHelper && (
+          <div className="consumption-helper">
+            <div className="consumption-presets">
+              {VEHICLE_PRESETS.map((v) => (
+                <button key={v.label}
+                  className={`consumption-preset ${Math.abs(consumption - v.l100km) < 0.1 ? "consumption-preset-active" : ""}`}
+                  onClick={() => applyConsumption(v.l100km)}>
+                  {v.icon} {v.label}
+                  <span className="consumption-preset-val">{v.l100km}L</span>
+                </button>
+              ))}
+            </div>
+            <div className="consumption-calc">
+              <span className="consumption-calc-label">Or calculate from last fill-up:</span>
+              <div className="consumption-calc-row">
+                <input className="route-consumption-input consumption-calc-input"
+                  type="number" min="1" placeholder="km driven"
+                  value={calcKm} onChange={(e) => setCalcKm(e.target.value)} />
+                <span className="route-consumption-unit">km ÷</span>
+                <input className="route-consumption-input consumption-calc-input"
+                  type="number" min="1" placeholder="litres used"
+                  value={calcLitres} onChange={(e) => setCalcLitres(e.target.value)} />
+                <span className="route-consumption-unit">L</span>
+                <button className="btn-refresh" style={{ padding: "7px 12px" }}
+                  disabled={!calcKm || !calcLitres}
+                  onClick={() => {
+                    const v = (parseFloat(calcLitres) / parseFloat(calcKm)) * 100;
+                    if (!isNaN(v) && v > 0) applyConsumption(Math.round(v * 10) / 10);
+                  }}>Use</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && <div className="error-box">{error}</div>}
@@ -328,13 +533,11 @@ export default function RouteTab({ stations }) {
             {results?.map((s, i) => {
               const isSelected = selectedStation?.station_id === s.station_id;
               return (
-                <Marker
-                  key={s.station_id}
+                <Marker key={s.station_id}
                   ref={(r) => { if (r) markerRefs.current[s.station_id] = r; }}
                   position={[s.latitude, s.longitude]}
                   icon={makeIcon(i + 1, STATION_COLORS[i] || "#94a3b8", isSelected)}
-                  eventHandlers={{ click: () => handleSelectStation(s) }}
-                >
+                  eventHandlers={{ click: () => handleSelectStation(s) }}>
                   <Popup>
                     <strong>{s.name}</strong><br />
                     {s.address}<br />
@@ -354,29 +557,32 @@ export default function RouteTab({ stations }) {
           <span>🛣️ <strong>{routeInfo.distanceKm} km</strong></span>
           <span>⏱️ <strong>{routeInfo.durationMin} min</strong></span>
           {results !== null && (
-            <span>⛽ <strong>{results.length}</strong> station{results.length !== 1 ? "s" : ""} along route</span>
+            <span>⛽ <strong>{results.length}</strong> station{results.length !== 1 ? "s" : ""} found</span>
           )}
+          {results?.length > 0 && (() => {
+            const costs = results.map((s) =>
+              calcTripCost(routeInfo.distanceKm, consumption, s[fuelType]?.price || 0));
+            const lo = Math.min(...costs).toFixed(2);
+            const hi = Math.max(...costs).toFixed(2);
+            return (
+              <span>💰 ~<strong>{lo === hi ? `$${lo}` : `$${lo}–$${hi}`}</strong> fuel cost</span>
+            );
+          })()}
         </div>
       )}
 
-      {/* ── Brand filter (shown only when results exist) ── */}
+      {/* ── Brand filter ── */}
       {availableBrands.length > 1 && (
         <div className="route-brand-filter">
           <span className="route-brand-label">Filter by brand</span>
           <div className="route-brand-chips">
             {availableBrands.map((b) => (
-              <button
-                key={b}
+              <button key={b}
                 className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
-                onClick={() => toggleBrand(b)}
-              >
-                {b}
-              </button>
+                onClick={() => toggleBrand(b)}>{b}</button>
             ))}
             {brandFilter.size > 0 && (
-              <button className="btn-clear-filters" onClick={() => setBrandFilter(new Set())}>
-                Clear
-              </button>
+              <button className="btn-clear-filters" onClick={() => setBrandFilter(new Set())}>Clear</button>
             )}
           </div>
         </div>
@@ -401,35 +607,41 @@ export default function RouteTab({ stations }) {
             </span>
           </p>
           <div className="route-result-list">
-            {displayedResults.map((s, i) => {
+            {displayedResults.map((s) => {
               const priceData = s[fuelType];
               const rank = results.indexOf(s) + 1;
               const isSelected = selectedStation?.station_id === s.station_id;
               return (
-                <div
-                  key={s.station_id}
+                <div key={s.station_id}
                   className={`route-result-row ${rank === 1 ? "route-result-best" : ""} ${isSelected ? "route-result-selected" : ""}`}
-                  onClick={() => handleSelectStation(s)}
-                >
-                  <div className="route-result-rank" style={{ background: STATION_COLORS[rank - 1] || "#94a3b8" }}>
+                  onClick={() => handleSelectStation(s)}>
+                  <div className="route-result-rank"
+                    style={{ background: STATION_COLORS[rank - 1] || "#94a3b8" }}>
                     {rank}
                   </div>
                   <div className="route-result-info">
                     <span className="route-result-name">{s.name}</span>
-                    <span className="route-result-addr">{s.address}{s._area ? ` · ${s._area}` : ""}</span>
+                    <span className="route-result-addr">
+                      {s.address}{s._area ? ` · ${s._area}` : ""}
+                    </span>
                   </div>
                   <div className="route-result-right">
                     <span className="route-result-price">{priceData.price}¢</span>
                     <span className="route-result-detour">
                       {s.detour <= 0.3 ? "on route" : `+${s.detour}km detour`}
                     </span>
+                    {routeInfo && (
+                      <span className="route-result-tripcost">
+                        ~${calcTripCost(routeInfo.distanceKm, consumption, priceData.price).toFixed(2)} fuel
+                      </span>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
           <p className="route-results-note">
-            Effective cost includes a ~{DETOUR_PENALTY_PER_KM}¢/L per km detour penalty
+            Ranked by price + ~{DETOUR_PENALTY_PER_KM}¢/L per km detour
           </p>
         </div>
       )}
