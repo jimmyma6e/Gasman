@@ -30,17 +30,21 @@ logger = logging.getLogger(__name__)
 SEARCH_COORDS = [
     # --- Metro Vancouver: Vancouver ---
     (49.2827, -123.1207),  # Downtown Vancouver
-    (49.2640, -123.0586),  # East Vancouver / Mount Pleasant
+    (49.2700, -123.0700),  # East Vancouver (Commercial / Hastings)
+    (49.2500, -123.0400),  # East Van / Boundary area
+    (49.2430, -123.0230),  # Boundary Road corridor
     (49.2300, -123.1500),  # Vancouver West Side (Kitsilano)
     (49.2100, -123.1400),  # Marpole / South Vancouver
     (49.2450, -123.1800),  # Kerrisdale / Oakridge
+    (49.2550, -123.1000),  # Kingsway / Victoria corridor
     # --- Metro Vancouver: North Shore ---
     (49.3163, -123.0724),  # North Vancouver Central
     (49.3400, -123.0200),  # North Vancouver East (Lynn Valley)
     (49.3667, -123.1670),  # West Vancouver
     # --- Metro Vancouver: Burnaby ---
     (49.2650, -122.9200),  # Burnaby North / Brentwood
-    (49.2488, -122.9805),  # Burnaby West / Metrotown
+    (49.2500, -122.9800),  # Burnaby West / Metrotown
+    (49.2400, -123.0000),  # Burnaby / Boundary corridor
     (49.2200, -122.9600),  # South Burnaby / Big Bend
     # --- Metro Vancouver: New Westminster / Coquitlam ---
     (49.2057, -122.9110),  # New Westminster
