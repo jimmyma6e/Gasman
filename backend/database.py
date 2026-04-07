@@ -72,8 +72,111 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_station_fuel_time
         ON price_history (station_id, fuel_type, recorded_at)
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stations (
+            station_id  TEXT PRIMARY KEY,
+            name        TEXT,
+            address     TEXT,
+            latitude    REAL NOT NULL,
+            longitude   REAL NOT NULL,
+            last_seen   TEXT NOT NULL
+        )
+    """)
+    # Back-fill stations table from price_history on first run
+    count = conn.execute("SELECT COUNT(*) FROM stations").fetchone()[0]
+    if count == 0:
+        conn.execute("""
+            INSERT OR IGNORE INTO stations (station_id, name, address, latitude, longitude, last_seen)
+            SELECT station_id,
+                   MAX(name),
+                   MAX(address),
+                   AVG(latitude),
+                   AVG(longitude),
+                   MAX(recorded_at)
+            FROM price_history
+            WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+            GROUP BY station_id
+        """)
     conn.commit()
     conn.close()
+
+
+def upsert_stations(stations: list) -> None:
+    """Insert or update station registry (location metadata only, no prices)."""
+    if not stations:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    rows = [
+        (s["station_id"], s.get("name"), s.get("address"),
+         s.get("latitude"), s.get("longitude"), now)
+        for s in stations
+        if s.get("latitude") is not None and s.get("longitude") is not None
+    ]
+    if not rows:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    conn.executemany("""
+        INSERT INTO stations (station_id, name, address, latitude, longitude, last_seen)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(station_id) DO UPDATE SET
+            name=excluded.name,
+            address=excluded.address,
+            latitude=excluded.latitude,
+            longitude=excluded.longitude,
+            last_seen=excluded.last_seen
+    """, rows)
+    conn.commit()
+    conn.close()
+
+
+def get_known_stations() -> list:
+    """Return all stations from the registry (lat/lng for clustering)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT station_id, name, address, latitude, longitude FROM stations"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_latest_stations() -> list:
+    """Reconstruct the most recent full station list from price_history (for cache warm-up)."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        # Find timestamp of most recent batch
+        ts = conn.execute(
+            "SELECT recorded_at FROM price_history ORDER BY recorded_at DESC LIMIT 1"
+        ).fetchone()
+        if not ts:
+            return []
+        latest = ts["recorded_at"]
+        rows = conn.execute("""
+            SELECT station_id, name, address, latitude, longitude,
+                   fuel_type, price, currency, unit, recorded_at
+            FROM price_history
+            WHERE recorded_at = ?
+        """, (latest,)).fetchall()
+
+    # Group into station dicts keyed by station_id
+    stations_map: dict = {}
+    for r in rows:
+        sid = r["station_id"]
+        if sid not in stations_map:
+            stations_map[sid] = {
+                "station_id": sid,
+                "name": r["name"],
+                "address": r["address"],
+                "latitude": r["latitude"],
+                "longitude": r["longitude"],
+                "currency": r["currency"],
+                "unit_of_measure": r["unit"],
+                "regular_gas": None, "midgrade_gas": None,
+                "premium_gas": None, "diesel": None, "e85": None,
+            }
+        if r["fuel_type"] in stations_map[sid] and r["price"] is not None:
+            stations_map[sid][r["fuel_type"]] = {"price": r["price"]}
+    return list(stations_map.values())
 
 
 def insert_prices(stations: list):

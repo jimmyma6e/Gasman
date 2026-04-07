@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -12,17 +14,44 @@ from fastapi.responses import FileResponse
 import database
 import gasbuddy_client as gb
 
+logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-async def poll_and_store() -> None:
-    print(f"[{datetime.now().strftime('%H:%M')}] Polling gas prices …")
+async def discovery_job() -> None:
+    """Full grid scan — discovers new stations across BC. Runs daily."""
+    logger.info("discovery_job: starting full BC grid scan …")
     try:
-        stations, _ = await gb.get_all_bc()
+        def on_flush(stations):
+            database.upsert_stations(stations)
+            database.insert_prices(stations)
+
+        stations, _ = await gb.discover_stations(on_flush=on_flush)
+        database.upsert_stations(stations)
         database.insert_prices(stations)
-        print(f"  Stored {len(stations)} stations.")
-    except Exception as e:
-        print(f"  Poll failed: {e}")
+        logger.info("discovery_job: done — %d stations", len(stations))
+    except Exception:
+        logger.exception("discovery_job failed")
+
+
+async def price_refresh_job() -> None:
+    """Fast refresh using known station cluster centers. Runs every 30 min."""
+    known = database.get_known_stations()
+    if not known:
+        logger.info("price_refresh_job: no known stations — running discovery first")
+        await discovery_job()
+        return
+
+    logger.info("price_refresh_job: refreshing prices for %d known stations …", len(known))
+    try:
+        def on_flush(stations):
+            database.insert_prices(stations)
+
+        stations, _ = await gb.refresh_prices(known, on_flush=on_flush)
+        database.insert_prices(stations)
+        logger.info("price_refresh_job: done — %d stations updated", len(stations))
+    except Exception:
+        logger.exception("price_refresh_job failed")
 
 
 scheduler = AsyncIOScheduler()
@@ -31,14 +60,26 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
-    await poll_and_store()
-    scheduler.add_job(poll_and_store, "interval", minutes=30)
+
+    # Warm the in-memory cache instantly from DB (so /api/stations responds immediately)
+    cached = database.get_latest_stations()
+    if cached:
+        gb.warm_cache_from_db(cached)
+        logger.info("Warmed cache with %d stations from DB", len(cached))
+
+    # Schedule recurring jobs
+    scheduler.add_job(price_refresh_job, "interval", minutes=30, id="price_refresh")
+    scheduler.add_job(discovery_job,     "interval", days=1,     id="discovery")
     scheduler.start()
+
+    # Kick off the right job immediately in the background (non-blocking)
+    asyncio.create_task(price_refresh_job())
+
     yield
     scheduler.shutdown()
 
 
-app = FastAPI(title="Vancouver Gas Prices API", lifespan=lifespan)
+app = FastAPI(title="BC Gas Prices API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -81,6 +122,13 @@ async def get_insights(fuel_type: str = "regular_gas"):
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+
+
+# Trigger a manual discovery scan (useful after deploy or to force refresh)
+@app.post("/api/admin/discover")
+async def trigger_discovery():
+    asyncio.create_task(discovery_job())
+    return {"status": "discovery job started"}
 
 
 # Serve the built React SPA — must be mounted AFTER all /api routes

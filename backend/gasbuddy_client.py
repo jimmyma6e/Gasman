@@ -20,6 +20,7 @@ Schema notes (discovered by inspection):
 
 import asyncio
 import logging
+import math
 from datetime import datetime, timezone, timedelta
 
 from playwright.async_api import async_playwright
@@ -248,9 +249,45 @@ def _parse_trend(raw: dict) -> dict:
 
 
 BATCH_SIZE     = 200   # zones per browser session before restarting
-SESSION_BREAK  = 90    # seconds to wait between browser sessions
-ZONE_SLEEP     = 6     # seconds between zone requests within a session
+SESSION_BREAK  = 90    # seconds between browser sessions (discovery)
+ZONE_SLEEP     = 6     # seconds between zone requests (discovery)
 FLUSH_EVERY    = 50    # flush cache + DB every N zones
+
+# Refresh mode uses fewer total queries so session breaks can be shorter
+REFRESH_SESSION_BREAK = 60
+REFRESH_ZONE_SLEEP    = 5
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in km between two lat/lng points."""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def build_query_centers(stations: list[dict], radius_km: float = 2.0) -> list[tuple[float, float]]:
+    """Greedy clustering: pick centers so every station is within radius_km of some center.
+
+    For ~991 stations at 2 km radius this typically produces ~66–150 centers,
+    reducing the refresh scan from 2189 zones to ~100 queries.
+    """
+    coords = [(s["latitude"], s["longitude"]) for s in stations]
+    uncovered = list(range(len(coords)))
+    centers: list[tuple[float, float]] = []
+
+    while uncovered:
+        seed_idx = uncovered[0]
+        slat, slng = coords[seed_idx]
+        cluster = [i for i in uncovered if _haversine_km(slat, slng, *coords[i]) <= radius_km]
+        lats = [coords[i][0] for i in cluster]
+        lngs = [coords[i][1] for i in cluster]
+        centers.append((sum(lats) / len(lats), sum(lngs) / len(lngs)))
+        covered = set(cluster)
+        uncovered = [i for i in uncovered if i not in covered]
+
+    return centers
 
 
 async def _start_browser_session(pw):
@@ -304,10 +341,16 @@ async def _start_browser_session(pw):
     return browser, page, gbcsrf_token
 
 
-async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
+async def _fetch_via_playwright(
+    coords: list[tuple[float, float]],
+    on_flush=None,
+    *,
+    zone_sleep: float = ZONE_SLEEP,
+    session_break: float = SESSION_BREAK,
+) -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
-    total = len(SEARCH_COORDS)
+    total = len(coords)
 
     async with async_playwright() as pw:
         i = 0
@@ -323,9 +366,9 @@ async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
 
             for j in range(i, batch_end):
                 if j > i:
-                    await asyncio.sleep(ZONE_SLEEP)
+                    await asyncio.sleep(zone_sleep)
 
-                lat, lng = SEARCH_COORDS[j]
+                lat, lng = coords[j]
                 try:
                     result = await page.evaluate(
                         _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
@@ -390,34 +433,54 @@ async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
 
             # Break between sessions so GasBuddy doesn't flag us
             if i < total:
-                print(f"  [session break] {SESSION_BREAK}s before next session …")
-                await asyncio.sleep(SESSION_BREAK)
+                print(f"  [session break] {session_break}s before next session …")
+                await asyncio.sleep(session_break)
 
     logger.info("Done: %d stations, %d trends", len(stations_map), len(trends))
     return list(stations_map.values()), trends
 
 
-async def _ensure_fresh() -> None:
-    now = datetime.now(timezone.utc)
-    if (
-        _cache["stations"] is None
-        or _cache["fetched_at"] is None
-        or now - _cache["fetched_at"] > CACHE_TTL
-    ):
-        await _fetch_via_playwright()
+async def discover_stations(on_flush=None) -> tuple[list[dict], list[dict]]:
+    """Full grid scan across all of BC — finds new/unknown stations.
+    Runs infrequently (daily). Returns (stations, trends).
+    """
+    logger.info("discover_stations: scanning %d zones …", len(SEARCH_COORDS))
+    stations, trends = await _fetch_via_playwright(
+        SEARCH_COORDS, on_flush,
+        zone_sleep=ZONE_SLEEP,
+        session_break=SESSION_BREAK,
+    )
+    _cache["stations"]   = stations
+    _cache["trends"]     = trends
+    _cache["fetched_at"] = datetime.now(timezone.utc)
+    return stations, trends
 
 
-async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]:
-    async with _lock:
-        await _ensure_fresh()
-    return _cache["stations"], _cache["trends"]
+async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[list[dict], list[dict]]:
+    """Fast price refresh using cluster centers derived from known station locations.
+    Runs every 30 min. Much fewer queries than full discovery.
+    """
+    centers = build_query_centers(known_stations)
+    logger.info(
+        "refresh_prices: %d known stations → %d query centers",
+        len(known_stations), len(centers),
+    )
+    stations, trends = await _fetch_via_playwright(
+        centers, on_flush,
+        zone_sleep=REFRESH_ZONE_SLEEP,
+        session_break=REFRESH_SESSION_BREAK,
+    )
+    _cache["stations"]   = stations
+    _cache["trends"]     = trends
+    _cache["fetched_at"] = datetime.now(timezone.utc)
+    return stations, trends
 
 
-async def get_all_vancouver() -> tuple[list[dict], list[dict]]:
-    # Return cached data immediately if available (even if stale — background poll will refresh)
+async def get_all_bc() -> tuple[list[dict], list[dict]]:
+    """Return cached station data immediately; background poll keeps it fresh."""
     if _cache["stations"] is not None:
         return _cache["stations"], _cache["trends"] or []
-    # No cache yet — must wait for first poll
-    async with _lock:
-        await _ensure_fresh()
-    return _cache["stations"], _cache["trends"]
+    # No cache yet — wait for first poll result
+    while _cache["stations"] is None:
+        await asyncio.sleep(1)
+    return _cache["stations"], _cache["trends"] or []
