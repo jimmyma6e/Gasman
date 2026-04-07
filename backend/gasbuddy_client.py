@@ -139,7 +139,7 @@ _STEALTH_HEADERS = {
 _GQL = """
 query locationBySearchTerm($lat: Float, $lng: Float) {
   locationBySearchTerm(lat: $lat, lng: $lng) {
-    stations(maxCount: 50) {
+    stations {
       results {
         id
         name
