@@ -115,6 +115,9 @@ CACHE_TTL = timedelta(hours=4)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
+# Prevents concurrent discovery + refresh scans (two Playwright sessions = rate-limit cascade)
+_scan_lock = asyncio.Lock()
+
 
 def warm_cache_from_db(stations: list):
     """Pre-populate the in-memory cache with DB data so startup is instant."""
@@ -122,6 +125,8 @@ def warm_cache_from_db(stations: list):
         _cache["stations"]   = stations
         _cache["trends"]     = []
         _cache["fetched_at"] = datetime.now(timezone.utc) - timedelta(minutes=29)
+
+
 _lock = asyncio.Lock()
 
 _UA = (
@@ -442,38 +447,48 @@ async def _fetch_via_playwright(
 
 async def discover_stations(on_flush=None) -> tuple[list[dict], list[dict]]:
     """Full grid scan across all of BC — finds new/unknown stations.
-    Runs infrequently (daily). Returns (stations, trends).
+    Runs daily. Returns (stations, trends).
     """
-    logger.info("discover_stations: scanning %d zones …", len(SEARCH_COORDS))
-    stations, trends = await _fetch_via_playwright(
-        SEARCH_COORDS, on_flush,
-        zone_sleep=ZONE_SLEEP,
-        session_break=SESSION_BREAK,
-    )
-    _cache["stations"]   = stations
-    _cache["trends"]     = trends
-    _cache["fetched_at"] = datetime.now(timezone.utc)
-    return stations, trends
+    if _scan_lock.locked():
+        logger.warning("discover_stations: scan already in progress — skipping")
+        return _cache.get("stations") or [], _cache.get("trends") or []
+
+    async with _scan_lock:
+        logger.info("discover_stations: scanning %d zones …", len(SEARCH_COORDS))
+        stations, trends = await _fetch_via_playwright(
+            SEARCH_COORDS, on_flush,
+            zone_sleep=ZONE_SLEEP,
+            session_break=SESSION_BREAK,
+        )
+        _cache["stations"]   = stations
+        _cache["trends"]     = trends
+        _cache["fetched_at"] = datetime.now(timezone.utc)
+        return stations, trends
 
 
 async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[list[dict], list[dict]]:
     """Fast price refresh using cluster centers derived from known station locations.
     Runs every 30 min. Much fewer queries than full discovery.
     """
-    centers = build_query_centers(known_stations)
-    logger.info(
-        "refresh_prices: %d known stations → %d query centers",
-        len(known_stations), len(centers),
-    )
-    stations, trends = await _fetch_via_playwright(
-        centers, on_flush,
-        zone_sleep=REFRESH_ZONE_SLEEP,
-        session_break=REFRESH_SESSION_BREAK,
-    )
-    _cache["stations"]   = stations
-    _cache["trends"]     = trends
-    _cache["fetched_at"] = datetime.now(timezone.utc)
-    return stations, trends
+    if _scan_lock.locked():
+        logger.warning("refresh_prices: scan already in progress — skipping this cycle")
+        return _cache.get("stations") or [], _cache.get("trends") or []
+
+    async with _scan_lock:
+        centers = build_query_centers(known_stations)
+        logger.info(
+            "refresh_prices: %d known stations → %d query centers",
+            len(known_stations), len(centers),
+        )
+        stations, trends = await _fetch_via_playwright(
+            centers, on_flush,
+            zone_sleep=REFRESH_ZONE_SLEEP,
+            session_break=REFRESH_SESSION_BREAK,
+        )
+        _cache["stations"]   = stations
+        _cache["trends"]     = trends
+        _cache["fetched_at"] = datetime.now(timezone.utc)
+        return stations, trends
 
 
 async def get_all_bc() -> tuple[list[dict], list[dict]]:
