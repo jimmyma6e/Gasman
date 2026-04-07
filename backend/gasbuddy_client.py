@@ -80,7 +80,7 @@ query locationBySearchTerm($lat: Float, $lng: Float) {
       results {
         id
         name
-        address { line1 }
+        address { line1 city state country }
         latitude
         longitude
         fuels
@@ -144,10 +144,14 @@ def _parse_station(raw: dict) -> dict:
     fuels  = raw.get("fuels") or []
     prices = raw.get("prices") or []
 
+    addr = raw.get("address") or {}
     station: dict = {
         "station_id":      str(raw.get("id", "")),
         "name":            raw.get("name", f"Station #{raw.get('id','')}"),
-        "address":         (raw.get("address") or {}).get("line1", "Vancouver, BC"),
+        "address":         addr.get("line1", ""),
+        "city":            addr.get("city", ""),
+        "province":        addr.get("state", ""),
+        "country":         addr.get("country", ""),
         "latitude":        raw.get("latitude"),
         "longitude":       raw.get("longitude"),
         "currency":        "CAD",
@@ -247,8 +251,13 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
                 sid = str(s.get("id", ""))
                 if sid and sid not in stations_map:
                     parsed = _parse_station(s)
-                    if _is_bc_station(parsed["latitude"], parsed["longitude"]):
-                        stations_map[sid] = parsed
+                    # Filter by country if available, fall back to coordinate check
+                    country = parsed.get("country", "")
+                    if country and country.upper() not in ("CA", "CAN", "CANADA"):
+                        continue
+                    if not country and not _is_bc_station(parsed["latitude"], parsed["longitude"]):
+                        continue
+                    stations_map[sid] = parsed
 
             if not trends and raw_trends:
                 trends.extend(_parse_trend(t) for t in raw_trends)
