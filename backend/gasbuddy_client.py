@@ -347,8 +347,8 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
             if not trends and raw_trends:
                 trends.extend(_parse_trend(t) for t in raw_trends)
 
-            logger.info("  -> %d raw, +%d new, total unique: %d",
-                        len(raw_stations), len(stations_map) - before, len(stations_map))
+            added = len(stations_map) - before
+            print(f"  zone {i+1}/{len(SEARCH_COORDS)} ({lat:.2f},{lng:.2f}): {len(raw_stations)} raw, +{added} new, total={len(stations_map)}")
 
         await browser.close()
 
