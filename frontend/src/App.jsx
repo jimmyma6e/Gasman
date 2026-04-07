@@ -97,13 +97,15 @@ function getAreaFromCoords(lat, lng) {
     if (lng >= -122.60) return "Langley";
     if (lat < 49.07 && lng >= -122.88) return "White Rock";
     if (lng >= -122.97) return "Surrey";
-    if (lng >= -123.20) return "Delta";  // covers Tsawwassen & Ladner
+    // North Delta: east of Richmond, between Surrey and Ladner
+    if (lat >= 49.09 && lng >= -123.04) return "North Delta";
+    // Delta (Tsawwassen & Ladner): south of the South arm of Fraser
+    if (lat < 49.12) return "Delta";
+    // Richmond: lat 49.12–49.20, west of Surrey/North Delta
     return "Richmond";
   }
 
   if (lat < 49.225 && lng > -122.97) return "New Westminster";
-  // North Delta is *north* of 49.10 (not south)
-  if (lat >= 49.10 && lat < 49.20 && lng >= -123.03 && lng < -122.97) return "North Delta";
   if (lat < 49.24 && lng > -123.027) return "South Burnaby";
   if (lng > -123.027) return "Burnaby";
   if (lng >= -123.11) return "East Vancouver";
@@ -548,62 +550,51 @@ export default function App() {
           </div>
         </div>
 
-        {/* Brand filter — searchable dropdown */}
+        {/* Brand filter — popular as chips, rest in dropdown */}
         {brands.length > 0 && (
           <div className="filter-section">
             <span className="filter-label">Brand</span>
             <div className="chip-row">
-              {/* Selected brand chips */}
-              {[...brandFilter].map((b) => (
+              {/* Popular brand chips (always visible) */}
+              {POPULAR_BRANDS.filter((b) => brands.includes(b)).map((b) => (
+                <button key={b}
+                  className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
+                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}>
+                  {b}
+                </button>
+              ))}
+              {/* Selected non-popular brands as dismissible chips */}
+              {[...brandFilter].filter((b) => !POPULAR_BRANDS.includes(b)).map((b) => (
                 <button key={b} className="brand-chip brand-chip-active"
                   onClick={() => setBrandFilter(toggleSet(brandFilter, b))}>
                   {b} ×
                 </button>
               ))}
-              <div className="area-more-wrap" ref={brandDropdownRef}>
-                <button
-                  className={`area-more-btn ${brandFilter.size > 0 ? "brand-chip-active" : ""}`}
-                  onClick={() => { setBrandDropdownOpen((o) => !o); setBrandSearch(""); }}
-                >
-                  Brands {brandDropdownOpen ? "▴" : "▾"}
-                </button>
-                {brandDropdownOpen && (
-                  <div className="area-dropdown brand-dropdown">
-                    <input className="area-search-input" type="text" placeholder="Search brand…"
-                      value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} autoFocus />
-                    {/* Popular brands */}
-                    {POPULAR_BRANDS.filter((b) => brands.includes(b) &&
-                      b.toLowerCase().includes(brandSearch.toLowerCase())).length > 0 && (
-                      <div className="area-region-group">
-                        <div className="area-region-header">Popular</div>
-                        {POPULAR_BRANDS.filter((b) => brands.includes(b) &&
-                          b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
-                          <label key={b} className="area-dropdown-item">
-                            <input type="checkbox" checked={brandFilter.has(b)}
-                              onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
-                            {b}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {/* All other brands */}
-                    {brands.filter((b) => !POPULAR_BRANDS.includes(b) &&
-                      b.toLowerCase().includes(brandSearch.toLowerCase())).length > 0 && (
-                      <div className="area-region-group">
-                        <div className="area-region-header">Other</div>
-                        {brands.filter((b) => !POPULAR_BRANDS.includes(b) &&
-                          b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
-                          <label key={b} className="area-dropdown-item">
-                            <input type="checkbox" checked={brandFilter.has(b)}
-                              onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
-                            {b}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {/* "More" dropdown for non-popular brands */}
+              {brands.filter((b) => !POPULAR_BRANDS.includes(b)).length > 0 && (
+                <div className="area-more-wrap" ref={brandDropdownRef}>
+                  <button
+                    className={`area-more-btn ${[...brandFilter].some((b) => !POPULAR_BRANDS.includes(b)) ? "brand-chip-active" : ""}`}
+                    onClick={() => { setBrandDropdownOpen((o) => !o); setBrandSearch(""); }}
+                  >
+                    More {brandDropdownOpen ? "▴" : "▾"}
+                  </button>
+                  {brandDropdownOpen && (
+                    <div className="area-dropdown brand-dropdown">
+                      <input className="area-search-input" type="text" placeholder="Search brand…"
+                        value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} autoFocus />
+                      {brands.filter((b) => !POPULAR_BRANDS.includes(b) &&
+                        b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
+                        <label key={b} className="area-dropdown-item">
+                          <input type="checkbox" checked={brandFilter.has(b)}
+                            onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
+                          {b}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
