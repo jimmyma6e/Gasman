@@ -41,11 +41,11 @@ def _build_search_coords() -> list:
                 lng += lng_step
             lat += lat_step
 
-    # Metro Vancouver — 2.5 km grid (catches every station, ~500 points)
-    grid(49.00, 49.42, -123.35, -122.45, 2.5)
+    # Metro Vancouver — 1.5 km grid (comprehensive, ~1300 points)
+    grid(49.00, 49.42, -123.35, -122.45, 1.5)
 
-    # Fraser Valley — 6 km grid
-    grid(49.00, 49.45, -122.45, -121.00, 6.0)
+    # Fraser Valley — 4 km grid
+    grid(49.00, 49.45, -122.45, -121.00, 4.0)
 
     # Sea to Sky corridor — targeted
     coords += [
@@ -198,7 +198,7 @@ _DUMMY = [
     (58.8050, -122.6978),  # Fort Nelson
 ]
 
-CACHE_TTL = timedelta(minutes=60)
+CACHE_TTL = timedelta(minutes=90)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
@@ -390,7 +390,7 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
                     wait_until="networkidle",
                     timeout=60_000,
                 )
-                await asyncio.sleep(3)
+                await asyncio.sleep(2)
             except Exception as e:
                 logger.warning("BC page load warning: %s", e)
 
@@ -398,7 +398,7 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         for i, (lat, lng) in enumerate(SEARCH_COORDS):
             if i > 0:
-                await asyncio.sleep(3)  # avoid 429 rate limiting
+                await asyncio.sleep(2)  # avoid 429 rate limiting
 
             logger.info("  /graphql for (%.4f, %.4f) …", lat, lng)
             try:
