@@ -86,7 +86,7 @@ function getAreaFromCoords(lat, lng) {
     if (lng >= -122.65) return "Langley";
     if (lat < 49.06 && lng >= -122.85) return "White Rock";
     if (lng >= -122.97) return "Surrey";
-    if (lat < 49.16 && lng >= -123.02) return "Delta";
+    if (lat < 49.16 && lng >= -123.20) return "Delta";
     return "Richmond";
   }
   if (lng > -122.97 && lat < 49.225) return "New Westminster";
