@@ -668,6 +668,19 @@ export default function App() {
           </div>
         )}
 
+        {data && sorted.length === 0 && !loading && (
+          <div className="empty-state">
+            <p style={{ fontSize: "2rem" }}>🔍</p>
+            <p><strong>No stations match your filters</strong></p>
+            {(areaFilter.size > 0 || brandFilter.size > 0 || search) && (
+              <button className="btn-clear-filters" style={{ marginTop: 8 }}
+                onClick={() => { setAreaFilter(new Set()); setBrandFilter(new Set()); setSearch(""); }}>
+                Clear all filters
+              </button>
+            )}
+          </div>
+        )}
+
         {data && sorted.length > 0 && (
           <>
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>

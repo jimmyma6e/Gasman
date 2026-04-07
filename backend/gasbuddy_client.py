@@ -112,6 +112,38 @@ def _build_search_coords() -> list:
 SEARCH_COORDS = _build_search_coords()
 print(f"[config] {len(SEARCH_COORDS)} search zones loaded.")
 
+# Named anchor points always included in every refresh scan, even before those
+# areas have any known stations (ensures Sea-to-Sky, Island, Interior, North
+# always get checked on every 30-min cycle — not just after discovery).
+ANCHOR_COORDS = [
+    # Sea to Sky
+    (49.4400, -123.2800),  # Gibsons
+    (49.7016, -123.1558),  # Squamish
+    (50.1163, -122.9574),  # Whistler
+    # Vancouver Island
+    (49.1659, -123.9401),  # Nanaimo
+    (49.3000, -124.3100),  # Parksville / Qualicum
+    (49.6870, -124.9901),  # Courtenay / Comox
+    (50.0163, -125.2445),  # Campbell River
+    # Okanagan
+    (49.1783, -119.5919),  # Oliver / Osoyoos
+    (49.4870, -119.3960),  # Penticton
+    (49.8880, -119.4960),  # Kelowna
+    (50.2670, -119.2720),  # Vernon
+    # Thompson / Kamloops
+    (50.6745, -120.3273),  # Kamloops
+    (50.9250, -118.7717),  # Salmon Arm
+    # Kootenays
+    (49.4926, -117.2948),  # Nelson
+    (49.5198, -115.7697),  # Cranbrook
+    # Northern BC
+    (53.9166, -122.7497),  # Prince George
+    (54.5168, -128.5975),  # Terrace
+    (56.2518, -120.8476),  # Fort St. John
+    (55.7596, -120.2388),  # Dawson Creek
+    (58.8050, -122.6978),  # Fort Nelson
+]
+
 CACHE_TTL = timedelta(hours=4)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
@@ -481,10 +513,16 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
         return _cache.get("stations") or [], _cache.get("trends") or []
 
     async with _scan_lock:
-        centers = build_query_centers(known_stations)
+        cluster_centers = build_query_centers(known_stations)
+        # Always include named anchors so areas without known stations
+        # (e.g. Squamish, Whistler, Northern BC) are still refreshed.
+        anchor_set = {(round(c[0], 3), round(c[1], 3)) for c in cluster_centers}
+        extra_anchors = [c for c in ANCHOR_COORDS
+                         if (round(c[0], 3), round(c[1], 3)) not in anchor_set]
+        centers = cluster_centers + extra_anchors
         logger.info(
-            "refresh_prices: %d known stations → %d query centers",
-            len(known_stations), len(centers),
+            "refresh_prices: %d known stations → %d cluster centers + %d anchors = %d total",
+            len(known_stations), len(cluster_centers), len(extra_anchors), len(centers),
         )
         stations, trends = await _fetch_via_playwright(
             centers, on_flush,
