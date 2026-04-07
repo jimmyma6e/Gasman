@@ -302,6 +302,47 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .area-dropdown-item:hover { background: var(--surface2); }
 .area-dropdown-item input { accent-color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
 
+/* ── Route Tab ── */
+.route-tab { display: flex; flex-direction: column; gap: 16px; }
+
+.route-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.route-place-wrap { position: relative; flex: 1; min-width: 180px; }
+.route-place-label { display: block; font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.route-place-input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
+.route-place-input:focus { border-color: var(--accent); }
+.route-suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 9999; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); overflow: hidden; }
+.route-suggestion-item { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 0.83rem; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.route-suggestion-item:last-child { border-bottom: none; }
+.route-suggestion-item:hover { background: var(--surface2); }
+
+.route-fuel-wrap { display: flex; flex-direction: column; gap: 4px; }
+.route-fuel-select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; outline: none; }
+.route-find-btn { align-self: flex-end; padding: 9px 20px; white-space: nowrap; }
+
+.route-map-wrap { height: 340px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+
+.route-summary { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-size: 0.88rem; color: var(--text-dim); }
+.route-summary strong { color: var(--text); }
+
+.route-results { display: flex; flex-direction: column; gap: 10px; }
+.route-results-title { font-size: 0.88rem; color: var(--text-dim); }
+.route-results-title strong { color: var(--text); }
+.route-result-list { display: flex; flex-direction: column; gap: 8px; }
+.route-result-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; transition: border-color 0.15s; }
+.route-result-row:hover { border-color: var(--accent); }
+.route-result-best { border-color: var(--accent) !important; background: linear-gradient(90deg, var(--surface), #fff8f0); }
+.route-result-rank { color: #fff; font-weight: 700; font-size: 0.82rem; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.route-result-info { flex: 1; min-width: 0; }
+.route-result-name { display: block; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.route-result-addr { display: block; font-size: 0.76rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.route-result-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.route-result-price { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+.route-result-detour { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
+.route-results-note { font-size: 0.75rem; color: var(--text-dim); padding-top: 4px; }
+
+.route-empty-prompt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 60px 20px; color: var(--text-dim); text-align: center; }
+.route-empty-prompt strong { color: var(--text); }
+
 @media (max-width: 900px) {
   .split-view { grid-template-columns: 1fr; }
   .split-map { position: static; height: 350px; order: -1; }

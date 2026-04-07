@@ -3,6 +3,7 @@ import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
 import MapView from "./components/MapView";
+import RouteTab from "./components/RouteTab";
 
 // Region groupings for the area filter
 const BC_REGIONS = {
@@ -465,18 +466,27 @@ export default function App() {
         {/* Tabs */}
         <div className="tabs-row">
           <div className="tabs">
-            <button className={`tab-nav ${tab === "all"  ? "tab-nav-active" : ""}`} onClick={() => setTab("all")}>
+            <button className={`tab-nav ${tab === "all"   ? "tab-nav-active" : ""}`} onClick={() => setTab("all")}>
               All Stations
               {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
             </button>
-            <button className={`tab-nav ${tab === "mine" ? "tab-nav-active" : ""}`} onClick={() => setTab("mine")}>
+            <button className={`tab-nav ${tab === "mine"  ? "tab-nav-active" : ""}`} onClick={() => setTab("mine")}>
               ★ My Stations
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
+            </button>
+            <button className={`tab-nav ${tab === "route" ? "tab-nav-active" : ""}`} onClick={() => setTab("route")}>
+              🗺️ Route Finder
             </button>
           </div>
         </div>
 
-        {/* Search */}
+        {/* Route Tab */}
+        {tab === "route" && (
+          <RouteTab stations={stationsWithArea} />
+        )}
+
+        {/* Station list — hidden on route tab */}
+        {tab !== "route" && (<>
         <div className="search-row">
           <input
             className="search-input"
@@ -784,6 +794,7 @@ export default function App() {
             </div>{/* end split-view */}
           </>
         )}
+        </>)}{/* end tab !== route */}
       </main>
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
