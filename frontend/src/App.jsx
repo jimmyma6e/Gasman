@@ -445,8 +445,8 @@ export default function App() {
           <div className="header-title">
             <span className="header-icon">⛽</span>
             <div>
-              <h1>BC Gas Prices</h1>
-              <p className="header-sub">British Columbia</p>
+              <h1>Gasman</h1>
+              <p className="header-sub">moving you always &middot; powered by JM</p>
             </div>
           </div>
           <div className="header-actions">
