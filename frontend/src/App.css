@@ -277,6 +277,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .insight-pill strong { color: var(--text); }
 .pill-up { background: rgba(220,38,38,0.08); border-color: rgba(220,38,38,0.25); color: var(--red); }
 .pill-down { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.25); color: var(--green); }
+.pill-active-fuel { background: rgba(249,115,22,0.08); border-color: rgba(249,115,22,0.3); color: var(--accent); }
 .insights-toggle { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .insights-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .insights-areas { display: flex; gap: 8px; padding: 6px 14px 12px; overflow-x: auto; flex-wrap: nowrap; }

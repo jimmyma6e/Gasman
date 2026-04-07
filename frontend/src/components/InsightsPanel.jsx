@@ -1,48 +1,64 @@
 import { useState, useEffect } from "react";
 
-const FUEL_LABELS = {
-  regular_gas:  "Regular",
-  midgrade_gas: "Mid",
-  premium_gas:  "Premium",
-  diesel:       "Diesel",
-};
-
 export default function InsightsPanel({ activeFuel }) {
-  const [insights, setInsights] = useState(null);
+  const [regular, setRegular] = useState(null);
+  const [active, setActive]   = useState(null);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    fetch("/api/insights?fuel_type=regular_gas")
+      .then((r) => r.json())
+      .then(setRegular)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeFuel === "regular_gas") { setActive(null); return; }
     fetch(`/api/insights?fuel_type=${activeFuel}`)
       .then((r) => r.json())
-      .then(setInsights)
+      .then(setActive)
       .catch(() => {});
   }, [activeFuel]);
 
-  if (!insights) return null;
+  if (!regular) return null;
 
-  const { area_averages, ytd_vs_today } = insights;
-  const areasWithData = area_averages.filter((a) => a.avg_today != null);
-  if (areasWithData.length === 0 || !ytd_vs_today.today_avg) return null;
+  const { area_averages, ytd_vs_today } = regular;
+  const areasWithData = (area_averages || []).filter((a) => a.avg_today != null);
+  if (areasWithData.length === 0) return null;
 
-  const fuelLabel = FUEL_LABELS[activeFuel] ?? activeFuel;
+  const todayAvg = ytd_vs_today?.today_avg;
+  const ytdAvg   = ytd_vs_today?.ytd_avg;
+  const changePct = ytd_vs_today?.change_pct;
+
+  // Active fuel label (for secondary pill, when not regular)
+  const activeLabel = {
+    midgrade_gas: "Mid", premium_gas: "Premium", diesel: "Diesel", e85: "E85",
+  }[activeFuel];
+  const activeAvg = active?.ytd_vs_today?.today_avg;
 
   return (
     <div className="insights-panel">
-      {/* Always-visible summary bar */}
       <div className="insights-header">
-        <span className="insights-title">{fuelLabel} Insights</span>
+        <span className="insights-title">Regular Insights</span>
         <div className="insights-summary-pills">
-          <span className="insight-pill">
-            Today <strong>{ytd_vs_today.today_avg}¢/L</strong>
-          </span>
-          {ytd_vs_today.ytd_avg && (
+          {todayAvg && (
             <span className="insight-pill">
-              YTD <strong>{ytd_vs_today.ytd_avg}¢/L</strong>
+              Today <strong>{todayAvg}¢/L</strong>
             </span>
           )}
-          {ytd_vs_today.change_pct != null && (
-            <span className={`insight-pill ${ytd_vs_today.change_pct > 0 ? "pill-up" : "pill-down"}`}>
-              {ytd_vs_today.change_pct > 0 ? "+" : ""}{ytd_vs_today.change_pct}% vs YTD
+          {ytdAvg && (
+            <span className="insight-pill">
+              YTD <strong>{ytdAvg}¢/L</strong>
+            </span>
+          )}
+          {changePct != null && (
+            <span className={`insight-pill ${changePct > 0 ? "pill-up" : "pill-down"}`}>
+              {changePct > 0 ? "+" : ""}{changePct}% vs YTD
+            </span>
+          )}
+          {activeLabel && activeAvg && (
+            <span className="insight-pill pill-active-fuel">
+              {activeLabel} <strong>{activeAvg}¢/L</strong>
             </span>
           )}
         </div>
@@ -55,7 +71,6 @@ export default function InsightsPanel({ activeFuel }) {
         </button>
       </div>
 
-      {/* Expanded: horizontal scrollable area pills */}
       {expanded && (
         <div className="insights-areas">
           {areasWithData.map((a) => (

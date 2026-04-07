@@ -342,13 +342,6 @@ export default function App() {
     return a.localeCompare(b);
   });
 
-  // Global cheapest (valid prices only) — used for tab price hints
-  const globalCheapest = {};
-  for (const { key } of FUEL_TYPES) {
-    const prices = allStations.map((s) => s[key]?.price).filter(VALID_PRICE);
-    globalCheapest[key] = prices.length ? Math.min(...prices) : null;
-  }
-
   const q = search.trim().toLowerCase();
   const filtered = stationsWithArea.filter((s) => {
     if (tab === "mine" && !favourites.includes(s.station_id)) return false;
@@ -532,8 +525,8 @@ export default function App() {
                 onClick={() => setActiveFuel(key)}
               >
                 {label}
-                {globalCheapest[key] != null && (
-                  <span className="tab-price">{formatPrice(globalCheapest[key], allStations[0]?.unit_of_measure)}</span>
+                {cheapestPrices[key] != null && (
+                  <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
                 )}
               </button>
             ))}
