@@ -350,6 +350,10 @@ async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]
 
 
 async def get_all_vancouver() -> tuple[list[dict], list[dict]]:
+    # Return cached data immediately if available (even if stale — background poll will refresh)
+    if _cache["stations"] is not None:
+        return _cache["stations"], _cache["trends"] or []
+    # No cache yet — must wait for first poll
     async with _lock:
         await _ensure_fresh()
     return _cache["stations"], _cache["trends"]
