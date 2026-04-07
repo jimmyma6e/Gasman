@@ -101,10 +101,15 @@ def init_db():
                     station_id  TEXT PRIMARY KEY,
                     name        TEXT,
                     address     TEXT,
+                    city        TEXT,
                     latitude    DOUBLE PRECISION NOT NULL,
                     longitude   DOUBLE PRECISION NOT NULL,
                     last_seen   TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
+            """)
+            # Add city column to existing deployments that pre-date this column
+            cur.execute("""
+                ALTER TABLE stations ADD COLUMN IF NOT EXISTS city TEXT
             """)
             # Back-fill stations table from price_history on first run (idempotent)
             cur.execute("""
@@ -123,7 +128,7 @@ def upsert_stations(stations: list) -> None:
     if not stations:
         return
     rows = [
-        (s["station_id"], s.get("name"), s.get("address"),
+        (s["station_id"], s.get("name"), s.get("address"), s.get("city") or None,
          s.get("latitude"), s.get("longitude"))
         for s in stations
         if s.get("station_id") and s.get("latitude") is not None and s.get("longitude") is not None
@@ -133,11 +138,12 @@ def upsert_stations(stations: list) -> None:
     with _conn() as conn:
         with conn.cursor() as cur:
             psycopg2.extras.execute_values(cur, """
-                INSERT INTO stations (station_id, name, address, latitude, longitude)
+                INSERT INTO stations (station_id, name, address, city, latitude, longitude)
                 VALUES %s
                 ON CONFLICT (station_id) DO UPDATE SET
                     name=EXCLUDED.name,
                     address=EXCLUDED.address,
+                    city=COALESCE(EXCLUDED.city, stations.city),
                     latitude=EXCLUDED.latitude,
                     longitude=EXCLUDED.longitude,
                     last_seen=NOW()
@@ -149,7 +155,7 @@ def get_known_stations() -> list:
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                "SELECT station_id, name, address, latitude, longitude FROM stations"
+                "SELECT station_id, name, address, city, latitude, longitude FROM stations"
             )
             return [dict(r) for r in cur.fetchall()]
 
@@ -287,12 +293,14 @@ def get_latest_stations() -> list:
                 return []
             latest_time = row["recorded_at"]
 
-            # All rows from that batch
+            # All rows from that batch, joined with stations for city
             cur.execute("""
-                SELECT station_id, name, address, latitude, longitude,
-                       fuel_type, price, currency, unit, recorded_at
-                FROM price_history
-                WHERE recorded_at = %s
+                SELECT ph.station_id, ph.name, ph.address, s.city,
+                       ph.latitude, ph.longitude,
+                       ph.fuel_type, ph.price, ph.currency, ph.unit, ph.recorded_at
+                FROM price_history ph
+                LEFT JOIN stations s USING (station_id)
+                WHERE ph.recorded_at = %s
             """, (latest_time,))
             rows = cur.fetchall()
 
@@ -304,6 +312,7 @@ def get_latest_stations() -> list:
                 "station_id":      sid,
                 "name":            r["name"],
                 "address":         r["address"],
+                "city":            r["city"],
                 "latitude":        r["latitude"],
                 "longitude":       r["longitude"],
                 "unit_of_measure": r["unit"],
