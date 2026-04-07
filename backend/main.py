@@ -33,8 +33,9 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Debug: print DB-related env vars so we can see what Railway injects
-    db_keys = [k for k in os.environ if any(x in k.upper() for x in ["DATABASE", "POSTGRES", "PG"])]
-    print(f"[DEBUG] DB env vars present: {db_keys}")
+    db_keys = {k: (os.environ[k][:20] + "...") if len(os.environ[k]) > 20 else repr(os.environ[k])
+               for k in os.environ if any(x in k.upper() for x in ["DATABASE", "POSTGRES", "PG"])}
+    print(f"[DEBUG] DB env vars: {db_keys}")
     database.init_db()
     asyncio.create_task(poll_and_store())  # run in background so healthcheck passes immediately
     scheduler.add_job(poll_and_store, "interval", minutes=30)
