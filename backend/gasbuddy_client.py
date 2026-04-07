@@ -41,11 +41,11 @@ def _build_search_coords() -> list:
                 lng += lng_step
             lat += lat_step
 
-    # Metro Vancouver — 3 km grid (~330 points, avoids rate limiting)
-    grid(49.00, 49.42, -123.35, -122.45, 3.0)
+    # Metro Vancouver — 1.5 km grid (~1440 points, comprehensive)
+    grid(49.00, 49.42, -123.35, -122.45, 1.5)
 
-    # Fraser Valley — 10 km grid (~50 points)
-    grid(49.00, 49.45, -122.45, -121.00, 10.0)
+    # Fraser Valley — 5 km grid (~130 points)
+    grid(49.00, 49.45, -122.45, -121.00, 5.0)
 
     # Sea to Sky corridor — targeted
     coords += [
@@ -54,8 +54,8 @@ def _build_search_coords() -> list:
         (50.1163, -122.9574),  # Whistler
     ]
 
-    # Vancouver Island — 10 km grid for south island, targeted for north
-    grid(48.30, 49.00, -124.50, -123.25, 10.0)
+    # Vancouver Island — 8 km grid
+    grid(48.30, 49.00, -124.50, -123.25, 8.0)
     coords += [
         (49.1659, -123.9401),  # Nanaimo
         (49.3000, -124.3100),  # Parksville / Qualicum
@@ -63,8 +63,8 @@ def _build_search_coords() -> list:
         (50.0163, -125.2445),  # Campbell River
     ]
 
-    # Okanagan — 10 km grid (~35 points)
-    grid(49.00, 50.40, -119.80, -119.10, 10.0)
+    # Okanagan — 5 km grid (~80 points)
+    grid(49.00, 50.40, -119.80, -119.10, 5.0)
     coords += [
         (49.1783, -119.5919),  # Oliver / Osoyoos
     ]
@@ -110,95 +110,7 @@ def _build_search_coords() -> list:
 SEARCH_COORDS = _build_search_coords()
 print(f"[config] {len(SEARCH_COORDS)} search zones loaded.")
 
-_DUMMY = [
-    (49.2700, -123.0700),  # East Vancouver (Commercial / Hastings)
-    (49.2500, -123.0400),  # East Van / Boundary area
-    (49.2430, -123.0230),  # Boundary Road corridor
-    (49.2300, -123.1500),  # Vancouver West Side (Kitsilano)
-    (49.2100, -123.1400),  # Marpole / South Vancouver
-    (49.2450, -123.1800),  # Kerrisdale / Oakridge
-    (49.2550, -123.1000),  # Kingsway / Victoria corridor
-    # --- Metro Vancouver: North Shore ---
-    (49.3163, -123.0724),  # North Vancouver Central
-    (49.3400, -123.0200),  # North Vancouver East (Lynn Valley)
-    (49.3667, -123.1670),  # West Vancouver
-    # --- Metro Vancouver: Burnaby ---
-    (49.2650, -122.9200),  # Burnaby North / Brentwood
-    (49.2500, -122.9800),  # Burnaby West / Metrotown
-    (49.2400, -123.0000),  # Burnaby / Boundary corridor
-    (49.2200, -122.9600),  # South Burnaby / Big Bend
-    # --- Metro Vancouver: New Westminster / Coquitlam ---
-    (49.2057, -122.9110),  # New Westminster
-    (49.2837, -122.8310),  # Coquitlam
-    (49.2607, -122.7800),  # Port Coquitlam
-    (49.2834, -122.8319),  # Port Moody
-    # --- Metro Vancouver: Richmond / Delta ---
-    (49.2045, -123.1116),  # Richmond North
-    (49.1700, -123.1380),  # Richmond Central / South
-    (49.0900, -123.0800),  # Delta (Ladner / Tsawwassen)
-    (49.1300, -123.0500),  # North Delta
-    # --- Metro Vancouver: Surrey / White Rock ---
-    (49.1045, -122.8490),  # Surrey Central / Whalley
-    (49.1600, -122.8450),  # Surrey North / Guildford
-    (49.0700, -122.8200),  # Surrey South / Cloverdale
-    (49.0253, -122.8027),  # White Rock / South Surrey
-    # --- Metro Vancouver: Langley ---
-    (49.1050, -122.6604),  # Langley City
-    (49.1900, -122.6800),  # Langley Township / Walnut Grove
-    (49.0700, -122.6000),  # Aldergrove
-    # --- Pitt Meadows / Maple Ridge ---
-    (49.2320, -122.6890),  # Pitt Meadows
-    (49.2200, -122.5980),  # Maple Ridge West
-    (49.2100, -122.5000),  # Maple Ridge East
-    # --- Sea to Sky ---
-    (49.7016, -123.1558),  # Squamish
-    (50.1163, -122.9574),  # Whistler
-    (49.4400, -123.2800),  # Gibsons / Sechelt (Sunshine Coast)
-    # --- Fraser Valley ---
-    (49.1330, -122.3050),  # Mission
-    (49.0504, -122.3045),  # Abbotsford West
-    (49.0200, -122.1500),  # Abbotsford East
-    (49.1579, -121.9514),  # Chilliwack West
-    (49.1700, -121.7500),  # Chilliwack East
-    (49.3837, -121.4419),  # Hope
-    # --- Vancouver Island ---
-    (48.4284, -123.3656),  # Victoria Downtown
-    (48.4500, -123.4700),  # Langford / Colwood
-    (48.5081, -123.4169),  # Saanich / Sidney
-    (49.1659, -123.9401),  # Nanaimo
-    (49.3000, -124.3100),  # Parksville / Qualicum
-    (49.6870, -124.9901),  # Courtenay / Comox
-    (50.0163, -125.2445),  # Campbell River
-    (48.8267, -124.0281),  # Port Alberni
-    # --- Okanagan ---
-    (49.8880, -119.4960),  # Kelowna
-    (49.9600, -119.3800),  # Lake Country / Winfield
-    (50.2674, -119.2720),  # Vernon
-    (49.4991, -119.5937),  # Penticton
-    (49.1783, -119.5919),  # Oliver / Osoyoos
-    (49.3300, -119.6500),  # Summerland / Naramata
-    # --- Thompson / Kamloops ---
-    (50.6745, -120.3273),  # Kamloops
-    (50.7500, -120.3800),  # Kamloops North
-    (50.9250, -118.7717),  # Salmon Arm
-    (51.3000, -120.1400),  # Clearwater area
-    # --- Kootenays ---
-    (49.4926, -117.2948),  # Nelson
-    (49.0956, -117.7097),  # Trail / Castlegar
-    (49.5198, -115.7697),  # Cranbrook
-    (49.5100, -114.9700),  # Fernie
-    # --- Northern BC ---
-    (53.9166, -122.7497),  # Prince George
-    (54.0133, -124.2484),  # Vanderhoof / Burns Lake
-    (54.7700, -127.1800),  # Smithers
-    (54.5168, -128.5975),  # Terrace
-    (54.3150, -130.3208),  # Prince Rupert
-    (56.2518, -120.8476),  # Fort St. John
-    (55.7596, -120.2388),  # Dawson Creek
-    (58.8050, -122.6978),  # Fort Nelson
-]
-
-CACHE_TTL = timedelta(minutes=60)
+CACHE_TTL = timedelta(hours=4)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
@@ -335,135 +247,151 @@ def _parse_trend(raw: dict) -> dict:
     }
 
 
+BATCH_SIZE     = 200   # zones per browser session before restarting
+SESSION_BREAK  = 60    # seconds to wait between browser sessions
+ZONE_SLEEP     = 6     # seconds between zone requests within a session
+FLUSH_EVERY    = 50    # flush cache + DB every N zones
+
+
+async def _start_browser_session(pw):
+    """Launch browser, navigate to GasBuddy, return (browser, page, token)."""
+    browser = await pw.chromium.launch(
+        headless=True,
+        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    )
+    context = await browser.new_context(
+        user_agent=_UA,
+        viewport={"width": 1280, "height": 800},
+        locale="en-CA",
+        extra_http_headers=_STEALTH_HEADERS,
+    )
+    await context.add_init_script(
+        "Object.defineProperty(navigator, 'webdriver', {get: () => false})"
+    )
+    page = await context.new_page()
+    gbcsrf_token = ""
+
+    def on_request(req):
+        nonlocal gbcsrf_token
+        if "/graphql" in req.url and not gbcsrf_token:
+            gbcsrf_token = req.headers.get("gbcsrf", "")
+
+    page.on("request", on_request)
+
+    try:
+        await page.goto("https://www.gasbuddy.com", wait_until="networkidle", timeout=60_000)
+    except Exception as e:
+        logger.warning("Homepage load warning: %s", e)
+
+    if not gbcsrf_token:
+        cookies = await context.cookies("https://www.gasbuddy.com")
+        for c in cookies:
+            if c.get("name", "").lower() == "gbcsrf":
+                gbcsrf_token = c["value"]
+                break
+
+    if not gbcsrf_token:
+        try:
+            await page.goto(
+                "https://www.gasbuddy.com/gas-prices/canada/british-columbia",
+                wait_until="networkidle", timeout=60_000,
+            )
+            await asyncio.sleep(2)
+        except Exception as e:
+            logger.warning("BC page load warning: %s", e)
+
+    logger.info("Session ready — gbcsrf: %s", gbcsrf_token[:8] + "…" if gbcsrf_token else "(none)")
+    return browser, page, gbcsrf_token
+
+
 async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
-    gbcsrf_token: str = ""
+    total = len(SEARCH_COORDS)
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-        )
-        context = await browser.new_context(
-            user_agent=_UA,
-            viewport={"width": 1280, "height": 800},
-            locale="en-CA",
-            extra_http_headers=_STEALTH_HEADERS,
-        )
-        await context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => false})"
-        )
-        page = await context.new_page()
+        i = 0
+        session_num = 0
 
-        async def on_request(req):
-            nonlocal gbcsrf_token
-            if "/graphql" in req.url and not gbcsrf_token:
-                gbcsrf_token = req.headers.get("gbcsrf", "")
+        while i < total:
+            batch_end = min(i + BATCH_SIZE, total)
+            session_num += 1
+            print(f"  [session {session_num}] zones {i+1}–{batch_end} of {total}")
 
-        page.on("request", on_request)
+            browser, page, gbcsrf_token = await _start_browser_session(pw)
+            consecutive_errors = 0
 
-        logger.info("Loading GasBuddy to capture gbcsrf token …")
-        try:
-            await page.goto(
-                "https://www.gasbuddy.com",
-                wait_until="networkidle",
-                timeout=60_000,
-            )
-        except Exception as e:
-            logger.warning("Homepage load warning: %s", e)
+            for j in range(i, batch_end):
+                if j > i:
+                    await asyncio.sleep(ZONE_SLEEP)
 
-        # Try to get gbcsrf from cookies (most reliable method)
-        if not gbcsrf_token:
-            cookies = await context.cookies("https://www.gasbuddy.com")
-            for c in cookies:
-                if c.get("name", "").lower() == "gbcsrf":
-                    gbcsrf_token = c["value"]
-                    logger.info("Got gbcsrf from cookie: %s", gbcsrf_token[:8] + "…")
-                    break
-
-        # Fallback: navigate to BC page to trigger GraphQL request interception
-        if not gbcsrf_token:
-            try:
-                await page.goto(
-                    "https://www.gasbuddy.com/gas-prices/canada/british-columbia",
-                    wait_until="networkidle",
-                    timeout=60_000,
-                )
-                await asyncio.sleep(2)
-            except Exception as e:
-                logger.warning("BC page load warning: %s", e)
-
-        logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
-
-        FLUSH_EVERY  = 30   # update cache + DB every N zones
-        consecutive_errors = 0
-
-        for i, (lat, lng) in enumerate(SEARCH_COORDS):
-            if i > 0:
-                await asyncio.sleep(5)  # conservative: avoid 429
-
-            try:
-                result = await page.evaluate(
-                    _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
-                )
-            except Exception as e:
-                logger.warning("  evaluate error: %s", e)
-                consecutive_errors += 1
-                continue
-
-            if not isinstance(result, dict) or "error" in result:
-                err = (result or {}).get("error", "unknown") if isinstance(result, dict) else result
-                if "429" in str(err):
+                lat, lng = SEARCH_COORDS[j]
+                try:
+                    result = await page.evaluate(
+                        _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
+                    )
+                except Exception as e:
+                    logger.warning("  evaluate error: %s", e)
                     consecutive_errors += 1
-                    backoff = min(60, 15 * consecutive_errors)
-                    print(f"  [429] rate limited — backing off {backoff}s (zone {i+1})")
-                    await asyncio.sleep(backoff)
                     continue
-                if "403" in str(err):
-                    print(f"  [403] blocked at zone {i+1} — stopping poll early")
-                    break
-                logger.warning("  error: %s", result)
-                consecutive_errors += 1
-                continue
 
-            consecutive_errors = 0  # reset on success
-
-            loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
-            raw_stations = (loc.get("stations") or {}).get("results") or []
-            raw_trends   = loc.get("trends") or []
-
-            before = len(stations_map)
-            for s in raw_stations:
-                sid = str(s.get("id", ""))
-                if sid and sid not in stations_map:
-                    parsed = _parse_station(s)
-                    country = parsed.get("country", "")
-                    if country and country.upper() not in ("CA", "CAN", "CANADA"):
+                if not isinstance(result, dict) or "error" in result:
+                    err = (result or {}).get("error", "") if isinstance(result, dict) else str(result)
+                    if "429" in str(err):
+                        consecutive_errors += 1
+                        backoff = min(120, 30 * consecutive_errors)
+                        print(f"  [429] rate limited — backing off {backoff}s (zone {j+1})")
+                        await asyncio.sleep(backoff)
                         continue
-                    if not country and not _is_bc_station(parsed["latitude"], parsed["longitude"]):
-                        continue
-                    stations_map[sid] = parsed
+                    if "403" in str(err):
+                        print(f"  [403] session blocked at zone {j+1} — restarting session early")
+                        batch_end = j  # end this batch here, restart session
+                        break
+                    consecutive_errors += 1
+                    continue
 
-            if not trends and raw_trends:
-                trends.extend(_parse_trend(t) for t in raw_trends)
+                consecutive_errors = 0
+                loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
+                raw_stations = (loc.get("stations") or {}).get("results") or []
+                raw_trends   = loc.get("trends") or []
 
-            added = len(stations_map) - before
-            pct   = (i + 1) / len(SEARCH_COORDS) * 100
-            if added > 0 or (i + 1) % FLUSH_EVERY == 0:
-                print(f"  [{pct:5.1f}%] zone {i+1}/{len(SEARCH_COORDS)}: +{added} new → {len(stations_map)} total")
+                before = len(stations_map)
+                for s in raw_stations:
+                    sid = str(s.get("id", ""))
+                    if sid and sid not in stations_map:
+                        parsed = _parse_station(s)
+                        country = parsed.get("country", "")
+                        if country and country.upper() not in ("CA", "CAN", "CANADA"):
+                            continue
+                        if not country and not _is_bc_station(parsed["latitude"], parsed["longitude"]):
+                            continue
+                        stations_map[sid] = parsed
 
-            # Progressive flush: update cache + DB so users see live results
-            if (i + 1) % FLUSH_EVERY == 0 or (i + 1) == len(SEARCH_COORDS):
-                snapshot = list(stations_map.values())
-                _cache["stations"]   = snapshot
-                _cache["trends"]     = trends or []
-                _cache["fetched_at"] = datetime.now(timezone.utc)
-                if on_flush:
-                    on_flush(snapshot)
-                print(f"  [flush] {len(snapshot)} stations pushed to cache + DB")
+                if not trends and raw_trends:
+                    trends.extend(_parse_trend(t) for t in raw_trends)
 
-        await browser.close()
+                added = len(stations_map) - before
+                pct   = (j + 1) / total * 100
+                if added > 0 or (j + 1) % 100 == 0:
+                    print(f"  [{pct:5.1f}%] zone {j+1}/{total}: +{added} new → {len(stations_map)} total")
+
+                # Progressive flush every FLUSH_EVERY zones
+                if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
+                    snapshot = list(stations_map.values())
+                    _cache["stations"]   = snapshot
+                    _cache["trends"]     = trends or []
+                    _cache["fetched_at"] = datetime.now(timezone.utc)
+                    if on_flush:
+                        on_flush(snapshot)
+                    print(f"  [flush] {len(snapshot)} stations → cache + DB")
+
+            await browser.close()
+            i = batch_end
+
+            # Break between sessions so GasBuddy doesn't flag us
+            if i < total:
+                print(f"  [session break] {SESSION_BREAK}s before next session …")
+                await asyncio.sleep(SESSION_BREAK)
 
     logger.info("Done: %d stations, %d trends", len(stations_map), len(trends))
     return list(stations_map.values()), trends
