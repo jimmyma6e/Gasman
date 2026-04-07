@@ -365,4 +365,19 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   /* Modal — full screen on mobile */
   .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { border-radius: 16px 16px 0 0; max-height: 92vh; padding: 20px 16px; }
+
+  /* Dropdowns — bottom sheet on mobile to avoid overflow-x clipping */
+  .area-dropdown,
+  .brand-dropdown {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    border-radius: 16px 16px 0 0;
+    max-height: 70vh;
+    min-width: unset;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+    z-index: 10000;
+  }
 }

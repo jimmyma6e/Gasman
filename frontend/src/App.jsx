@@ -33,68 +33,81 @@ const POPULAR_AREAS = [
 // Fallback area detection when city isn't available from API
 function getAreaFromCoords(lat, lng) {
   if (lat == null || lng == null) return "Other";
-  // Northern BC
-  if (lat >= 56.0) return "Northern BC";
+
+  // ── Northern BC ──────────────────────────────────────────────────
+  if (lat >= 58.0) return "Fort Nelson";
+  if (lat >= 55.7) return "Fort St. John";
+  if (lat >= 55.0) return "Dawson Creek";
   if (lat >= 54.4 && lng <= -128.0) return "Terrace";
-  if (lat >= 54.2 && lng <= -130.0) return "Prince Rupert";
-  if (lat >= 55.5) return "Fort St. John";
-  if (lat >= 53.5 && lat < 55.5 && lng >= -123.5) return "Prince George";
-  // Kootenays
-  if (lng >= -118.0) {
+  if (lat >= 54.0 && lng <= -130.0) return "Prince Rupert";
+  if (lat >= 53.5) return "Prince George";
+
+  // ── Kootenays (east of -118.5°) ──────────────────────────────────
+  if (lng >= -118.5) {
     if (lat >= 49.4) return "Kootenays";
     return "Cranbrook";
   }
-  // Okanagan
+
+  // ── Okanagan (-120.5° to -118.5°) ────────────────────────────────
   if (lng >= -120.5) {
-    if (lat >= 50.1) return "Salmon Arm";
+    if (lat >= 50.5) return "Salmon Arm";
     if (lat >= 50.0) return "Vernon";
     if (lat >= 49.7) return "Kelowna";
     if (lat >= 49.3) return "Penticton";
     return "Oliver";
   }
-  // Kamloops area
-  if (lat >= 50.3 && lng >= -121.5) return "Kamloops";
-  // Sea to Sky
-  if (lat >= 49.9 && lng >= -123.4 && lng <= -122.7) return "Whistler";
+
+  // ── Thompson / Kamloops ───────────────────────────────────────────
+  if (lat >= 50.2 && lng >= -121.5) return "Kamloops";
+
+  // ── Sea to Sky ────────────────────────────────────────────────────
+  if (lat >= 50.0 && lng >= -123.2 && lng <= -122.7) return "Whistler";
   if (lat >= 49.55 && lng >= -123.4 && lng <= -122.9) return "Squamish";
   if (lat >= 49.35 && lng <= -123.4) return "Gibsons";
-  // Fraser Valley
-  if (lat >= 49.35 && lng >= -121.6) return "Hope";
-  if (lat >= 49.1 && lng >= -121.75) return "Chilliwack";
-  if (lat >= 49.05 && lng >= -122.45) return "Abbotsford";
-  if (lat >= 49.1 && lng >= -122.45) return "Mission";
-  // Vancouver Island — must come before Metro Van checks
-  // Below 49°N in BC = always Vancouver Island / Gulf Islands (mainland ends at 49°N)
+
+  // ── Fraser Valley ─────────────────────────────────────────────────
+  if (lat >= 49.3 && lng >= -121.6) return "Hope";
+  if (lat >= 49.08 && lng >= -121.9 && lng < -121.3) return "Chilliwack";
+  // Mission before Abbotsford — Mission is lat 49.1–49.2, lng -122.2 to -122.5
+  if (lat >= 49.1 && lng >= -122.5 && lng < -121.9) return "Mission";
+  if (lat >= 49.0 && lng >= -122.5 && lng < -121.9) return "Abbotsford";
+
+  // ── Vancouver Island ─────────────────────────────────────────────
+  // BC mainland ends at 49°N — below that is always Vancouver Island / Gulf Islands
   if (lat < 49.0) return "Victoria";
-  // Nanaimo and mid-island: lat 49.0–49.4, lng roughly -123.8 to -124.4
-  if (lat < 49.4 && lng < -123.7) return "Nanaimo";
+  // Mid-island: Nanaimo lat 49.0–49.4, well west of mainland
+  if (lat < 49.35 && lng < -123.7) return "Nanaimo";
   // Northern Vancouver Island
-  if (lng <= -124.5) {
+  if (lng <= -124.8) {
     if (lat >= 49.9) return "Campbell River";
     if (lat >= 49.5) return "Courtenay";
     return "Nanaimo";
   }
-  // Metro Vancouver
-  if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
-  if (lat >= 49.305) return "North Vancouver";
-  if (lat >= 49.27 && lng >= -122.88 && lng <= -122.77) return "Port Moody";
-  if (lat >= 49.20 && lng >= -122.64) return "Maple Ridge";
-  if (lat >= 49.20 && lng >= -122.73) return "Pitt Meadows";
-  if (lat >= 49.20 && lng >= -122.79) return "Port Coquitlam";
-  if (lat >= 49.20 && lng >  -122.87) return "Coquitlam";
+
+  // ── Metro Vancouver ───────────────────────────────────────────────
+  if (lat >= 49.31 && lng <= -123.14) return "West Vancouver";
+  if (lat >= 49.30) return "North Vancouver";
+  if (lat >= 49.27 && lng >= -122.90 && lng <= -122.77) return "Port Moody";
+  if (lat >= 49.20 && lng >= -122.63) return "Maple Ridge";
+  if (lat >= 49.20 && lng >= -122.74) return "Pitt Meadows";
+  if (lat >= 49.22 && lng >= -122.83) return "Port Coquitlam";
+  if (lat >= 49.22 && lng >= -122.90) return "Coquitlam";
+
   if (lat < 49.20) {
-    if (lng >= -122.65) return "Langley";
-    if (lat < 49.06 && lng >= -122.85) return "White Rock";
+    if (lng >= -122.60) return "Langley";
+    if (lat < 49.07 && lng >= -122.88) return "White Rock";
     if (lng >= -122.97) return "Surrey";
-    if (lat < 49.16 && lng >= -123.20) return "Delta";
+    if (lng >= -123.20) return "Delta";  // covers Tsawwassen & Ladner
     return "Richmond";
   }
-  if (lng > -122.97 && lat < 49.225) return "New Westminster";
-  if (lat < 49.105 && lng >= -123.02 && lng < -122.97) return "North Delta";
-  if (lng > -123.027 && lat < 49.225) return "South Burnaby";
+
+  if (lat < 49.225 && lng > -122.97) return "New Westminster";
+  // North Delta is *north* of 49.10 (not south)
+  if (lat >= 49.10 && lat < 49.20 && lng >= -123.03 && lng < -122.97) return "North Delta";
+  if (lat < 49.24 && lng > -123.027) return "South Burnaby";
   if (lng > -123.027) return "Burnaby";
-  if (lng >= -123.10) return "East Vancouver";
-  if (lat >= 49.265) return "Downtown Vancouver";
+  if (lng >= -123.11) return "East Vancouver";
+  if (lat >= 49.27) return "Downtown Vancouver";
   return "Vancouver";
 }
 
@@ -102,6 +115,21 @@ const POPULAR_BRANDS = [
   "Petro-Canada", "Shell", "Chevron", "Esso", "Husky",
   "Costco", "Canadian Tire", "7-Eleven", "Fas Gas", "Co-op",
 ];
+
+// Normalize raw GasBuddy brand names to canonical versions
+const BRAND_ALIASES = {
+  "CENTEX": "Centex", "Centex Gas": "Centex",
+  "CO-OP": "Co-op", "CO-OP Cardlock": "Co-op", "Co-op Cardlock": "Co-op", "Co-Op": "Co-op",
+  "Yellow Stores": "Yellow",
+  "Husky Go!": "Husky", "HUSKY": "Husky",
+  "ESSO": "Esso",
+  "SHELL": "Shell",
+  "CHEVRON": "Chevron",
+  "Petro-Can": "Petro-Canada",
+};
+function normalizeBrand(name) {
+  return (name && BRAND_ALIASES[name]) || name;
+}
 
 
 const FUEL_TYPES = [
@@ -283,9 +311,12 @@ export default function App() {
   const [areaFilter, setAreaFilter]     = useState(new Set());
   const [brandFilter, setBrandFilter]   = useState(new Set());
   const [viewMode, setViewMode]         = useState("card");
-  const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
-  const [areaSearch, setAreaSearch] = useState("");
-  const dropdownRef = useRef(null);
+  const [areaDropdownOpen, setAreaDropdownOpen]   = useState(false);
+  const [areaSearch, setAreaSearch]               = useState("");
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+  const [brandSearch, setBrandSearch]             = useState("");
+  const dropdownRef     = useRef(null);
+  const brandDropdownRef = useRef(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
 
@@ -334,15 +365,25 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handler);
   }, [areaDropdownOpen]);
 
+  useEffect(() => {
+    if (!brandDropdownOpen) return;
+    const handler = (e) => {
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target))
+        setBrandDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [brandDropdownOpen]);
+
   const allStations = data?.stations ?? [];
 
   const stationsWithArea = allStations.map((s) => ({
     ...s,
-    _area: s.city || getAreaFromCoords(s.latitude, s.longitude),
+    _area:  s.city || getAreaFromCoords(s.latitude, s.longitude),
+    _brand: normalizeBrand(s.name),
   }));
 
-
-  const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))];
+  const brands = [...new Set(stationsWithArea.map((s) => s._brand).filter(Boolean))];
   brands.sort((a, b) => {
     const ai = POPULAR_BRANDS.indexOf(a);
     const bi = POPULAR_BRANDS.indexOf(b);
@@ -356,7 +397,7 @@ export default function App() {
   const filtered = stationsWithArea.filter((s) => {
     if (tab === "mine" && !favourites.includes(s.station_id)) return false;
     if (areaFilter.size  > 0 && !areaFilter.has(s._area))    return false;
-    if (brandFilter.size > 0 && !brandFilter.has(s.name))    return false;
+    if (brandFilter.size > 0 && !brandFilter.has(s._brand))   return false;
     if (q && !s.name.toLowerCase().includes(q) && !s.address.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -507,20 +548,62 @@ export default function App() {
           </div>
         </div>
 
-        {/* Brand chips */}
+        {/* Brand filter — searchable dropdown */}
         {brands.length > 0 && (
           <div className="filter-section">
             <span className="filter-label">Brand</span>
             <div className="chip-row">
-              {brands.map((b) => (
-                <button
-                  key={b}
-                  className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
-                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}
-                >
-                  {b}
+              {/* Selected brand chips */}
+              {[...brandFilter].map((b) => (
+                <button key={b} className="brand-chip brand-chip-active"
+                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}>
+                  {b} ×
                 </button>
               ))}
+              <div className="area-more-wrap" ref={brandDropdownRef}>
+                <button
+                  className={`area-more-btn ${brandFilter.size > 0 ? "brand-chip-active" : ""}`}
+                  onClick={() => { setBrandDropdownOpen((o) => !o); setBrandSearch(""); }}
+                >
+                  Brands {brandDropdownOpen ? "▴" : "▾"}
+                </button>
+                {brandDropdownOpen && (
+                  <div className="area-dropdown brand-dropdown">
+                    <input className="area-search-input" type="text" placeholder="Search brand…"
+                      value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} autoFocus />
+                    {/* Popular brands */}
+                    {POPULAR_BRANDS.filter((b) => brands.includes(b) &&
+                      b.toLowerCase().includes(brandSearch.toLowerCase())).length > 0 && (
+                      <div className="area-region-group">
+                        <div className="area-region-header">Popular</div>
+                        {POPULAR_BRANDS.filter((b) => brands.includes(b) &&
+                          b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
+                          <label key={b} className="area-dropdown-item">
+                            <input type="checkbox" checked={brandFilter.has(b)}
+                              onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
+                            {b}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {/* All other brands */}
+                    {brands.filter((b) => !POPULAR_BRANDS.includes(b) &&
+                      b.toLowerCase().includes(brandSearch.toLowerCase())).length > 0 && (
+                      <div className="area-region-group">
+                        <div className="area-region-header">Other</div>
+                        {brands.filter((b) => !POPULAR_BRANDS.includes(b) &&
+                          b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
+                          <label key={b} className="area-dropdown-item">
+                            <input type="checkbox" checked={brandFilter.has(b)}
+                              onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
+                            {b}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
