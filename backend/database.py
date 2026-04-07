@@ -5,8 +5,22 @@ import psycopg2
 import psycopg2.extras
 
 # Railway injects DATABASE_URL automatically when a Postgres service is linked.
-# Falls back to SQLite-style path warning so local dev fails fast with a clear message.
-_DATABASE_URL = os.environ.get("DATABASE_URL", "")
+# Also try POSTGRES_URL / individual PG* vars as fallback.
+_DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or os.environ.get("POSTGRES_URL")
+    or os.environ.get("POSTGRESQL_URL")
+    or ""
+)
+if not _DATABASE_URL:
+    # Build from individual PG* vars that Railway also injects
+    pg_host = os.environ.get("PGHOST") or os.environ.get("POSTGRES_HOST")
+    pg_port = os.environ.get("PGPORT") or os.environ.get("POSTGRES_PORT", "5432")
+    pg_db   = os.environ.get("PGDATABASE") or os.environ.get("POSTGRES_DB")
+    pg_user = os.environ.get("PGUSER") or os.environ.get("POSTGRES_USER")
+    pg_pass = os.environ.get("PGPASSWORD") or os.environ.get("POSTGRES_PASSWORD")
+    if pg_host and pg_db and pg_user:
+        _DATABASE_URL = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
 if _DATABASE_URL.startswith("postgres://"):
     # psycopg2 requires postgresql:// scheme
     _DATABASE_URL = _DATABASE_URL.replace("postgres://", "postgresql://", 1)
