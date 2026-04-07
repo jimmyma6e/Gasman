@@ -26,74 +26,103 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
-# ── search zones covering all of British Columbia ────────────────────────────
-SEARCH_COORDS = [
-    # Greater Vancouver
-    (49.2827, -123.1207),  # Downtown Vancouver
-    (49.2640, -123.0586),  # East Vancouver
-    (49.3163, -123.0724),  # North Vancouver
-    (49.2045, -123.1116),  # Richmond
-    (49.2488, -122.9805),  # Burnaby / New Westminster
-    # Lower Mainland extensions
-    (49.1913, -122.8490),  # Surrey
-    (49.1044, -122.6604),  # Langley
-    (49.0504, -122.3045),  # Abbotsford
-    (49.1579, -121.9514),  # Chilliwack
-    (49.3828, -121.4455),  # Hope
-    # Vancouver Island
-    (48.4284, -123.3656),  # Victoria
-    (49.1659, -123.9401),  # Nanaimo
-    (49.6878, -124.9944),  # Courtenay / Comox
-    (50.0162, -125.2477),  # Campbell River
-    # Sea-to-Sky / Sunshine Coast
-    (49.7016, -123.1558),  # Squamish
-    (50.1163, -122.9574),  # Whistler
-    (49.8326, -124.5248),  # Powell River
-    # Okanagan
-    (49.8880, -119.4960),  # Kelowna
-    (49.4988, -119.5869),  # Penticton
-    (50.2674, -119.2720),  # Vernon
-    # Thompson / Interior
-    (50.6745, -120.3273),  # Kamloops
-    (50.1115, -120.7862),  # Merritt
-    # Kootenays
-    (49.4926, -117.2948),  # Nelson
-    (49.5122, -115.7697),  # Cranbrook
-    (49.0960, -117.7122),  # Trail / Castlegar
-    # Central BC
-    (52.1396, -122.1414),  # Williams Lake
-    (52.9784, -122.4927),  # Quesnel
-    (53.9166, -122.7497),  # Prince George
-    # Northern BC
-    (54.7825, -127.1776),  # Smithers
-    (54.5149, -128.5989),  # Terrace
-    (54.3150, -130.3208),  # Prince Rupert
-    (56.2518, -120.8476),  # Fort St. John
-    (58.8044, -122.6980),  # Fort Nelson
-]
+def _build_search_coords() -> list:
+    coords = []
+
+    def grid(lat_min, lat_max, lng_min, lng_max, km):
+        """Generate a lat/lng grid with given spacing in km."""
+        lat_step = km / 111.0
+        lng_step = km / (111.0 * __import__("math").cos(__import__("math").radians((lat_min + lat_max) / 2)))
+        lat = lat_min
+        while lat <= lat_max + lat_step * 0.5:
+            lng = lng_min
+            while lng <= lng_max + lng_step * 0.5:
+                coords.append((round(lat, 4), round(lng, 4)))
+                lng += lng_step
+            lat += lat_step
+
+    # Metro Vancouver — 1.5 km grid (~1440 points, comprehensive)
+    grid(49.00, 49.42, -123.35, -122.45, 1.5)
+
+    # Fraser Valley — 5 km grid (~130 points)
+    grid(49.00, 49.45, -122.45, -121.00, 5.0)
+
+    # Sea to Sky corridor — targeted
+    coords += [
+        (49.4400, -123.2800),  # Gibsons
+        (49.7016, -123.1558),  # Squamish
+        (50.1163, -122.9574),  # Whistler
+    ]
+
+    # Vancouver Island — 8 km grid
+    grid(48.30, 49.00, -124.50, -123.25, 8.0)
+    coords += [
+        (49.1659, -123.9401),  # Nanaimo
+        (49.3000, -124.3100),  # Parksville / Qualicum
+        (49.6870, -124.9901),  # Courtenay / Comox
+        (50.0163, -125.2445),  # Campbell River
+    ]
+
+    # Okanagan — 5 km grid (~80 points)
+    grid(49.00, 50.40, -119.80, -119.10, 5.0)
+    coords += [
+        (49.1783, -119.5919),  # Oliver / Osoyoos
+    ]
+
+    # Thompson / Kamloops — targeted
+    coords += [
+        (50.6745, -120.3273),  # Kamloops
+        (50.7500, -120.3800),  # Kamloops North
+        (50.9250, -118.7717),  # Salmon Arm
+    ]
+
+    # Kootenays — targeted
+    coords += [
+        (49.4926, -117.2948),  # Nelson
+        (49.0956, -117.7097),  # Trail / Castlegar
+        (49.5198, -115.7697),  # Cranbrook
+        (49.5100, -114.9700),  # Fernie
+    ]
+
+    # Northern BC — targeted
+    coords += [
+        (53.9166, -122.7497),  # Prince George
+        (54.0133, -124.2484),  # Vanderhoof / Burns Lake
+        (54.7700, -127.1800),  # Smithers
+        (54.5168, -128.5975),  # Terrace
+        (54.3150, -130.3208),  # Prince Rupert
+        (56.2518, -120.8476),  # Fort St. John
+        (55.7596, -120.2388),  # Dawson Creek
+        (58.8050, -122.6978),  # Fort Nelson
+    ]
+
+    # Deduplicate (grid edges can overlap)
+    seen = set()
+    result = []
+    for c in coords:
+        key = (round(c[0], 3), round(c[1], 3))
+        if key not in seen:
+            seen.add(key)
+            result.append(c)
+    return result
 
 
-def _is_bc_station(lat, lng) -> bool:
-    """Return True if coordinates fall within British Columbia, Canada."""
-    if lat is None or lng is None:
-        return True  # keep if no coords
-    if not (48.2 <= lat <= 60.1):
-        return False
-    if not (-139.5 <= lng <= -114.0):
-        return False
-    # Exclude US Pacific Northwest near the border (Bellingham, Blaine, etc.)
-    # Victoria BC (48.43, -123.37) must pass: it's west of -123.1 so it's fine
-    if lat < 49.0 and lng > -123.1:
-        return False
-    return True
+SEARCH_COORDS = _build_search_coords()
+print(f"[config] {len(SEARCH_COORDS)} search zones loaded.")
 
-CACHE_TTL = timedelta(minutes=30)
+CACHE_TTL = timedelta(hours=4)
 
-# ── in-memory cache ───────────────────────────────────────────────────────────
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
+
+
+def warm_cache_from_db(stations: list):
+    """Pre-populate the in-memory cache with DB data so startup is instant."""
+    if stations:
+        _cache["stations"]   = stations
+        _cache["trends"]     = []
+        _cache["fetched_at"] = datetime.now(timezone.utc) - timedelta(minutes=29)
 _lock = asyncio.Lock()
 
-# ── browser config ────────────────────────────────────────────────────────────
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -104,7 +133,6 @@ _STEALTH_HEADERS = {
     "Sec-CH-UA-Platform": '"macOS"',
 }
 
-# ── GraphQL query ─────────────────────────────────────────────────────────────
 _GQL = """
 query locationBySearchTerm($lat: Float, $lng: Float) {
   locationBySearchTerm(lat: $lat, lng: $lng) {
@@ -127,7 +155,6 @@ query locationBySearchTerm($lat: Float, $lng: Float) {
 }
 """
 
-# JS runs inside the browser — same-origin fetch avoids Cloudflare WAF
 _JS_FETCH = """
 async ({ query, lat, lng, gbcsrf }) => {
     try {
@@ -155,15 +182,33 @@ async ({ query, lat, lng, gbcsrf }) => {
 """
 
 
-# ── station parser ────────────────────────────────────────────────────────────
+def _is_bc_station(lat, lng) -> bool:
+    """Return True only if coordinates fall within British Columbia.
+
+    BC mainland border with Washington State is at 49°N.
+    Vancouver Island/Gulf Islands extend south to ~48.2°N but are west of -123.3°W.
+    """
+    if lat is None or lng is None:
+        return False
+    if lat > 60.0 or lat < 48.2:
+        return False
+    if lng < -139.1 or lng > -114.0:
+        return False
+    # Below 49°N only allow Vancouver Island / Gulf Islands (west of Strait of Georgia)
+    if lat < 49.0 and lng > -123.3:
+        return False
+    return True
+
+
 def _parse_station(raw: dict) -> dict:
     fuels  = raw.get("fuels") or []
     prices = raw.get("prices") or []
 
+    addr = (raw.get("address") or {}).get("line1", "")
     station: dict = {
         "station_id":      str(raw.get("id", "")),
         "name":            raw.get("name", f"Station #{raw.get('id','')}"),
-        "address":         (raw.get("address") or {}).get("line1", "Vancouver, BC"),
+        "address":         addr,
         "latitude":        raw.get("latitude"),
         "longitude":       raw.get("longitude"),
         "currency":        "CAD",
@@ -202,87 +247,156 @@ def _parse_trend(raw: dict) -> dict:
     }
 
 
-# ── main fetch ────────────────────────────────────────────────────────────────
-async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
+BATCH_SIZE     = 200   # zones per browser session before restarting
+SESSION_BREAK  = 90    # seconds to wait between browser sessions
+ZONE_SLEEP     = 6     # seconds between zone requests within a session
+FLUSH_EVERY    = 50    # flush cache + DB every N zones
+
+
+async def _start_browser_session(pw):
+    """Launch browser, navigate to GasBuddy, return (browser, page, token)."""
+    browser = await pw.chromium.launch(
+        headless=True,
+        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    )
+    context = await browser.new_context(
+        user_agent=_UA,
+        viewport={"width": 1280, "height": 800},
+        locale="en-CA",
+        extra_http_headers=_STEALTH_HEADERS,
+    )
+    await context.add_init_script(
+        "Object.defineProperty(navigator, 'webdriver', {get: () => false})"
+    )
+    page = await context.new_page()
+    gbcsrf_token = ""
+
+    def on_request(req):
+        nonlocal gbcsrf_token
+        if "/graphql" in req.url and not gbcsrf_token:
+            gbcsrf_token = req.headers.get("gbcsrf", "")
+
+    page.on("request", on_request)
+
+    try:
+        await page.goto("https://www.gasbuddy.com", wait_until="networkidle", timeout=60_000)
+    except Exception as e:
+        logger.warning("Homepage load warning: %s", e)
+
+    if not gbcsrf_token:
+        cookies = await context.cookies("https://www.gasbuddy.com")
+        for c in cookies:
+            if c.get("name", "").lower() == "gbcsrf":
+                gbcsrf_token = c["value"]
+                break
+
+    if not gbcsrf_token:
+        try:
+            await page.goto(
+                "https://www.gasbuddy.com/gas-prices/canada/british-columbia",
+                wait_until="networkidle", timeout=60_000,
+            )
+            await asyncio.sleep(2)
+        except Exception as e:
+            logger.warning("BC page load warning: %s", e)
+
+    logger.info("Session ready — gbcsrf: %s", gbcsrf_token[:8] + "…" if gbcsrf_token else "(none)")
+    return browser, page, gbcsrf_token
+
+
+async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
-    gbcsrf_token: str = ""
+    total = len(SEARCH_COORDS)
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-        )
-        context = await browser.new_context(
-            user_agent=_UA,
-            viewport={"width": 1280, "height": 800},
-            locale="en-CA",
-            extra_http_headers=_STEALTH_HEADERS,
-        )
-        await context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => false})"
-        )
-        page = await context.new_page()
+        i = 0
+        session_num = 0
 
-        # Capture the gbcsrf CSRF token from GasBuddy's own first /graphql call
-        async def on_request(req):
-            nonlocal gbcsrf_token
-            if "/graphql" in req.url and not gbcsrf_token:
-                gbcsrf_token = req.headers.get("gbcsrf", "")
+        while i < total:
+            batch_end = min(i + BATCH_SIZE, total)
+            session_num += 1
+            print(f"  [session {session_num}] zones {i+1}–{batch_end} of {total}")
 
-        page.on("request", on_request)
+            browser, page, gbcsrf_token = await _start_browser_session(pw)
+            consecutive_errors = 0
 
-        logger.info("Loading https://www.gasbuddy.com …")
-        try:
-            await page.goto("https://www.gasbuddy.com", wait_until="networkidle", timeout=60_000)
-        except Exception as e:
-            logger.warning("Homepage load warning: %s", e)
+            for j in range(i, batch_end):
+                if j > i:
+                    await asyncio.sleep(ZONE_SLEEP)
 
-        logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
+                lat, lng = SEARCH_COORDS[j]
+                try:
+                    result = await page.evaluate(
+                        _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
+                    )
+                except Exception as e:
+                    logger.warning("  evaluate error: %s", e)
+                    consecutive_errors += 1
+                    continue
 
-        # Query each zone
-        for lat, lng in SEARCH_COORDS:
-            logger.info("  /graphql for (%.4f, %.4f) …", lat, lng)
-            try:
-                result = await page.evaluate(
-                    _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
-                )
-            except Exception as e:
-                logger.warning("  evaluate error: %s", e)
-                continue
+                if not isinstance(result, dict) or "error" in result:
+                    err = (result or {}).get("error", "") if isinstance(result, dict) else str(result)
+                    if "429" in str(err):
+                        consecutive_errors += 1
+                        backoff = min(120, 30 * consecutive_errors)
+                        print(f"  [429] rate limited — backing off {backoff}s (zone {j+1})")
+                        await asyncio.sleep(backoff)
+                        continue
+                    if "403" in str(err):
+                        print(f"  [403] session blocked at zone {j+1} — restarting session early")
+                        batch_end = j  # end this batch here, restart session
+                        break
+                    consecutive_errors += 1
+                    continue
 
-            if not isinstance(result, dict) or "error" in result:
-                logger.warning("  error: %s", result)
-                continue
+                consecutive_errors = 0
+                loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
+                raw_stations = (loc.get("stations") or {}).get("results") or []
+                raw_trends   = loc.get("trends") or []
 
-            loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
-            raw_stations = (loc.get("stations") or {}).get("results") or []
-            raw_trends   = loc.get("trends") or []
-
-            for s in raw_stations:
-                sid = str(s.get("id", ""))
-                if sid and sid not in stations_map:
-                    parsed = _parse_station(s)
-                    if _is_bc_station(parsed.get("latitude"), parsed.get("longitude")):
+                before = len(stations_map)
+                for s in raw_stations:
+                    sid = str(s.get("id", ""))
+                    if sid and sid not in stations_map:
+                        parsed = _parse_station(s)
+                        country = parsed.get("country", "")
+                        if country and country.upper() not in ("CA", "CAN", "CANADA"):
+                            continue
+                        if not country and not _is_bc_station(parsed["latitude"], parsed["longitude"]):
+                            continue
                         stations_map[sid] = parsed
 
-            if not trends and raw_trends:
-                trends.extend(_parse_trend(t) for t in raw_trends)
+                if not trends and raw_trends:
+                    trends.extend(_parse_trend(t) for t in raw_trends)
 
-            logger.info("  → %d stations, total unique: %d", len(raw_stations), len(stations_map))
+                added = len(stations_map) - before
+                pct   = (j + 1) / total * 100
+                if added > 0 or (j + 1) % 100 == 0:
+                    print(f"  [{pct:5.1f}%] zone {j+1}/{total}: +{added} new → {len(stations_map)} total")
 
-        await browser.close()
+                # Progressive flush every FLUSH_EVERY zones
+                if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
+                    snapshot = list(stations_map.values())
+                    _cache["stations"]   = snapshot
+                    _cache["trends"]     = trends or []
+                    _cache["fetched_at"] = datetime.now(timezone.utc)
+                    if on_flush:
+                        on_flush(snapshot)
+                    print(f"  [flush] {len(snapshot)} stations → cache + DB")
 
-    stations = list(stations_map.values())
-    stations.sort(key=lambda x: (
-        x.get("regular_gas") is None or (x["regular_gas"] or {}).get("price") is None,
-        (x.get("regular_gas") or {}).get("price") or float("inf"),
-    ))
-    logger.info("Done: %d stations, %d trends", len(stations), len(trends))
-    return stations, trends
+            await browser.close()
+            i = batch_end
+
+            # Break between sessions so GasBuddy doesn't flag us
+            if i < total:
+                print(f"  [session break] {SESSION_BREAK}s before next session …")
+                await asyncio.sleep(SESSION_BREAK)
+
+    logger.info("Done: %d stations, %d trends", len(stations_map), len(trends))
+    return list(stations_map.values()), trends
 
 
-# ── cache ─────────────────────────────────────────────────────────────────────
 async def _ensure_fresh() -> None:
     now = datetime.now(timezone.utc)
     if (
@@ -290,26 +404,20 @@ async def _ensure_fresh() -> None:
         or _cache["fetched_at"] is None
         or now - _cache["fetched_at"] > CACHE_TTL
     ):
-        stations, trends = await _fetch_via_playwright()
-        _cache["stations"]   = stations
-        _cache["trends"]     = trends
-        _cache["fetched_at"] = now
+        await _fetch_via_playwright()
 
 
-# ── public API ────────────────────────────────────────────────────────────────
 async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]:
-    """API-compat shim — lat/lon ignored, full Vancouver fetched in one pass."""
     async with _lock:
         await _ensure_fresh()
     return _cache["stations"], _cache["trends"]
 
 
-async def get_all_bc() -> tuple[list[dict], list[dict]]:
-    """Return (stations, trends) for all of British Columbia, cached 30 min."""
+async def get_all_vancouver() -> tuple[list[dict], list[dict]]:
+    # Return cached data immediately if available (even if stale — background poll will refresh)
+    if _cache["stations"] is not None:
+        return _cache["stations"], _cache["trends"] or []
+    # No cache yet — must wait for first poll
     async with _lock:
         await _ensure_fresh()
     return _cache["stations"], _cache["trends"]
-
-
-# backward-compat alias
-get_all_vancouver = get_all_bc
