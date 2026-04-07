@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
         gb.warm_cache_from_db(cached)
         print(f"[startup] Warmed cache with {len(cached)} stations from DB.")
     asyncio.create_task(poll_and_store())  # refresh in background
-    scheduler.add_job(poll_and_store, "interval", minutes=120)
+    scheduler.add_job(poll_and_store, "interval", minutes=60)
     scheduler.start()
     yield
     scheduler.shutdown()

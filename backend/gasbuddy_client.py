@@ -41,11 +41,11 @@ def _build_search_coords() -> list:
                 lng += lng_step
             lat += lat_step
 
-    # Metro Vancouver — 1.5 km grid (comprehensive, ~1440 points)
-    grid(49.00, 49.42, -123.35, -122.45, 1.5)
+    # Metro Vancouver — 3 km grid (~330 points, avoids rate limiting)
+    grid(49.00, 49.42, -123.35, -122.45, 3.0)
 
-    # Fraser Valley — 8 km grid (~90 points)
-    grid(49.00, 49.45, -122.45, -121.00, 8.0)
+    # Fraser Valley — 10 km grid (~50 points)
+    grid(49.00, 49.45, -122.45, -121.00, 10.0)
 
     # Sea to Sky corridor — targeted
     coords += [
@@ -198,7 +198,7 @@ _DUMMY = [
     (58.8050, -122.6978),  # Fort Nelson
 ]
 
-CACHE_TTL = timedelta(minutes=120)
+CACHE_TTL = timedelta(minutes=60)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
@@ -396,11 +396,12 @@ async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
 
         logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
 
-        FLUSH_EVERY = 50  # update cache + DB every N zones
+        FLUSH_EVERY  = 30   # update cache + DB every N zones
+        consecutive_errors = 0
 
         for i, (lat, lng) in enumerate(SEARCH_COORDS):
             if i > 0:
-                await asyncio.sleep(2)  # avoid 429 rate limiting
+                await asyncio.sleep(5)  # conservative: avoid 429
 
             try:
                 result = await page.evaluate(
@@ -408,11 +409,25 @@ async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
                 )
             except Exception as e:
                 logger.warning("  evaluate error: %s", e)
+                consecutive_errors += 1
                 continue
 
             if not isinstance(result, dict) or "error" in result:
+                err = (result or {}).get("error", "unknown") if isinstance(result, dict) else result
+                if "429" in str(err):
+                    consecutive_errors += 1
+                    backoff = min(60, 15 * consecutive_errors)
+                    print(f"  [429] rate limited — backing off {backoff}s (zone {i+1})")
+                    await asyncio.sleep(backoff)
+                    continue
+                if "403" in str(err):
+                    print(f"  [403] blocked at zone {i+1} — stopping poll early")
+                    break
                 logger.warning("  error: %s", result)
+                consecutive_errors += 1
                 continue
+
+            consecutive_errors = 0  # reset on success
 
             loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
             raw_stations = (loc.get("stations") or {}).get("results") or []
