@@ -9,13 +9,14 @@ const BC_REGIONS = {
   "Metro Vancouver": [
     "Downtown Vancouver", "East Vancouver", "Vancouver",
     "West Vancouver", "North Vancouver",
-    "Burnaby", "New Westminster",
-    "Richmond", "Delta",
+    "Burnaby", "South Burnaby", "New Westminster",
+    "Richmond", "Delta", "North Delta",
     "Surrey", "White Rock",
-    "Langley",
+    "Langley", "Aldergrove",
     "Coquitlam", "Port Coquitlam", "Port Moody",
     "Pitt Meadows", "Maple Ridge",
   ],
+  "Sea to Sky": ["Squamish", "Whistler", "Gibsons", "Sechelt"],
   "Fraser Valley": ["Abbotsford", "Mission", "Chilliwack", "Hope"],
   "Vancouver Island": ["Victoria", "Nanaimo", "Courtenay", "Campbell River", "Port Alberni"],
   "Okanagan": ["Kelowna", "Vernon", "Penticton", "Oliver", "Osoyoos"],
@@ -53,6 +54,10 @@ function getAreaFromCoords(lat, lng) {
   }
   // Kamloops area
   if (lat >= 50.3 && lng >= -121.5) return "Kamloops";
+  // Sea to Sky
+  if (lat >= 49.9 && lng >= -123.4 && lng <= -122.7) return "Whistler";
+  if (lat >= 49.55 && lng >= -123.4 && lng <= -122.9) return "Squamish";
+  if (lat >= 49.35 && lng <= -123.4) return "Gibsons";
   // Fraser Valley
   if (lat >= 49.35 && lng >= -121.6) return "Hope";
   if (lat >= 49.1 && lng >= -121.75) return "Chilliwack";
@@ -82,6 +87,8 @@ function getAreaFromCoords(lat, lng) {
     return "Richmond";
   }
   if (lng > -122.97 && lat < 49.225) return "New Westminster";
+  if (lat < 49.105 && lng >= -123.02 && lng < -122.97) return "North Delta";
+  if (lng > -123.027 && lat < 49.225) return "South Burnaby";
   if (lng > -123.027) return "Burnaby";
   if (lng >= -123.10) return "East Vancouver";
   if (lat >= 49.265) return "Downtown Vancouver";

@@ -28,58 +28,88 @@ logger = logging.getLogger(__name__)
 
 # search zones covering British Columbia
 SEARCH_COORDS = [
-    # --- Metro Vancouver ---
+    # --- Metro Vancouver: Vancouver ---
     (49.2827, -123.1207),  # Downtown Vancouver
     (49.2640, -123.0586),  # East Vancouver / Mount Pleasant
-    (49.2300, -123.1500),  # Vancouver West Side (Kitsilano, Marpole)
-    (49.3163, -123.0724),  # North Vancouver
+    (49.2300, -123.1500),  # Vancouver West Side (Kitsilano)
+    (49.2100, -123.1400),  # Marpole / South Vancouver
+    (49.2450, -123.1800),  # Kerrisdale / Oakridge
+    # --- Metro Vancouver: North Shore ---
+    (49.3163, -123.0724),  # North Vancouver Central
+    (49.3400, -123.0200),  # North Vancouver East (Lynn Valley)
     (49.3667, -123.1670),  # West Vancouver
-    (49.2488, -122.9805),  # Burnaby West
-    (49.2650, -122.9200),  # Burnaby East
+    # --- Metro Vancouver: Burnaby ---
+    (49.2650, -122.9200),  # Burnaby North / Brentwood
+    (49.2488, -122.9805),  # Burnaby West / Metrotown
+    (49.2200, -122.9600),  # South Burnaby / Big Bend
+    # --- Metro Vancouver: New Westminster / Coquitlam ---
     (49.2057, -122.9110),  # New Westminster
-    (49.2045, -123.1116),  # Richmond North
-    (49.1700, -123.1380),  # Richmond Central
-    (49.0900, -123.0800),  # Delta (Ladner / Tsawwassen)
-    (49.1045, -122.8490),  # Surrey Central
-    (49.1600, -122.8450),  # Surrey North
-    (49.0253, -122.8027),  # White Rock
-    (49.1050, -122.6604),  # Langley City
-    (49.1900, -122.6800),  # Langley Township
     (49.2837, -122.8310),  # Coquitlam
     (49.2607, -122.7800),  # Port Coquitlam
     (49.2834, -122.8319),  # Port Moody
+    # --- Metro Vancouver: Richmond / Delta ---
+    (49.2045, -123.1116),  # Richmond North
+    (49.1700, -123.1380),  # Richmond Central / South
+    (49.0900, -123.0800),  # Delta (Ladner / Tsawwassen)
+    (49.1300, -123.0500),  # North Delta
+    # --- Metro Vancouver: Surrey / White Rock ---
+    (49.1045, -122.8490),  # Surrey Central / Whalley
+    (49.1600, -122.8450),  # Surrey North / Guildford
+    (49.0700, -122.8200),  # Surrey South / Cloverdale
+    (49.0253, -122.8027),  # White Rock / South Surrey
+    # --- Metro Vancouver: Langley ---
+    (49.1050, -122.6604),  # Langley City
+    (49.1900, -122.6800),  # Langley Township / Walnut Grove
+    (49.0700, -122.6000),  # Aldergrove
+    # --- Pitt Meadows / Maple Ridge ---
     (49.2320, -122.6890),  # Pitt Meadows
-    (49.2200, -122.5980),  # Maple Ridge
+    (49.2200, -122.5980),  # Maple Ridge West
+    (49.2100, -122.5000),  # Maple Ridge East
+    # --- Sea to Sky ---
+    (49.7016, -123.1558),  # Squamish
+    (50.1163, -122.9574),  # Whistler
+    (49.4400, -123.2800),  # Gibsons / Sechelt (Sunshine Coast)
     # --- Fraser Valley ---
-    (49.0504, -122.3045),  # Abbotsford
-    (49.1579, -121.9514),  # Chilliwack
     (49.1330, -122.3050),  # Mission
+    (49.0504, -122.3045),  # Abbotsford West
+    (49.0200, -122.1500),  # Abbotsford East
+    (49.1579, -121.9514),  # Chilliwack West
+    (49.1700, -121.7500),  # Chilliwack East
     (49.3837, -121.4419),  # Hope
     # --- Vancouver Island ---
-    (48.4284, -123.3656),  # Victoria
-    (48.5081, -123.4169),  # Saanich / Langford
+    (48.4284, -123.3656),  # Victoria Downtown
+    (48.4500, -123.4700),  # Langford / Colwood
+    (48.5081, -123.4169),  # Saanich / Sidney
     (49.1659, -123.9401),  # Nanaimo
+    (49.3000, -124.3100),  # Parksville / Qualicum
     (49.6870, -124.9901),  # Courtenay / Comox
     (50.0163, -125.2445),  # Campbell River
     (48.8267, -124.0281),  # Port Alberni
     # --- Okanagan ---
     (49.8880, -119.4960),  # Kelowna
-    (49.4991, -119.5937),  # Penticton
+    (49.9600, -119.3800),  # Lake Country / Winfield
     (50.2674, -119.2720),  # Vernon
+    (49.4991, -119.5937),  # Penticton
     (49.1783, -119.5919),  # Oliver / Osoyoos
+    (49.3300, -119.6500),  # Summerland / Naramata
     # --- Thompson / Kamloops ---
     (50.6745, -120.3273),  # Kamloops
+    (50.7500, -120.3800),  # Kamloops North
     (50.9250, -118.7717),  # Salmon Arm
+    (51.3000, -120.1400),  # Clearwater area
     # --- Kootenays ---
-    (49.4926, -117.2948),  # Nelson / Trail
-    (49.5198, -115.7697),  # Cranbrook / Fernie
+    (49.4926, -117.2948),  # Nelson
+    (49.0956, -117.7097),  # Trail / Castlegar
+    (49.5198, -115.7697),  # Cranbrook
+    (49.5100, -114.9700),  # Fernie
     # --- Northern BC ---
     (53.9166, -122.7497),  # Prince George
-    (54.0133, -124.2484),  # Vanderhoof area
-    (56.2518, -120.8476),  # Fort St. John
-    (55.7596, -120.2388),  # Dawson Creek
+    (54.0133, -124.2484),  # Vanderhoof / Burns Lake
+    (54.7700, -127.1800),  # Smithers
     (54.5168, -128.5975),  # Terrace
     (54.3150, -130.3208),  # Prince Rupert
+    (56.2518, -120.8476),  # Fort St. John
+    (55.7596, -120.2388),  # Dawson Creek
     (58.8050, -122.6978),  # Fort Nelson
 ]
 
