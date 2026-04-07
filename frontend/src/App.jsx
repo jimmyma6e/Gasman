@@ -63,13 +63,16 @@ function getAreaFromCoords(lat, lng) {
   if (lat >= 49.1 && lng >= -121.75) return "Chilliwack";
   if (lat >= 49.05 && lng >= -122.45) return "Abbotsford";
   if (lat >= 49.1 && lng >= -122.45) return "Mission";
-  // Vancouver Island
+  // Vancouver Island — must come before Metro Van checks
+  // Below 49°N in BC = always Vancouver Island / Gulf Islands (mainland ends at 49°N)
+  if (lat < 49.0) return "Victoria";
+  // Nanaimo and mid-island: lat 49.0–49.4, lng roughly -123.8 to -124.4
+  if (lat < 49.4 && lng < -123.7) return "Nanaimo";
+  // Northern Vancouver Island
   if (lng <= -124.5) {
     if (lat >= 49.9) return "Campbell River";
     if (lat >= 49.5) return "Courtenay";
-    if (lat >= 49.05) return "Nanaimo";
-    if (lat >= 48.7) return "Port Alberni";
-    return "Victoria";
+    return "Nanaimo";
   }
   // Metro Vancouver
   if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
