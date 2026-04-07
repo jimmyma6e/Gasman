@@ -218,11 +218,23 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         page.on("request", on_request)
 
-        logger.info("Loading https://www.gasbuddy.com …")
+        logger.info("Loading GasBuddy BC page to capture gbcsrf token …")
         try:
-            await page.goto("https://www.gasbuddy.com", wait_until="networkidle", timeout=60_000)
+            await page.goto(
+                "https://www.gasbuddy.com/gas-prices/canada/british-columbia",
+                wait_until="networkidle",
+                timeout=60_000,
+            )
         except Exception as e:
-            logger.warning("Homepage load warning: %s", e)
+            logger.warning("BC page load warning: %s", e)
+
+        # If token not captured yet, try scrolling to trigger lazy GraphQL calls
+        if not gbcsrf_token:
+            try:
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(3)
+            except Exception:
+                pass
 
         logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
 
