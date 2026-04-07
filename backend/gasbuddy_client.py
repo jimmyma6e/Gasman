@@ -10,7 +10,7 @@ How it works:
   3. Use page.evaluate() to call fetch('/graphql', ...) from inside the browser
      (same-origin request — Cloudflare WAF treats it as legitimate JS), passing
      the captured CSRF token + other required headers.
-  4. Query 5 lat/lng zones covering Greater Vancouver, deduplicate, cache 30 min.
+  4. Query lat/lng zones covering BC, deduplicate, cache 4 hours.
 
 Schema notes (discovered by inspection):
   - `fuels`  is an array of fuel-type strings: ["regular_gas", "midgrade_gas", ...]
@@ -20,11 +20,13 @@ Schema notes (discovered by inspection):
 
 import asyncio
 import logging
+import math
 from datetime import datetime, timezone, timedelta
 
 from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
+
 
 def _build_search_coords() -> list:
     coords = []
@@ -32,7 +34,7 @@ def _build_search_coords() -> list:
     def grid(lat_min, lat_max, lng_min, lng_max, km):
         """Generate a lat/lng grid with given spacing in km."""
         lat_step = km / 111.0
-        lng_step = km / (111.0 * __import__("math").cos(__import__("math").radians((lat_min + lat_max) / 2)))
+        lng_step = km / (111.0 * math.cos(math.radians((lat_min + lat_max) / 2)))
         lat = lat_min
         while lat <= lat_max + lat_step * 0.5:
             lng = lng_min
@@ -114,6 +116,11 @@ CACHE_TTL = timedelta(hours=4)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
+# Prevents concurrent discovery + refresh scans (two Playwright sessions = rate-limit cascade)
+_scan_lock = asyncio.Lock()
+
+_lock = asyncio.Lock()
+
 
 def warm_cache_from_db(stations: list):
     """Pre-populate the in-memory cache with DB data so startup is instant."""
@@ -121,7 +128,7 @@ def warm_cache_from_db(stations: list):
         _cache["stations"]   = stations
         _cache["trends"]     = []
         _cache["fetched_at"] = datetime.now(timezone.utc) - timedelta(minutes=29)
-_lock = asyncio.Lock()
+
 
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -183,18 +190,12 @@ async ({ query, lat, lng, gbcsrf }) => {
 
 
 def _is_bc_station(lat, lng) -> bool:
-    """Return True only if coordinates fall within British Columbia.
-
-    BC mainland border with Washington State is at 49°N.
-    Vancouver Island/Gulf Islands extend south to ~48.2°N but are west of -123.3°W.
-    """
     if lat is None or lng is None:
         return False
     if lat > 60.0 or lat < 48.2:
         return False
     if lng < -139.1 or lng > -114.0:
         return False
-    # Below 49°N only allow Vancouver Island / Gulf Islands (west of Strait of Georgia)
     if lat < 49.0 and lng > -123.3:
         return False
     return True
@@ -247,11 +248,55 @@ def _parse_trend(raw: dict) -> dict:
     }
 
 
-BATCH_SIZE     = 300   # zones per browser session before restarting
-SESSION_BREAK  = 30    # seconds to wait between browser sessions
-ZONE_SLEEP     = 4     # seconds between zone requests within a session
+# ── Poll constants ────────────────────────────────────────────────────────────
+BATCH_SIZE     = 200   # zones per browser session before restarting
+SESSION_BREAK  = 90    # seconds between browser sessions (discovery)
+ZONE_SLEEP     = 6     # seconds between zone requests (discovery)
 FLUSH_EVERY    = 50    # flush cache + DB every N zones
 
+# Refresh mode — fewer total queries so sessions can be shorter
+REFRESH_SESSION_BREAK = 60
+REFRESH_ZONE_SLEEP    = 5
+
+
+# ── Clustering for price refresh ──────────────────────────────────────────────
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in km between two lat/lng points."""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(dlng / 2) ** 2)
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def build_query_centers(stations: list[dict], radius_km: float = 2.0) -> list[tuple[float, float]]:
+    """Greedy clustering: pick centers so every station is within radius_km of some center.
+
+    For ~991 stations at 2 km radius this produces ~66–150 centers,
+    reducing price refresh from 2189 zones to ~100 queries.
+    """
+    coords = [(s["latitude"], s["longitude"]) for s in stations
+              if s.get("latitude") is not None and s.get("longitude") is not None]
+    uncovered = list(range(len(coords)))
+    centers: list[tuple[float, float]] = []
+
+    while uncovered:
+        seed_idx = uncovered[0]
+        slat, slng = coords[seed_idx]
+        cluster = [i for i in uncovered if _haversine_km(slat, slng, *coords[i]) <= radius_km]
+        lats = [coords[i][0] for i in cluster]
+        lngs = [coords[i][1] for i in cluster]
+        centers.append((sum(lats) / len(lats), sum(lngs) / len(lngs)))
+        covered = set(cluster)
+        uncovered = [i for i in uncovered if i not in covered]
+
+    return centers
+
+
+# ── Core Playwright scanner ───────────────────────────────────────────────────
 
 async def _start_browser_session(pw):
     """Launch browser, navigate to GasBuddy, return (browser, page, token)."""
@@ -304,10 +349,16 @@ async def _start_browser_session(pw):
     return browser, page, gbcsrf_token
 
 
-async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
+async def _fetch_via_playwright(
+    coords: list[tuple[float, float]],
+    on_flush=None,
+    *,
+    zone_sleep: float = ZONE_SLEEP,
+    session_break: float = SESSION_BREAK,
+) -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
-    total = len(SEARCH_COORDS)
+    total = len(coords)
 
     async with async_playwright() as pw:
         i = 0
@@ -323,9 +374,9 @@ async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
 
             for j in range(i, batch_end):
                 if j > i:
-                    await asyncio.sleep(ZONE_SLEEP)
+                    await asyncio.sleep(zone_sleep)
 
-                lat, lng = SEARCH_COORDS[j]
+                lat, lng = coords[j]
                 try:
                     result = await page.evaluate(
                         _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
@@ -390,34 +441,66 @@ async def _fetch_via_playwright(on_flush=None) -> tuple[list[dict], list[dict]]:
 
             # Break between sessions so GasBuddy doesn't flag us
             if i < total:
-                print(f"  [session break] {SESSION_BREAK}s before next session …")
-                await asyncio.sleep(SESSION_BREAK)
+                print(f"  [session break] {session_break}s before next session …")
+                await asyncio.sleep(session_break)
 
     logger.info("Done: %d stations, %d trends", len(stations_map), len(trends))
     return list(stations_map.values()), trends
 
 
-async def _ensure_fresh() -> None:
-    now = datetime.now(timezone.utc)
-    if (
-        _cache["stations"] is None
-        or _cache["fetched_at"] is None
-        or now - _cache["fetched_at"] > CACHE_TTL
-    ):
-        await _fetch_via_playwright()
+# ── Public API ────────────────────────────────────────────────────────────────
+
+async def discover_stations(on_flush=None) -> tuple[list[dict], list[dict]]:
+    """Full grid scan across all of BC — finds new/unknown stations.
+    Runs daily. Returns (stations, trends).
+    """
+    if _scan_lock.locked():
+        logger.warning("discover_stations: scan already in progress — skipping")
+        return _cache.get("stations") or [], _cache.get("trends") or []
+
+    async with _scan_lock:
+        logger.info("discover_stations: scanning %d zones …", len(SEARCH_COORDS))
+        stations, trends = await _fetch_via_playwright(
+            SEARCH_COORDS, on_flush,
+            zone_sleep=ZONE_SLEEP,
+            session_break=SESSION_BREAK,
+        )
+        _cache["stations"]   = stations
+        _cache["trends"]     = trends
+        _cache["fetched_at"] = datetime.now(timezone.utc)
+        return stations, trends
 
 
-async def search_nearby(lat: float, lon: float) -> tuple[list[dict], list[dict]]:
-    async with _lock:
-        await _ensure_fresh()
-    return _cache["stations"], _cache["trends"]
+async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[list[dict], list[dict]]:
+    """Fast price refresh using cluster centers derived from known station locations.
+    Runs every 30 min. Much fewer queries than full discovery.
+    """
+    if _scan_lock.locked():
+        logger.warning("refresh_prices: scan already in progress — skipping this cycle")
+        return _cache.get("stations") or [], _cache.get("trends") or []
+
+    async with _scan_lock:
+        centers = build_query_centers(known_stations)
+        logger.info(
+            "refresh_prices: %d known stations → %d query centers",
+            len(known_stations), len(centers),
+        )
+        stations, trends = await _fetch_via_playwright(
+            centers, on_flush,
+            zone_sleep=REFRESH_ZONE_SLEEP,
+            session_break=REFRESH_SESSION_BREAK,
+        )
+        _cache["stations"]   = stations
+        _cache["trends"]     = trends
+        _cache["fetched_at"] = datetime.now(timezone.utc)
+        return stations, trends
 
 
-async def get_all_vancouver() -> tuple[list[dict], list[dict]]:
-    # Return cached data immediately if available (even if stale — background poll will refresh)
+async def get_all_bc() -> tuple[list[dict], list[dict]]:
+    """Return cached station data immediately; background poll keeps it fresh."""
     if _cache["stations"] is not None:
         return _cache["stations"], _cache["trends"] or []
-    # No cache yet — must wait for first poll
-    async with _lock:
-        await _ensure_fresh()
-    return _cache["stations"], _cache["trends"]
+    # No cache yet — wait for first poll
+    while _cache["stations"] is None:
+        await asyncio.sleep(1)
+    return _cache["stations"], _cache["trends"] or []

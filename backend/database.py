@@ -28,6 +28,7 @@ if _DATABASE_URL.startswith("postgres://"):
 FUEL_TYPES = ["regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85"]
 
 AREA_CENTROIDS = [
+    # Greater Vancouver
     ("Downtown Vancouver", 49.2827, -123.1207),
     ("East Vancouver",     49.2622, -123.0680),
     ("Vancouver",          49.2300, -123.1200),
@@ -51,13 +52,17 @@ AREA_CENTROIDS = [
     ("Whistler",           50.1163, -122.9574),
     ("Gibsons",            49.3950, -123.5100),
     ("Pitt Meadows",       49.2290, -122.6890),
+    # Fraser Valley
     ("Abbotsford",         49.0504, -122.3045),
     ("Chilliwack",         49.1579, -121.9514),
+    # Vancouver Island
     ("Victoria",           48.4284, -123.3656),
     ("Nanaimo",            49.1659, -123.9401),
+    # Interior
     ("Kelowna",            49.8880, -119.4960),
     ("Kamloops",           50.6745, -120.3273),
     ("Kootenays",          49.4926, -117.2948),
+    # Northern BC
     ("Prince George",      53.9166, -122.7497),
     ("Northern BC",        56.2518, -120.8476),
 ]
@@ -91,6 +96,62 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_station_fuel_time
                 ON price_history (station_id, fuel_type, recorded_at)
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS stations (
+                    station_id  TEXT PRIMARY KEY,
+                    name        TEXT,
+                    address     TEXT,
+                    latitude    DOUBLE PRECISION NOT NULL,
+                    longitude   DOUBLE PRECISION NOT NULL,
+                    last_seen   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            # Back-fill stations table from price_history on first run (idempotent)
+            cur.execute("""
+                INSERT INTO stations (station_id, name, address, latitude, longitude, last_seen)
+                SELECT DISTINCT ON (station_id)
+                    station_id, name, address, latitude, longitude, MAX(recorded_at)
+                FROM price_history
+                WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+                GROUP BY station_id, name, address, latitude, longitude
+                ON CONFLICT (station_id) DO NOTHING
+            """)
+
+
+def upsert_stations(stations: list) -> None:
+    """Insert or update station registry (location metadata only, no prices)."""
+    if not stations:
+        return
+    rows = [
+        (s["station_id"], s.get("name"), s.get("address"),
+         s.get("latitude"), s.get("longitude"))
+        for s in stations
+        if s.get("station_id") and s.get("latitude") is not None and s.get("longitude") is not None
+    ]
+    if not rows:
+        return
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, """
+                INSERT INTO stations (station_id, name, address, latitude, longitude)
+                VALUES %s
+                ON CONFLICT (station_id) DO UPDATE SET
+                    name=EXCLUDED.name,
+                    address=EXCLUDED.address,
+                    latitude=EXCLUDED.latitude,
+                    longitude=EXCLUDED.longitude,
+                    last_seen=NOW()
+            """, rows)
+
+
+def get_known_stations() -> list:
+    """Return all stations from the registry (lat/lng for clustering)."""
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT station_id, name, address, latitude, longitude FROM stations"
+            )
+            return [dict(r) for r in cur.fetchall()]
 
 
 def insert_prices(stations: list):
@@ -158,7 +219,7 @@ def get_price_deltas() -> dict:
     return result
 
 
-def get_area_averages(fuel_type: str = "regular_gas") -> list:
+def get_area_averages(fuel_type: str = "regular_gas") -> dict:
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
