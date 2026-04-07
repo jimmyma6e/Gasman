@@ -113,7 +113,7 @@ SEARCH_COORDS = [
     (58.8050, -122.6978),  # Fort Nelson
 ]
 
-CACHE_TTL = timedelta(minutes=30)
+CACHE_TTL = timedelta(minutes=15)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 
@@ -313,7 +313,7 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         for i, (lat, lng) in enumerate(SEARCH_COORDS):
             if i > 0:
-                await asyncio.sleep(8)  # avoid 429 rate limiting
+                await asyncio.sleep(3)  # avoid 429 rate limiting
 
             logger.info("  /graphql for (%.4f, %.4f) …", lat, lng)
             try:
