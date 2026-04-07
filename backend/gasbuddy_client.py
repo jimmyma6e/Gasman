@@ -218,23 +218,36 @@ async def _fetch_via_playwright() -> tuple[list[dict], list[dict]]:
 
         page.on("request", on_request)
 
-        logger.info("Loading GasBuddy BC page to capture gbcsrf token …")
+        logger.info("Loading GasBuddy to capture gbcsrf token …")
         try:
             await page.goto(
-                "https://www.gasbuddy.com/gas-prices/canada/british-columbia",
+                "https://www.gasbuddy.com",
                 wait_until="networkidle",
                 timeout=60_000,
             )
         except Exception as e:
-            logger.warning("BC page load warning: %s", e)
+            logger.warning("Homepage load warning: %s", e)
 
-        # If token not captured yet, try scrolling to trigger lazy GraphQL calls
+        # Try to get gbcsrf from cookies (most reliable method)
+        if not gbcsrf_token:
+            cookies = await context.cookies("https://www.gasbuddy.com")
+            for c in cookies:
+                if c.get("name", "").lower() == "gbcsrf":
+                    gbcsrf_token = c["value"]
+                    logger.info("Got gbcsrf from cookie: %s", gbcsrf_token[:8] + "…")
+                    break
+
+        # Fallback: navigate to BC page to trigger GraphQL request interception
         if not gbcsrf_token:
             try:
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.goto(
+                    "https://www.gasbuddy.com/gas-prices/canada/british-columbia",
+                    wait_until="networkidle",
+                    timeout=60_000,
+                )
                 await asyncio.sleep(3)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("BC page load warning: %s", e)
 
         logger.info("Captured gbcsrf token: %s", gbcsrf_token or "(none)")
 
