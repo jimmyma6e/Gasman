@@ -26,36 +26,61 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
-# search zones covering Greater Vancouver
+# search zones covering British Columbia
 SEARCH_COORDS = [
-    # Vancouver
+    # --- Metro Vancouver ---
     (49.2827, -123.1207),  # Downtown Vancouver
     (49.2640, -123.0586),  # East Vancouver / Mount Pleasant
     (49.2300, -123.1500),  # Vancouver West Side (Kitsilano, Marpole)
-    # North Shore
     (49.3163, -123.0724),  # North Vancouver
     (49.3667, -123.1670),  # West Vancouver
-    # Burnaby / New Westminster
     (49.2488, -122.9805),  # Burnaby West
     (49.2650, -122.9200),  # Burnaby East
     (49.2057, -122.9110),  # New Westminster
-    # Richmond / Delta
     (49.2045, -123.1116),  # Richmond North
     (49.1700, -123.1380),  # Richmond Central
     (49.0900, -123.0800),  # Delta (Ladner / Tsawwassen)
-    # Surrey / White Rock / Langley
     (49.1045, -122.8490),  # Surrey Central
     (49.1600, -122.8450),  # Surrey North
     (49.0253, -122.8027),  # White Rock
     (49.1050, -122.6604),  # Langley City
     (49.1900, -122.6800),  # Langley Township
-    # Tri-Cities
     (49.2837, -122.8310),  # Coquitlam
     (49.2607, -122.7800),  # Port Coquitlam
     (49.2834, -122.8319),  # Port Moody
-    # Pitt Meadows / Maple Ridge
     (49.2320, -122.6890),  # Pitt Meadows
     (49.2200, -122.5980),  # Maple Ridge
+    # --- Fraser Valley ---
+    (49.0504, -122.3045),  # Abbotsford
+    (49.1579, -121.9514),  # Chilliwack
+    (49.1330, -122.3050),  # Mission
+    (49.3837, -121.4419),  # Hope
+    # --- Vancouver Island ---
+    (48.4284, -123.3656),  # Victoria
+    (48.5081, -123.4169),  # Saanich / Langford
+    (49.1659, -123.9401),  # Nanaimo
+    (49.6870, -124.9901),  # Courtenay / Comox
+    (50.0163, -125.2445),  # Campbell River
+    (48.8267, -124.0281),  # Port Alberni
+    # --- Okanagan ---
+    (49.8880, -119.4960),  # Kelowna
+    (49.4991, -119.5937),  # Penticton
+    (50.2674, -119.2720),  # Vernon
+    (49.1783, -119.5919),  # Oliver / Osoyoos
+    # --- Thompson / Kamloops ---
+    (50.6745, -120.3273),  # Kamloops
+    (50.9250, -118.7717),  # Salmon Arm
+    # --- Kootenays ---
+    (49.4926, -117.2948),  # Nelson / Trail
+    (49.5198, -115.7697),  # Cranbrook / Fernie
+    # --- Northern BC ---
+    (53.9166, -122.7497),  # Prince George
+    (54.0133, -124.2484),  # Vanderhoof area
+    (56.2518, -120.8476),  # Fort St. John
+    (55.7596, -120.2388),  # Dawson Creek
+    (54.5168, -128.5975),  # Terrace
+    (54.3150, -130.3208),  # Prince Rupert
+    (58.8050, -122.6978),  # Fort Nelson
 ]
 
 CACHE_TTL = timedelta(minutes=30)

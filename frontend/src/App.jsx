@@ -4,6 +4,26 @@ import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
 import MapView from "./components/MapView";
 
+// Region groupings for the area filter
+const BC_REGIONS = {
+  "Metro Vancouver": [
+    "Downtown Vancouver", "East Vancouver", "Vancouver",
+    "West Vancouver", "North Vancouver",
+    "Burnaby", "New Westminster",
+    "Richmond", "Delta",
+    "Surrey", "White Rock",
+    "Langley",
+    "Coquitlam", "Port Coquitlam", "Port Moody",
+    "Pitt Meadows", "Maple Ridge",
+  ],
+  "Fraser Valley": ["Abbotsford", "Mission", "Chilliwack", "Hope"],
+  "Vancouver Island": ["Victoria", "Nanaimo", "Courtenay", "Campbell River", "Port Alberni"],
+  "Okanagan": ["Kelowna", "Vernon", "Penticton", "Oliver", "Osoyoos"],
+  "Thompson / Kamloops": ["Kamloops", "Salmon Arm"],
+  "Kootenays": ["Nelson", "Trail", "Cranbrook", "Fernie"],
+  "Northern BC": ["Prince George", "Fort St. John", "Dawson Creek", "Terrace", "Prince Rupert", "Fort Nelson"],
+};
+
 const POPULAR_AREAS = [
   "Vancouver", "Burnaby", "Richmond", "Surrey",
   "North Vancouver", "Coquitlam", "Langley", "Abbotsford",
@@ -12,6 +32,41 @@ const POPULAR_AREAS = [
 // Fallback area detection when city isn't available from API
 function getAreaFromCoords(lat, lng) {
   if (lat == null || lng == null) return "Other";
+  // Northern BC
+  if (lat >= 56.0) return "Northern BC";
+  if (lat >= 54.4 && lng <= -128.0) return "Terrace";
+  if (lat >= 54.2 && lng <= -130.0) return "Prince Rupert";
+  if (lat >= 55.5) return "Fort St. John";
+  if (lat >= 53.5 && lat < 55.5 && lng >= -123.5) return "Prince George";
+  // Kootenays
+  if (lng >= -118.0) {
+    if (lat >= 49.4) return "Kootenays";
+    return "Cranbrook";
+  }
+  // Okanagan
+  if (lng >= -120.5) {
+    if (lat >= 50.1) return "Salmon Arm";
+    if (lat >= 50.0) return "Vernon";
+    if (lat >= 49.7) return "Kelowna";
+    if (lat >= 49.3) return "Penticton";
+    return "Oliver";
+  }
+  // Kamloops area
+  if (lat >= 50.3 && lng >= -121.5) return "Kamloops";
+  // Fraser Valley
+  if (lat >= 49.35 && lng >= -121.6) return "Hope";
+  if (lat >= 49.1 && lng >= -121.75) return "Chilliwack";
+  if (lat >= 49.05 && lng >= -122.45) return "Abbotsford";
+  if (lat >= 49.1 && lng >= -122.45) return "Mission";
+  // Vancouver Island
+  if (lng <= -124.5) {
+    if (lat >= 49.9) return "Campbell River";
+    if (lat >= 49.5) return "Courtenay";
+    if (lat >= 49.05) return "Nanaimo";
+    if (lat >= 48.7) return "Port Alberni";
+    return "Victoria";
+  }
+  // Metro Vancouver
   if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
   if (lat >= 49.305) return "North Vancouver";
   if (lat >= 49.27 && lng >= -122.88 && lng <= -122.77) return "Port Moody";
@@ -219,6 +274,7 @@ export default function App() {
   const [brandFilter, setBrandFilter]   = useState(new Set());
   const [viewMode, setViewMode]         = useState("card");
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
+  const [areaSearch, setAreaSearch] = useState("");
   const dropdownRef = useRef(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
@@ -275,10 +331,6 @@ export default function App() {
     _area: s.city || getAreaFromCoords(s.latitude, s.longitude),
   }));
 
-  // Build "More areas" dynamically from actual data, excluding popular ones
-  const moreAreas = [...new Set(stationsWithArea.map((s) => s._area))]
-    .filter((a) => a && a !== "Other" && !POPULAR_AREAS.includes(a))
-    .sort();
 
   const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))];
   brands.sort((a, b) => {
@@ -407,26 +459,45 @@ export default function App() {
                 {name}
               </button>
             ))}
-            {/* "More areas" dropdown */}
+            {/* Region dropdown */}
             <div className="area-more-wrap" ref={dropdownRef}>
               <button
-                className={`area-more-btn ${moreAreas.some((n) => areaFilter.has(n)) ? "brand-chip-active" : ""}`}
-                onClick={() => setAreaDropdownOpen((o) => !o)}
+                className={`area-more-btn ${[...areaFilter].some((n) => !POPULAR_AREAS.includes(n)) ? "brand-chip-active" : ""}`}
+                onClick={() => { setAreaDropdownOpen((o) => !o); setAreaSearch(""); }}
               >
-                More areas {areaDropdownOpen ? "▴" : "▾"}
+                All regions {areaDropdownOpen ? "▴" : "▾"}
               </button>
               {areaDropdownOpen && (
                 <div className="area-dropdown">
-                  {moreAreas.map((name) => (
-                    <label key={name} className="area-dropdown-item">
-                      <input
-                        type="checkbox"
-                        checked={areaFilter.has(name)}
-                        onChange={() => setAreaFilter(toggleSet(areaFilter, name))}
-                      />
-                      {name}
-                    </label>
-                  ))}
+                  <input
+                    className="area-search-input"
+                    type="text"
+                    placeholder="Search area..."
+                    value={areaSearch}
+                    onChange={(e) => setAreaSearch(e.target.value)}
+                    autoFocus
+                  />
+                  {Object.entries(BC_REGIONS).map(([region, cities]) => {
+                    const filtered = cities.filter((c) =>
+                      c.toLowerCase().includes(areaSearch.toLowerCase())
+                    );
+                    if (filtered.length === 0) return null;
+                    return (
+                      <div key={region} className="area-region-group">
+                        <div className="area-region-header">{region}</div>
+                        {filtered.map((name) => (
+                          <label key={name} className="area-dropdown-item">
+                            <input
+                              type="checkbox"
+                              checked={areaFilter.has(name)}
+                              onChange={() => setAreaFilter(toggleSet(areaFilter, name))}
+                            />
+                            {name}
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
