@@ -9,6 +9,30 @@ const POPULAR_AREAS = [
   "North Vancouver", "Coquitlam", "Langley", "Abbotsford",
 ];
 
+// Fallback area detection when city isn't available from API
+function getAreaFromCoords(lat, lng) {
+  if (lat == null || lng == null) return "Other";
+  if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
+  if (lat >= 49.305) return "North Vancouver";
+  if (lat >= 49.27 && lng >= -122.88 && lng <= -122.77) return "Port Moody";
+  if (lat >= 49.20 && lng >= -122.64) return "Maple Ridge";
+  if (lat >= 49.20 && lng >= -122.73) return "Pitt Meadows";
+  if (lat >= 49.20 && lng >= -122.79) return "Port Coquitlam";
+  if (lat >= 49.20 && lng >  -122.87) return "Coquitlam";
+  if (lat < 49.20) {
+    if (lng >= -122.65) return "Langley";
+    if (lat < 49.06 && lng >= -122.85) return "White Rock";
+    if (lng >= -122.97) return "Surrey";
+    if (lat < 49.16 && lng >= -123.02) return "Delta";
+    return "Richmond";
+  }
+  if (lng > -122.97 && lat < 49.225) return "New Westminster";
+  if (lng > -123.027) return "Burnaby";
+  if (lng >= -123.10) return "East Vancouver";
+  if (lat >= 49.265) return "Downtown Vancouver";
+  return "Vancouver";
+}
+
 const POPULAR_BRANDS = [
   "Petro-Canada", "Shell", "Chevron", "Esso", "Husky",
   "Costco", "Canadian Tire", "7-Eleven", "Fas Gas", "Co-op",
@@ -248,7 +272,7 @@ export default function App() {
 
   const stationsWithArea = allStations.map((s) => ({
     ...s,
-    _area: s.city || "Other",
+    _area: s.city || getAreaFromCoords(s.latitude, s.longitude),
   }));
 
   // Build "More areas" dynamically from actual data, excluding popular ones

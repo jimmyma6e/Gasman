@@ -80,7 +80,7 @@ query locationBySearchTerm($lat: Float, $lng: Float) {
       results {
         id
         name
-        address { line1 city state country }
+        address { line1 }
         latitude
         longitude
         fuels
@@ -144,14 +144,11 @@ def _parse_station(raw: dict) -> dict:
     fuels  = raw.get("fuels") or []
     prices = raw.get("prices") or []
 
-    addr = raw.get("address") or {}
+    addr = (raw.get("address") or {}).get("line1", "")
     station: dict = {
         "station_id":      str(raw.get("id", "")),
         "name":            raw.get("name", f"Station #{raw.get('id','')}"),
-        "address":         addr.get("line1", ""),
-        "city":            addr.get("city", ""),
-        "province":        addr.get("state", ""),
-        "country":         addr.get("country", ""),
+        "address":         addr,
         "latitude":        raw.get("latitude"),
         "longitude":       raw.get("longitude"),
         "currency":        "CAD",
