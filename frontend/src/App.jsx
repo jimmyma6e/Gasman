@@ -4,79 +4,16 @@ import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
 import MapView from "./components/MapView";
 
-const AREAS = [
-  "Downtown Vancouver", "East Vancouver", "Vancouver",
-  "North Vancouver", "West Vancouver",
-  "Burnaby", "New Westminster",
-  "Richmond", "Delta",
-  "Surrey", "White Rock", "Langley",
-  "Coquitlam", "Port Coquitlam", "Port Moody",
-  "Maple Ridge", "Pitt Meadows",
-  "Abbotsford", "Chilliwack",
-  "Victoria", "Nanaimo",
-  "Kelowna", "Kamloops",
-  "Prince George", "Kootenays", "Northern BC",
-];
-
 const POPULAR_AREAS = [
-  "Downtown Vancouver", "North Vancouver", "Burnaby",
-  "Richmond", "Surrey", "Coquitlam", "Langley", "Abbotsford",
+  "Vancouver", "Burnaby", "Richmond", "Surrey",
+  "North Vancouver", "Coquitlam", "Langley", "Abbotsford",
 ];
-
-const MORE_AREAS = AREAS.filter((a) => !POPULAR_AREAS.includes(a));
 
 const POPULAR_BRANDS = [
   "Petro-Canada", "Shell", "Chevron", "Esso", "Husky",
   "Costco", "Canadian Tire", "7-Eleven", "Fas Gas", "Co-op",
 ];
 
-function getArea(lat, lng) {
-  if (lat == null || lng == null) return "Other";
-
-  // North Shore
-  if (lat >= 49.305 && lng <= -123.14) return "West Vancouver";
-  if (lat >= 49.305) return "North Vancouver";
-
-  // Port Moody
-  if (lat >= 49.27 && lng >= -122.88 && lng <= -122.77) return "Port Moody";
-
-  // Northeast Metro Van (east-first)
-  if (lat >= 49.20 && lng >= -122.64) return "Maple Ridge";
-  if (lat >= 49.20 && lng >= -122.73) return "Pitt Meadows";
-  if (lat >= 49.20 && lng >= -122.79) return "Port Coquitlam";
-  if (lat >= 49.20 && lng >  -122.87) return "Coquitlam";
-
-  // South of Fraser River
-  if (lat < 49.20) {
-    if (lng >= -122.65)                 return "Langley";
-    if (lat < 49.06 && lng >= -122.85) return "White Rock";
-    if (lng >= -122.97)                 return "Surrey";
-    if (lat < 49.16 && lng >= -123.02) return "Delta";
-    return "Richmond";
-  }
-
-  // Inner Metro
-  if (lng > -122.97 && lat < 49.225) return "New Westminster";
-  if (lng > -123.027)                return "Burnaby";
-
-  // City of Vancouver
-  if (lng >= -123.10) return "East Vancouver";
-  if (lat >= 49.265)  return "Downtown Vancouver";
-  if (lat >= 49.20)   return "Vancouver";
-
-  // BC-wide fallback
-  if (lat >= 49.0 && lat <= 49.25 && lng >= -122.4 && lng <= -121.7) return "Abbotsford";
-  if (lat >= 49.1 && lat <= 49.2  && lng >= -121.7 && lng <= -121.5) return "Chilliwack";
-  if (lat < 48.7) return "Victoria";
-  if (lat >= 48.7 && lat < 49.4 && lng <= -123.8) return "Nanaimo";
-  if (lng >= -120.0 && lng <= -119.0 && lat >= 49.5 && lat <= 50.1) return "Kelowna";
-  if (lat >= 50.5 && lat <= 51.0 && lng >= -121.0 && lng <= -119.5) return "Kamloops";
-  if (lat >= 53.5 && lat <= 54.5) return "Prince George";
-  if (lat >= 54.5) return "Northern BC";
-  if (lng >= -118.0 && lng <= -115.0) return "Kootenays";
-
-  return "Other";
-}
 
 const FUEL_TYPES = [
   { key: "regular_gas",  label: "Regular" },
@@ -311,8 +248,13 @@ export default function App() {
 
   const stationsWithArea = allStations.map((s) => ({
     ...s,
-    _area: getArea(s.latitude, s.longitude),
+    _area: s.city || "Other",
   }));
+
+  // Build "More areas" dynamically from actual data, excluding popular ones
+  const moreAreas = [...new Set(stationsWithArea.map((s) => s._area))]
+    .filter((a) => a && a !== "Other" && !POPULAR_AREAS.includes(a))
+    .sort();
 
   const brands = [...new Set(allStations.map((s) => s.name).filter(Boolean))];
   brands.sort((a, b) => {
@@ -444,14 +386,14 @@ export default function App() {
             {/* "More areas" dropdown */}
             <div className="area-more-wrap" ref={dropdownRef}>
               <button
-                className={`area-more-btn ${MORE_AREAS.some((n) => areaFilter.has(n)) ? "brand-chip-active" : ""}`}
+                className={`area-more-btn ${moreAreas.some((n) => areaFilter.has(n)) ? "brand-chip-active" : ""}`}
                 onClick={() => setAreaDropdownOpen((o) => !o)}
               >
                 More areas {areaDropdownOpen ? "▴" : "▾"}
               </button>
               {areaDropdownOpen && (
                 <div className="area-dropdown">
-                  {MORE_AREAS.map((name) => (
+                  {moreAreas.map((name) => (
                     <label key={name} className="area-dropdown-item">
                       <input
                         type="checkbox"
