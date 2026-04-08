@@ -800,14 +800,14 @@ export default function App() {
                 </strong>
                 {scanStatus?.stations_found > 0 && ` · ${scanStatus.stations_found} found`}
               </span>
-              {scanStatus?.zones_total > 0 && (
+              {scanStatus?.zones_done > 0 && scanStatus?.zones_total > 0 && (
                 <span className="scan-progress-label">
                   {Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}% · zone {scanStatus.zones_done}/{scanStatus.zones_total}
                   {scanStatus.session > 1 && ` · session ${scanStatus.session}`}
                 </span>
               )}
             </div>
-            {scanStatus?.zones_total > 0 && (
+            {scanStatus?.zones_done > 0 && scanStatus?.zones_total > 0 && (
               <div className="scan-progress-bar scan-banner-bar">
                 <div
                   className="scan-progress-fill"
@@ -827,13 +827,25 @@ export default function App() {
 
         {data && sorted.length === 0 && !loading && (
           <div className="empty-state">
-            <p style={{ fontSize: "2rem" }}>🔍</p>
-            <p><strong>No stations match your filters</strong></p>
-            {(areaFilter.size > 0 || brandFilter.size > 0 || search) && (
-              <button className="btn-clear-filters" style={{ marginTop: 8 }}
-                onClick={() => { setAreaFilter(new Set()); setBrandFilter(new Set()); setSearch(""); }}>
-                Clear all filters
-              </button>
+            {scanning ? (
+              <>
+                <p style={{ fontSize: "2rem" }}>📡</p>
+                <p><strong>Scanning for stations…</strong></p>
+                <p style={{ color: "var(--text-dim)", fontSize: "0.88rem" }}>
+                  First results will appear shortly. The page updates automatically.
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: "2rem" }}>🔍</p>
+                <p><strong>No stations match your filters</strong></p>
+                {(areaFilter.size > 0 || brandFilter.size > 0 || search) && (
+                  <button className="btn-clear-filters" style={{ marginTop: 8 }}
+                    onClick={() => { setAreaFilter(new Set()); setBrandFilter(new Set()); setSearch(""); }}>
+                    Clear all filters
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
