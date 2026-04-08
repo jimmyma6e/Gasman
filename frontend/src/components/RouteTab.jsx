@@ -269,7 +269,7 @@ const DETOUR_THRESHOLD_KM = 5;
 const DETOUR_PENALTY_PER_KM = 0.4;
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -298,7 +298,22 @@ export default function RouteTab({ stations }) {
   const [calcKm, setCalcKm]         = useState("");
   const [calcLitres, setCalcLitres] = useState("");
 
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [routeLabel, setRouteLabel]   = useState("");
+
   const markerRefs = useRef({});
+
+  // Pre-load a saved route when launched from Dashboard
+  useEffect(() => {
+    if (!activeRouteLoad) return;
+    setFromPlace(activeRouteLoad.fromPlace);
+    setToPlace(activeRouteLoad.toPlace);
+    setFuelType(activeRouteLoad.fuelType);
+    setResults(null);
+    setRouteCoords(null);
+    setRouteInfo(null);
+    onClearRouteLoad();
+  }, [activeRouteLoad]);
 
   function applyConsumption(v) {
     setConsumption(v);
@@ -585,6 +600,32 @@ export default function RouteTab({ stations }) {
               <button className="btn-clear-filters" onClick={() => setBrandFilter(new Set())}>Clear</button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Save this route ── */}
+      {results !== null && results.length > 0 && (
+        <div className="route-save-row">
+          {savingRoute ? (
+            <div className="route-save-panel">
+              <input className="route-save-input" placeholder="Route name (optional)"
+                value={routeLabel} onChange={(e) => setRouteLabel(e.target.value)}
+                maxLength={50} autoFocus />
+              <button className="btn-refresh" onClick={() => {
+                onSaveRoute({
+                  fromPlace, toPlace, fuelType,
+                  label: routeLabel.trim() ||
+                    `${fromPlace.display_name.split(",")[0]} → ${toPlace.display_name.split(",")[0]}`,
+                });
+                setSavingRoute(false); setRouteLabel("");
+              }}>Save</button>
+              <button className="btn-clear-filters" onClick={() => { setSavingRoute(false); setRouteLabel(""); }}>Cancel</button>
+            </div>
+          ) : (
+            <button className="btn-save-route" onClick={() => setSavingRoute(true)}>
+              ★ Save this route
+            </button>
+          )}
         </div>
       )}
 

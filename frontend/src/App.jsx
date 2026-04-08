@@ -4,6 +4,7 @@ import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
 import MapView from "./components/MapView";
 import RouteTab from "./components/RouteTab";
+import Dashboard from "./components/Dashboard";
 
 // Region groupings for the area filter
 const BC_REGIONS = {
@@ -232,7 +233,7 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, showArea }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
@@ -292,9 +293,15 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         {fuelData?.last_updated && (
           <span className="last-updated">Updated {timeAgo(fuelData.last_updated)}</span>
         )}
-        <button className="btn-chart" onClick={() => onOpenChart(station)}>
-          📈 Price History
-        </button>
+        <div className="card-footer-actions">
+          {VALID_PRICE(fuelData?.price) && (
+            <button className="btn-snapshot" onClick={() => onSnapshot(station, activeFuel)}
+              title="Save price snapshot">📷</button>
+          )}
+          <button className="btn-chart" onClick={() => onOpenChart(station)}>
+            📈 Price History
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -334,6 +341,72 @@ export default function App() {
       localStorage.setItem("gasman-favourites", JSON.stringify(next));
       return next;
     });
+  }, []);
+
+  const [snapshots, setSnapshots] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-snapshots") || "[]"); }
+    catch { return []; }
+  });
+
+  const [savedRoutes, setSavedRoutes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-fav-routes") || "[]"); }
+    catch { return []; }
+  });
+
+  const [activeRouteLoad, setActiveRouteLoad] = useState(null);
+
+  const handleSnapshot = useCallback((station, fuelType) => {
+    const price = station[fuelType]?.price;
+    if (price == null) return;
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      station_id: station.station_id,
+      name: station.name,
+      address: station.address,
+      _area: station._area,
+      fuel_type: fuelType,
+      price,
+      timestamp: new Date().toISOString(),
+    };
+    setSnapshots((prev) => {
+      const next = [entry, ...prev];
+      localStorage.setItem("gasman-snapshots", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handleDeleteSnapshot = useCallback((id) => {
+    setSnapshots((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      localStorage.setItem("gasman-snapshots", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handleSaveRoute = useCallback((route) => {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      ...route,
+      savedAt: new Date().toISOString(),
+    };
+    setSavedRoutes((prev) => {
+      const next = [entry, ...prev];
+      localStorage.setItem("gasman-fav-routes", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handleDeleteRoute = useCallback((id) => {
+    setSavedRoutes((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      localStorage.setItem("gasman-fav-routes", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handleLaunchRoute = useCallback((route) => {
+    setActiveRouteLoad(route);
+    setTab("route");
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -446,8 +519,8 @@ export default function App() {
           <div className="header-title">
             <span className="header-icon">⛽</span>
             <div>
-              <h1>Gasman</h1>
-              <p className="header-sub">moving you always &middot; powered by JM</p>
+              <h1>GASMAN</h1>
+              <p className="header-sub">Moving You Always &middot; powered by JM</p>
             </div>
           </div>
           <div className="header-actions">
@@ -474,6 +547,12 @@ export default function App() {
               ★ My Stations
               {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
             </button>
+            <button className={`tab-nav ${tab === "dashboard" ? "tab-nav-active" : ""}`} onClick={() => setTab("dashboard")}>
+              📊 My Dashboard
+              {(snapshots.length + savedRoutes.length) > 0 && (
+                <span className="tab-badge">{snapshots.length + savedRoutes.length}</span>
+              )}
+            </button>
             <button className={`tab-nav ${tab === "route" ? "tab-nav-active" : ""}`} onClick={() => setTab("route")}>
               🗺️ Route Finder
             </button>
@@ -482,11 +561,27 @@ export default function App() {
 
         {/* Route Tab */}
         {tab === "route" && (
-          <RouteTab stations={stationsWithArea} />
+          <RouteTab stations={stationsWithArea}
+            activeRouteLoad={activeRouteLoad}
+            onClearRouteLoad={() => setActiveRouteLoad(null)}
+            onSaveRoute={handleSaveRoute} />
         )}
 
-        {/* Station list — hidden on route tab */}
-        {tab !== "route" && (<>
+        {/* Dashboard Tab */}
+        {tab === "dashboard" && (
+          <Dashboard
+            snapshots={snapshots}
+            savedRoutes={savedRoutes}
+            stationsWithArea={stationsWithArea}
+            activeFuel={activeFuel}
+            onDeleteSnapshot={handleDeleteSnapshot}
+            onDeleteRoute={handleDeleteRoute}
+            onLaunchRoute={handleLaunchRoute}
+          />
+        )}
+
+        {/* Station list — hidden on route/dashboard tabs */}
+        {tab !== "route" && tab !== "dashboard" && (<>
         <div className="search-row">
           <input
             className="search-input"
@@ -713,6 +808,7 @@ export default function App() {
                     isFavourite={favourites.includes(station.station_id)}
                     onToggleFavourite={toggleFavourite}
                     onOpenChart={setChartStation}
+                    onSnapshot={handleSnapshot}
                     showArea={sortBy === "city"}
                   />
                   </div>
@@ -761,6 +857,9 @@ export default function App() {
                           </>
                         ) : <span className="tbl-empty">—</span>}
                       </div>
+                      {VALID_PRICE(fuelData?.price) && (
+                        <button className="btn-snapshot btn-chart-sm" onClick={() => handleSnapshot(station, activeFuel)} title="Save price snapshot">📷</button>
+                      )}
                       <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
                     </div>
                   );
@@ -794,7 +893,7 @@ export default function App() {
             </div>{/* end split-view */}
           </>
         )}
-        </>)}{/* end tab !== route */}
+        </>)}{/* end tab !== route && tab !== dashboard */}
       </main>
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
