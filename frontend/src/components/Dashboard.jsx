@@ -5,6 +5,15 @@ const FUEL_LABELS = {
   diesel:       "Diesel",
 };
 
+const FUEL_TYPES = [
+  { key: "regular_gas",  label: "Regular" },
+  { key: "midgrade_gas", label: "Mid" },
+  { key: "premium_gas",  label: "Premium" },
+  { key: "diesel",       label: "Diesel" },
+];
+
+function VALID_PRICE(p) { return typeof p === "number" && p > 0; }
+
 function timeAgo(isoString) {
   if (!isoString) return "unknown";
   const diff = Math.floor((Date.now() - new Date(isoString)) / 60000);
@@ -16,10 +25,42 @@ function timeAgo(isoString) {
 }
 
 function shortName(displayName) {
-  // Trim to first two comma-separated parts for readability
   if (!displayName) return "";
   const parts = displayName.split(",");
   return parts.slice(0, 2).join(",").trim();
+}
+
+// ── My Stations section ───────────────────────────────────────────────────────
+
+function FavouriteStationRow({ station, activeFuel, cheapestPrices, onToggleFavourite }) {
+  const fuelData   = station[activeFuel];
+  const price      = fuelData?.price;
+  const isCheapest = VALID_PRICE(price) && price === cheapestPrices?.[activeFuel];
+
+  return (
+    <div className="fav-station-row">
+      <div className="fav-station-info">
+        <div className="fav-station-name">
+          {station.name}
+          {isCheapest && <span className="badge-cheapest fav-cheapest-badge">Cheapest</span>}
+        </div>
+        <div className="fav-station-meta">{station.address}{station._area ? ` · ${station._area}` : ""}</div>
+      </div>
+      <div className="fav-station-prices">
+        {FUEL_TYPES.map(({ key, label }) => {
+          const fd = station[key];
+          if (!VALID_PRICE(fd?.price)) return null;
+          return (
+            <div key={key} className={`fav-price-chip ${key === activeFuel ? "fav-price-active" : ""}`}>
+              <span className="fav-price-label">{label}</span>
+              <span className="fav-price-value">{fd.price}¢</span>
+            </div>
+          );
+        })}
+      </div>
+      <button className="btn-unfav" onClick={() => onToggleFavourite(station.station_id)} title="Remove from My Stations">★</button>
+    </div>
+  );
 }
 
 // ── Price Snapshot section ────────────────────────────────────────────────────
@@ -88,10 +129,37 @@ function SavedRouteCard({ route, onLaunch, onDelete }) {
 
 export default function Dashboard({
   snapshots, savedRoutes, stationsWithArea,
+  favourites, activeFuel, cheapestPrices, onToggleFavourite,
   onDeleteSnapshot, onDeleteRoute, onLaunchRoute,
 }) {
+  const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
+
   return (
     <div className="dashboard">
+
+      {/* ── My Stations ── */}
+      <div>
+        <div className="dashboard-section-title">
+          ★ My Stations
+          {favStations.length > 0 && (
+            <span className="tab-badge">{favStations.length}</span>
+          )}
+        </div>
+        {favStations.length === 0 ? (
+          <p className="dashboard-empty">
+            No favourite stations yet. Click ☆ on any station card to pin it here.
+          </p>
+        ) : (
+          <div className="fav-station-list">
+            {favStations.map((s) => (
+              <FavouriteStationRow key={s.station_id} station={s}
+                activeFuel={activeFuel}
+                cheapestPrices={cheapestPrices}
+                onToggleFavourite={onToggleFavourite} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Price Snapshots ── */}
       <div>
@@ -119,7 +187,7 @@ export default function Dashboard({
       {/* ── Saved Routes ── */}
       <div>
         <div className="dashboard-section-title">
-          ★ Saved Routes
+          🗺️ Saved Routes
           {savedRoutes.length > 0 && (
             <span className="tab-badge">{savedRoutes.length}</span>
           )}

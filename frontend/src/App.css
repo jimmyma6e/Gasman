@@ -496,6 +496,24 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   }
 }
 
+/* ── Favourite station rows (Dashboard) ── */
+.fav-station-list { display: flex; flex-direction: column; gap: 10px; }
+.fav-station-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fav-station-info { flex: 1; min-width: 160px; }
+.fav-station-name { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fav-station-meta { font-size: 0.75rem; color: var(--text-dim); margin-top: 3px; }
+.fav-cheapest-badge { font-size: 0.7rem; padding: 2px 7px; border-radius: 6px; }
+.fav-station-prices { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.fav-price-chip { display: flex; flex-direction: column; align-items: center; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; min-width: 52px; }
+.fav-price-chip.fav-price-active { border-color: var(--accent); background: rgba(var(--accent-rgb, 234 179 8), 0.08); }
+.fav-price-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.fav-price-value { font-size: 0.9rem; font-weight: 700; }
+.btn-unfav { background: none; border: none; color: var(--accent); font-size: 1.1rem;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: opacity 0.15s; flex-shrink: 0; line-height: 1; }
+.btn-unfav:hover { opacity: 0.6; }
+
 /* ── Card footer actions ── */
 .card-footer-actions { display: flex; align-items: center; gap: 6px; }
 

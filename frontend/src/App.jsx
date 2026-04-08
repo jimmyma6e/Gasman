@@ -471,7 +471,6 @@ export default function App() {
 
   const q = search.trim().toLowerCase();
   const filtered = stationsWithArea.filter((s) => {
-    if (tab === "mine" && !favourites.includes(s.station_id)) return false;
     if (areaFilter.size  > 0 && !areaFilter.has(s._area))    return false;
     if (brandFilter.size > 0 && !brandFilter.has(s._brand))   return false;
     if (q && !s.name.toLowerCase().includes(q) && !s.address.toLowerCase().includes(q)) return false;
@@ -543,14 +542,10 @@ export default function App() {
               All Stations
               {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
             </button>
-            <button className={`tab-nav ${tab === "mine"  ? "tab-nav-active" : ""}`} onClick={() => setTab("mine")}>
-              ★ My Stations
-              {favourites.length > 0 && <span className="tab-badge">{favourites.length}</span>}
-            </button>
             <button className={`tab-nav ${tab === "dashboard" ? "tab-nav-active" : ""}`} onClick={() => setTab("dashboard")}>
               📊 My Dashboard
-              {(snapshots.length + savedRoutes.length) > 0 && (
-                <span className="tab-badge">{snapshots.length + savedRoutes.length}</span>
+              {(favourites.length + snapshots.length + savedRoutes.length) > 0 && (
+                <span className="tab-badge">{favourites.length + snapshots.length + savedRoutes.length}</span>
               )}
             </button>
             <button className={`tab-nav ${tab === "route" ? "tab-nav-active" : ""}`} onClick={() => setTab("route")}>
@@ -573,7 +568,10 @@ export default function App() {
             snapshots={snapshots}
             savedRoutes={savedRoutes}
             stationsWithArea={stationsWithArea}
+            favourites={favourites}
             activeFuel={activeFuel}
+            cheapestPrices={cheapestPrices}
+            onToggleFavourite={toggleFavourite}
             onDeleteSnapshot={handleDeleteSnapshot}
             onDeleteRoute={handleDeleteRoute}
             onLaunchRoute={handleLaunchRoute}
@@ -763,14 +761,6 @@ export default function App() {
 
         {loading && !data && (
           <div className="loading-box"><div className="spinner" /><p>Fetching gas prices across British Columbia...</p></div>
-        )}
-
-        {tab === "mine" && favourites.length === 0 && (
-          <div className="empty-state">
-            <p style={{ fontSize: "2.5rem" }}>☆</p>
-            <p><strong>No favourite stations yet</strong></p>
-            <p>Click the ☆ on any station to add it here.</p>
-          </div>
         )}
 
         {data && sorted.length === 0 && !loading && (
