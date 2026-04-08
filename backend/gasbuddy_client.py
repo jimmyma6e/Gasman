@@ -414,6 +414,7 @@ async def _fetch_via_playwright(
         "stations_found": 0, "session": 0,
         "started_at": datetime.now(timezone.utc).isoformat(),
     })
+    print(f"[{mode}] starting — {total} zones", flush=True)
 
     try:
         async with async_playwright() as pw:
@@ -428,6 +429,7 @@ async def _fetch_via_playwright(
                             mode, session_num, i + 1, batch_end, total)
 
                 browser, page, gbcsrf_token = await _start_browser_session(pw)
+                print(f"[{mode}] session {session_num} ready — gbcsrf: {'ok' if gbcsrf_token else 'MISSING'}", flush=True)
                 consecutive_errors = 0
 
                 for j in range(i, batch_end):

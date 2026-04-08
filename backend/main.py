@@ -14,6 +14,15 @@ from fastapi.responses import FileResponse
 import database
 import gasbuddy_client as gb
 
+# Ensure our application loggers emit at INFO regardless of what
+# uvicorn does to the root logger.  force=True removes any existing
+# handlers so this always takes effect.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    force=True,
+)
+
 logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
