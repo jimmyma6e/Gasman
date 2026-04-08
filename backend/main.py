@@ -161,6 +161,11 @@ async def health():
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
 
 
+@app.get("/api/scan-status")
+async def scan_status():
+    return gb.get_scan_status()
+
+
 # Trigger a manual discovery scan (useful after deploy or to force refresh)
 @app.post("/api/admin/discover")
 async def trigger_discovery():

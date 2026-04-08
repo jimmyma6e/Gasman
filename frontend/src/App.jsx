@@ -409,6 +409,8 @@ export default function App() {
     setTab("route");
   }, []);
 
+  const [scanStatus, setScanStatus] = useState(null);
+
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -428,6 +430,20 @@ export default function App() {
     const id = setInterval(fetchData, REFRESH_INTERVAL);
     return () => clearInterval(id);
   }, [fetchData]);
+
+  // Poll scan-status while a scan is running (i.e. during initial load)
+  useEffect(() => {
+    let id;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/scan-status");
+        if (res.ok) setScanStatus(await res.json());
+      } catch { /* ignore */ }
+    };
+    poll();
+    id = setInterval(poll, 4000);
+    return () => clearInterval(id);
+  }, []);
 
   // Close area dropdown on outside click
   useEffect(() => {
@@ -760,7 +776,35 @@ export default function App() {
         )}
 
         {loading && !data && (
-          <div className="loading-box"><div className="spinner" /><p>Fetching gas prices across British Columbia...</p></div>
+          <div className="loading-box">
+            <div className="spinner" />
+            {scanStatus?.running ? (
+              <>
+                <p>
+                  <strong>
+                    {scanStatus.mode === "discovery" ? "Discovering" : "Refreshing"} stations…
+                  </strong>{" "}
+                  {scanStatus.stations_found > 0 && `${scanStatus.stations_found} found so far`}
+                </p>
+                {scanStatus.zones_total > 0 && (
+                  <>
+                    <div className="scan-progress-bar">
+                      <div
+                        className="scan-progress-fill"
+                        style={{ width: `${Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}%` }}
+                      />
+                    </div>
+                    <p className="scan-progress-label">
+                      Zone {scanStatus.zones_done} / {scanStatus.zones_total}
+                      {scanStatus.session > 1 && ` · session ${scanStatus.session}`}
+                    </p>
+                  </>
+                )}
+              </>
+            ) : (
+              <p>Fetching gas prices across British Columbia…</p>
+            )}
+          </div>
         )}
 
         {data && sorted.length === 0 && !loading && (

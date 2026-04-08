@@ -43,8 +43,8 @@ def _build_search_coords() -> list:
                 lng += lng_step
             lat += lat_step
 
-    # Metro Vancouver — 1.5 km grid (~1440 points, comprehensive)
-    grid(49.00, 49.42, -123.35, -122.45, 1.5)
+    # Metro Vancouver — 2.5 km grid (~500 points, still fully comprehensive)
+    grid(49.00, 49.42, -123.35, -122.45, 2.5)
 
     # Fraser Valley — 5 km grid (~130 points)
     grid(49.00, 49.45, -122.45, -121.00, 5.0)
@@ -56,8 +56,8 @@ def _build_search_coords() -> list:
         (50.1163, -122.9574),  # Whistler
     ]
 
-    # Vancouver Island — 8 km grid
-    grid(48.30, 49.00, -124.50, -123.25, 8.0)
+    # Vancouver Island — 10 km grid
+    grid(48.30, 49.00, -124.50, -123.25, 10.0)
     coords += [
         (49.1659, -123.9401),  # Nanaimo
         (49.3000, -124.3100),  # Parksville / Qualicum
@@ -152,6 +152,20 @@ _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
 _scan_lock = asyncio.Lock()
 
 _lock = asyncio.Lock()
+
+_scan_status: dict = {
+    "running":        False,
+    "mode":           None,   # "discovery" | "refresh"
+    "zones_done":     0,
+    "zones_total":    0,
+    "stations_found": 0,
+    "session":        0,
+    "started_at":     None,
+}
+
+
+def get_scan_status() -> dict:
+    return dict(_scan_status)
 
 
 def warm_cache_from_db(stations: list):
@@ -285,7 +299,7 @@ def _parse_trend(raw: dict) -> dict:
 BATCH_SIZE     = 200   # zones per browser session before restarting
 SESSION_BREAK  = 90    # seconds between browser sessions (discovery)
 ZONE_SLEEP     = 6     # seconds between zone requests (discovery)
-FLUSH_EVERY    = 50    # flush cache + DB every N zones
+FLUSH_EVERY    = 10    # flush cache + DB every N zones (fast first-data delivery)
 
 # Refresh mode — fewer total queries so sessions can be shorter
 REFRESH_SESSION_BREAK = 60
@@ -388,102 +402,118 @@ async def _fetch_via_playwright(
     *,
     zone_sleep: float = ZONE_SLEEP,
     session_break: float = SESSION_BREAK,
+    mode: str = "scan",
 ) -> tuple[list[dict], list[dict]]:
     stations_map: dict[str, dict] = {}
     trends: list[dict] = []
     total = len(coords)
 
-    async with async_playwright() as pw:
-        i = 0
-        session_num = 0
+    _scan_status.update({
+        "running": True, "mode": mode,
+        "zones_done": 0, "zones_total": total,
+        "stations_found": 0, "session": 0,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    })
 
-        while i < total:
-            batch_end = min(i + BATCH_SIZE, total)
-            session_num += 1
-            print(f"  [session {session_num}] zones {i+1}–{batch_end} of {total}")
+    try:
+        async with async_playwright() as pw:
+            i = 0
+            session_num = 0
 
-            browser, page, gbcsrf_token = await _start_browser_session(pw)
-            consecutive_errors = 0
+            while i < total:
+                batch_end = min(i + BATCH_SIZE, total)
+                session_num += 1
+                _scan_status["session"] = session_num
+                logger.info("[%s] session %d — zones %d–%d of %d",
+                            mode, session_num, i + 1, batch_end, total)
 
-            for j in range(i, batch_end):
-                if j > i:
-                    await asyncio.sleep(zone_sleep)
-
-                lat, lng = coords[j]
-                try:
-                    result = await page.evaluate(
-                        _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
-                    )
-                except Exception as e:
-                    logger.warning("  evaluate error: %s", e)
-                    consecutive_errors += 1
-                    continue
-
-                if not isinstance(result, dict) or "error" in result:
-                    err = (result or {}).get("error", "") if isinstance(result, dict) else str(result)
-                    if "429" in str(err):
-                        consecutive_errors += 1
-                        backoff = min(120, 30 * consecutive_errors)
-                        print(f"  [429] rate limited — backing off {backoff}s (zone {j+1})")
-                        await asyncio.sleep(backoff)
-                        continue
-                    if "403" in str(err):
-                        print(f"  [403] session blocked at zone {j+1} — restarting session early")
-                        batch_end = j  # end this batch here, restart session
-                        break
-                    consecutive_errors += 1
-                    continue
-
+                browser, page, gbcsrf_token = await _start_browser_session(pw)
                 consecutive_errors = 0
-                loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
-                raw_stations = (loc.get("stations") or {}).get("results") or []
-                raw_trends   = loc.get("trends") or []
 
-                before = len(stations_map)
-                for s in raw_stations:
-                    sid = str(s.get("id", ""))
-                    if sid and sid not in stations_map:
-                        parsed = _parse_station(s)
-                        country = parsed.get("country", "")
-                        if country and country.upper() not in ("CA", "CAN", "CANADA"):
+                for j in range(i, batch_end):
+                    if j > i:
+                        await asyncio.sleep(zone_sleep)
+
+                    lat, lng = coords[j]
+                    try:
+                        result = await page.evaluate(
+                            _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
+                        )
+                    except Exception as e:
+                        logger.warning("[%s] evaluate error at zone %d: %s", mode, j + 1, e)
+                        consecutive_errors += 1
+                        continue
+
+                    if not isinstance(result, dict) or "error" in result:
+                        err = (result or {}).get("error", "") if isinstance(result, dict) else str(result)
+                        if "429" in str(err):
+                            consecutive_errors += 1
+                            backoff = min(120, 30 * consecutive_errors)
+                            logger.warning("[%s] 429 rate-limited at zone %d — backoff %ds",
+                                          mode, j + 1, backoff)
+                            await asyncio.sleep(backoff)
                             continue
-                        if not country and not _is_bc_station(parsed["latitude"], parsed["longitude"]):
-                            continue
-                        stations_map[sid] = parsed
+                        if "403" in str(err):
+                            logger.warning("[%s] 403 session blocked at zone %d — restarting session",
+                                          mode, j + 1)
+                            batch_end = j  # end this batch here, restart session
+                            break
+                        consecutive_errors += 1
+                        continue
 
-                if not trends and raw_trends:
-                    trends.extend(_parse_trend(t) for t in raw_trends)
+                    consecutive_errors = 0
+                    loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
+                    raw_stations = (loc.get("stations") or {}).get("results") or []
+                    raw_trends   = loc.get("trends") or []
 
-                added = len(stations_map) - before
-                pct   = (j + 1) / total * 100
-                if added > 0 or (j + 1) % 100 == 0:
-                    print(f"  [{pct:5.1f}%] zone {j+1}/{total}: +{added} new → {len(stations_map)} total")
+                    before = len(stations_map)
+                    for s in raw_stations:
+                        sid = str(s.get("id", ""))
+                        if sid and sid not in stations_map:
+                            parsed = _parse_station(s)
+                            country = parsed.get("country", "")
+                            if country and country.upper() not in ("CA", "CAN", "CANADA"):
+                                continue
+                            if not country and not _is_bc_station(parsed["latitude"], parsed["longitude"]):
+                                continue
+                            stations_map[sid] = parsed
 
-                # Progressive flush every FLUSH_EVERY zones
-                if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
-                    snapshot = list(stations_map.values())
-                    # Merge with existing cache so a partial scan never shrinks
-                    # visible stations (critical for refresh scans that cover
-                    # fewer zones than the previous discovery scan).
-                    existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
-                    existing.update({s["station_id"]: s for s in snapshot})
-                    merged = list(existing.values())
-                    _cache["stations"]   = merged
-                    _cache["trends"]     = trends or []
-                    _cache["fetched_at"] = datetime.now(timezone.utc)
-                    if on_flush:
-                        on_flush(snapshot)
-                    print(f"  [flush] +{len(snapshot)} scanned → {len(merged)} total in cache")
+                    if not trends and raw_trends:
+                        trends.extend(_parse_trend(t) for t in raw_trends)
 
-            await browser.close()
-            i = batch_end
+                    added = len(stations_map) - before
+                    pct   = (j + 1) / total * 100
+                    _scan_status["zones_done"]     = j + 1
+                    _scan_status["stations_found"] = len(stations_map)
+                    if added > 0 or (j + 1) % 50 == 0:
+                        logger.info("[%s] %5.1f%% — zone %d/%d: +%d new → %d total stations",
+                                    mode, pct, j + 1, total, added, len(stations_map))
 
-            # Break between sessions so GasBuddy doesn't flag us
-            if i < total:
-                print(f"  [session break] {session_break}s before next session …")
-                await asyncio.sleep(session_break)
+                    # Progressive flush every FLUSH_EVERY zones
+                    if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
+                        snapshot = list(stations_map.values())
+                        existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
+                        existing.update({s["station_id"]: s for s in snapshot})
+                        merged = list(existing.values())
+                        _cache["stations"]   = merged
+                        _cache["trends"]     = trends or []
+                        _cache["fetched_at"] = datetime.now(timezone.utc)
+                        if on_flush:
+                            on_flush(snapshot)
+                        logger.info("[%s] flush — %d scanned / %d total in cache",
+                                    mode, len(snapshot), len(merged))
 
-    logger.info("Done: %d stations, %d trends", len(stations_map), len(trends))
+                await browser.close()
+                i = batch_end
+
+                if i < total:
+                    logger.info("[%s] session break — %ds before next session", mode, session_break)
+                    await asyncio.sleep(session_break)
+
+    finally:
+        _scan_status["running"] = False
+
+    logger.info("[%s] done — %d stations, %d trends", mode, len(stations_map), len(trends))
     return list(stations_map.values()), trends
 
 
@@ -503,6 +533,7 @@ async def discover_stations(on_flush=None) -> tuple[list[dict], list[dict]]:
             SEARCH_COORDS, on_flush,
             zone_sleep=ZONE_SLEEP,
             session_break=SESSION_BREAK,
+            mode="discovery",
         )
         _cache["stations"]   = stations
         _cache["trends"]     = trends
@@ -534,6 +565,7 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
             centers, on_flush,
             zone_sleep=REFRESH_ZONE_SLEEP,
             session_break=REFRESH_SESSION_BREAK,
+            mode="refresh",
         )
         # Merge refreshed stations into the existing cache rather than replacing.
         # A refresh scan covers fewer zones than discovery so we must not discard

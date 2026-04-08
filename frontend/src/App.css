@@ -496,6 +496,13 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   }
 }
 
+/* ── Scan progress ── */
+.scan-progress-bar { width: 100%; max-width: 320px; height: 6px; background: var(--surface2);
+  border-radius: 3px; overflow: hidden; margin: 10px auto 4px; }
+.scan-progress-fill { height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.4s ease; }
+.scan-progress-label { font-size: 0.78rem; color: var(--text-dim); margin: 0; }
+
 /* ── Favourite station rows (Dashboard) ── */
 .fav-station-list { display: flex; flex-direction: column; gap: 10px; }
 .fav-station-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
