@@ -193,7 +193,7 @@ query locationBySearchTerm($lat: Float, $lng: Float) {
       results {
         id
         name
-        address { line1 city }
+        address { line1 }
         latitude
         longitude
         fuels
