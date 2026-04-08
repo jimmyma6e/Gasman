@@ -209,24 +209,28 @@ query locationBySearchTerm($lat: Float, $lng: Float) {
 """
 
 _JS_FETCH = """
-async ({ query, lat, lng, gbcsrf }) => {
+async ({ query, operationName, lat, lng, gbcsrf }) => {
     try {
         const resp = await fetch('/graphql', {
             method: 'POST',
             credentials: 'include',
             headers: {
-                'Content-Type':           'application/json',
-                'Accept':                 '*/*',
+                'Content-Type':             'application/json',
+                'Accept':                   '*/*',
                 'apollo-require-preflight': 'true',
-                'gbcsrf':                 gbcsrf,
-                'referer':                'https://www.gasbuddy.com/',
+                'gbcsrf':                   gbcsrf,
             },
             body: JSON.stringify({
+                operationName,
                 query,
                 variables: { lat, lng },
             }),
         });
-        if (!resp.ok) return { error: `HTTP ${resp.status}` };
+        if (!resp.ok) {
+            let body = '';
+            try { body = await resp.text(); } catch (_) {}
+            return { error: `HTTP ${resp.status}`, body: body.slice(0, 400) };
+        }
         return await resp.json();
     } catch (e) {
         return { error: String(e) };
@@ -439,7 +443,12 @@ async def _fetch_via_playwright(
                     lat, lng = coords[j]
                     try:
                         result = await page.evaluate(
-                            _JS_FETCH, {"query": _GQL, "lat": lat, "lng": lng, "gbcsrf": gbcsrf_token}
+                            _JS_FETCH, {
+                                "query": _GQL,
+                                "operationName": "locationBySearchTerm",
+                                "lat": lat, "lng": lng,
+                                "gbcsrf": gbcsrf_token,
+                            }
                         )
                     except Exception as e:
                         logger.warning("[%s] evaluate error at zone %d: %s", mode, j + 1, e)
@@ -461,8 +470,9 @@ async def _fetch_via_playwright(
                             break
                         else:
                             # Log every unhandled error so we can see what GasBuddy is returning
-                            logger.warning("[%s] zone %d error (consecutive=%d): %r",
-                                          mode, j + 1, consecutive_errors + 1, err)
+                            body = result.get("body", "") if isinstance(result, dict) else ""
+                            logger.warning("[%s] zone %d error (consecutive=%d): %r body=%s",
+                                          mode, j + 1, consecutive_errors + 1, err, body or "(empty)")
                             consecutive_errors += 1
                         _scan_status["zones_done"] = j + 1
                         continue
