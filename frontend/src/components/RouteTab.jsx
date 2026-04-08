@@ -555,7 +555,7 @@ export default function RouteTab({ stations }) {
       {routeInfo && (
         <div className="route-summary">
           <span>🛣️ <strong>{routeInfo.distanceKm} km</strong></span>
-          <span>⏱️ <strong>{routeInfo.durationMin} min</strong></span>
+          <span>⏱️ <strong>{routeInfo.durationMin} min</strong> drive</span>
           {results !== null && (
             <span>⛽ <strong>{results.length}</strong> station{results.length !== 1 ? "s" : ""} found</span>
           )}
@@ -565,7 +565,7 @@ export default function RouteTab({ stations }) {
             const lo = Math.min(...costs).toFixed(2);
             const hi = Math.max(...costs).toFixed(2);
             return (
-              <span>💰 ~<strong>{lo === hi ? `$${lo}` : `$${lo}–$${hi}`}</strong> fuel cost</span>
+              <span>💰 ~<strong>{lo === hi ? `$${lo}` : `$${lo}–$${hi}`}</strong> for full trip</span>
             );
           })()}
         </div>
@@ -598,53 +598,76 @@ export default function RouteTab({ stations }) {
         </div>
       )}
 
-      {displayedResults?.length > 0 && (
-        <div className="route-results">
-          <p className="route-results-title">
-            Best <strong>{fuelLabel}</strong> stations along your route
-            <span style={{ fontWeight: 400, color: "var(--text-dim)", fontSize: "0.78rem", marginLeft: 8 }}>
-              click a row to see on map
-            </span>
-          </p>
-          <div className="route-result-list">
-            {displayedResults.map((s) => {
-              const priceData = s[fuelType];
-              const rank = results.indexOf(s) + 1;
-              const isSelected = selectedStation?.station_id === s.station_id;
-              return (
-                <div key={s.station_id}
-                  className={`route-result-row ${rank === 1 ? "route-result-best" : ""} ${isSelected ? "route-result-selected" : ""}`}
-                  onClick={() => handleSelectStation(s)}>
-                  <div className="route-result-rank"
-                    style={{ background: STATION_COLORS[rank - 1] || "#94a3b8" }}>
-                    {rank}
-                  </div>
-                  <div className="route-result-info">
-                    <span className="route-result-name">{s.name}</span>
-                    <span className="route-result-addr">
-                      {s.address}{s._area ? ` · ${s._area}` : ""}
-                    </span>
-                  </div>
-                  <div className="route-result-right">
-                    <span className="route-result-price">{priceData.price}¢</span>
-                    <span className="route-result-detour">
-                      {s.detour <= 0.3 ? "on route" : `+${s.detour}km detour`}
-                    </span>
-                    {routeInfo && (
-                      <span className="route-result-tripcost">
-                        ~${calcTripCost(routeInfo.distanceKm, consumption, priceData.price).toFixed(2)} fuel
+      {displayedResults?.length > 0 && (() => {
+        // Pre-compute max cost for savings comparison
+        const maxCost = results?.length
+          ? Math.max(...results.map((s) =>
+              calcTripCost(routeInfo?.distanceKm || 0, consumption, s[fuelType]?.price || 0)))
+          : 0;
+        return (
+          <div className="route-results">
+            <p className="route-results-title">
+              Best <strong>{fuelLabel}</strong> stations along your route
+              <span style={{ fontWeight: 400, color: "var(--text-dim)", fontSize: "0.78rem", marginLeft: 8 }}>
+                click a row to see on map
+              </span>
+            </p>
+            <div className="route-result-list">
+              {displayedResults.map((s) => {
+                const priceData = s[fuelType];
+                const rank = results.indexOf(s) + 1;
+                const isSelected = selectedStation?.station_id === s.station_id;
+                // Detour time estimate at ~50 km/h avg speed
+                const detourMin = s.detour > 0.3
+                  ? Math.max(1, Math.round(s.detour * 2 / 50 * 60))
+                  : 0;
+                const totalMin = routeInfo
+                  ? routeInfo.durationMin + detourMin
+                  : null;
+                const tripCost = routeInfo
+                  ? calcTripCost(routeInfo.distanceKm, consumption, priceData.price)
+                  : null;
+                const savings = tripCost != null ? maxCost - tripCost : 0;
+                return (
+                  <div key={s.station_id}
+                    className={`route-result-row ${rank === 1 ? "route-result-best" : ""} ${isSelected ? "route-result-selected" : ""}`}
+                    onClick={() => handleSelectStation(s)}>
+                    <div className="route-result-rank"
+                      style={{ background: STATION_COLORS[rank - 1] || "#94a3b8" }}>
+                      {rank}
+                    </div>
+                    <div className="route-result-info">
+                      <span className="route-result-name">{s.name}</span>
+                      <span className="route-result-addr">
+                        {s.address}{s._area ? ` · ${s._area}` : ""}
                       </span>
-                    )}
+                    </div>
+                    <div className="route-result-right">
+                      <span className="route-result-price">{priceData.price}¢/L</span>
+                      <span className="route-result-detour">
+                        {s.detour <= 0.3
+                          ? `on route · ${totalMin} min total`
+                          : `+${s.detour}km · +${detourMin} min · ${totalMin} min total`}
+                      </span>
+                      {tripCost != null && (
+                        <span className="route-result-tripcost">
+                          ~${tripCost.toFixed(2)} for trip
+                          {savings > 0.05 && (
+                            <span className="route-result-savings"> · save ${savings.toFixed(2)}</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <p className="route-results-note">
+              Trip cost = full {routeInfo?.distanceKm}km at {consumption}L/100km · ranked by price + detour
+            </p>
           </div>
-          <p className="route-results-note">
-            Ranked by price + ~{DETOUR_PENALTY_PER_KM}¢/L per km detour
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {displayedResults?.length === 0 && results?.length > 0 && (
         <div className="empty-state" style={{ padding: "30px 20px" }}>

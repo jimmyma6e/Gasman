@@ -462,12 +462,18 @@ async def _fetch_via_playwright(
                 # Progressive flush every FLUSH_EVERY zones
                 if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
                     snapshot = list(stations_map.values())
-                    _cache["stations"]   = snapshot
+                    # Merge with existing cache so a partial scan never shrinks
+                    # visible stations (critical for refresh scans that cover
+                    # fewer zones than the previous discovery scan).
+                    existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
+                    existing.update({s["station_id"]: s for s in snapshot})
+                    merged = list(existing.values())
+                    _cache["stations"]   = merged
                     _cache["trends"]     = trends or []
                     _cache["fetched_at"] = datetime.now(timezone.utc)
                     if on_flush:
                         on_flush(snapshot)
-                    print(f"  [flush] {len(snapshot)} stations → cache + DB")
+                    print(f"  [flush] +{len(snapshot)} scanned → {len(merged)} total in cache")
 
             await browser.close()
             i = batch_end
@@ -529,10 +535,17 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
             zone_sleep=REFRESH_ZONE_SLEEP,
             session_break=REFRESH_SESSION_BREAK,
         )
-        _cache["stations"]   = stations
-        _cache["trends"]     = trends
-        _cache["fetched_at"] = datetime.now(timezone.utc)
-        return stations, trends
+        # Merge refreshed stations into the existing cache rather than replacing.
+        # A refresh scan covers fewer zones than discovery so we must not discard
+        # stations that weren't in the refresh radius.
+        existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
+        existing.update({s["station_id"]: s for s in stations})
+        merged = list(existing.values())
+        if merged:
+            _cache["stations"]   = merged
+            _cache["trends"]     = trends or _cache.get("trends") or []
+            _cache["fetched_at"] = datetime.now(timezone.utc)
+        return merged, _cache.get("trends") or []
 
 
 async def get_all_bc() -> tuple[list[dict], list[dict]]:
