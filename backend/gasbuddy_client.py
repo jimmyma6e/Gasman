@@ -454,13 +454,17 @@ async def _fetch_via_playwright(
                             logger.warning("[%s] 429 rate-limited at zone %d — backoff %ds",
                                           mode, j + 1, backoff)
                             await asyncio.sleep(backoff)
-                            continue
-                        if "403" in str(err):
+                        elif "403" in str(err):
                             logger.warning("[%s] 403 session blocked at zone %d — restarting session",
                                           mode, j + 1)
                             batch_end = j  # end this batch here, restart session
                             break
-                        consecutive_errors += 1
+                        else:
+                            # Log every unhandled error so we can see what GasBuddy is returning
+                            logger.warning("[%s] zone %d error (consecutive=%d): %r",
+                                          mode, j + 1, consecutive_errors + 1, err)
+                            consecutive_errors += 1
+                        _scan_status["zones_done"] = j + 1
                         continue
 
                     consecutive_errors = 0
