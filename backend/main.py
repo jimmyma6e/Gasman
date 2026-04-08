@@ -91,8 +91,9 @@ app.add_middleware(
 
 @app.get("/api/stations")
 async def get_stations():
-    stations, trend = await gb.get_all_bc()
-    deltas = database.get_price_deltas()
+    stations, trend = gb.get_cache_snapshot()
+    scan_status     = gb.get_scan_status()
+    deltas = database.get_price_deltas() if stations else {}
     for s in stations:
         d = deltas.get(s["station_id"])
         if d:
@@ -102,6 +103,7 @@ async def get_stations():
         "trend":      trend,
         "count":      len(stations),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "scanning":   scan_status["running"],
     }
 
 

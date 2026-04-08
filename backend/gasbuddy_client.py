@@ -580,11 +580,6 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
         return merged, _cache.get("trends") or []
 
 
-async def get_all_bc() -> tuple[list[dict], list[dict]]:
-    """Return cached station data immediately; background poll keeps it fresh."""
-    if _cache["stations"] is not None:
-        return _cache["stations"], _cache["trends"] or []
-    # No cache yet — wait for first poll
-    while _cache["stations"] is None:
-        await asyncio.sleep(1)
-    return _cache["stations"], _cache["trends"] or []
+def get_cache_snapshot() -> tuple[list[dict], list[dict]]:
+    """Return whatever is currently cached (may be empty list). Never blocks."""
+    return _cache.get("stations") or [], _cache.get("trends") or []

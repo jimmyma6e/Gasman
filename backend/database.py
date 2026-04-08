@@ -280,28 +280,36 @@ def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
 
 def get_latest_stations() -> list:
     """Return the most recent price snapshot for every station, reconstructed
-    into the same dict format that gasbuddy_client produces."""
+    into the same dict format that gasbuddy_client produces.
+
+    Uses DISTINCT ON (station_id, fuel_type) ordered by recorded_at DESC so that
+    a partial/interrupted scan never silently discards stations — each station's
+    latest known price is always returned regardless of which batch wrote it.
+    """
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # Latest batch timestamp
-            cur.execute("""
-                SELECT recorded_at FROM price_history
-                ORDER BY recorded_at DESC LIMIT 1
-            """)
-            row = cur.fetchone()
-            if not row:
+            # Fast check: any data at all?
+            cur.execute("SELECT 1 FROM price_history LIMIT 1")
+            if not cur.fetchone():
                 return []
-            latest_time = row["recorded_at"]
 
-            # All rows from that batch, joined with stations for city
+            # Latest price per (station, fuel_type), within the last 7 days
             cur.execute("""
-                SELECT ph.station_id, ph.name, ph.address, s.city,
-                       ph.latitude, ph.longitude,
-                       ph.fuel_type, ph.price, ph.currency, ph.unit, ph.recorded_at
-                FROM price_history ph
+                WITH latest AS (
+                    SELECT DISTINCT ON (ph.station_id, ph.fuel_type)
+                        ph.station_id, ph.name, ph.address,
+                        ph.latitude, ph.longitude,
+                        ph.fuel_type, ph.price, ph.currency, ph.unit,
+                        ph.recorded_at
+                    FROM price_history ph
+                    WHERE ph.recorded_at >= NOW() - INTERVAL '7 days'
+                      AND ph.price IS NOT NULL
+                    ORDER BY ph.station_id, ph.fuel_type, ph.recorded_at DESC
+                )
+                SELECT l.*, s.city
+                FROM latest l
                 LEFT JOIN stations s USING (station_id)
-                WHERE ph.recorded_at = %s
-            """, (latest_time,))
+            """)
             rows = cur.fetchall()
 
     stations: dict = {}

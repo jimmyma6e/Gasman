@@ -410,13 +410,17 @@ export default function App() {
   }, []);
 
   const [scanStatus, setScanStatus] = useState(null);
+  // true while a backend scan is in progress (set from /api/stations response)
+  const [scanning, setScanning]     = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const res = await fetch("/api/stations");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setData(await res.json());
+      const json = await res.json();
+      setData(json);
+      setScanning(!!json.scanning);
       setLastRefresh(new Date());
     } catch (e) {
       setError(e.message);
@@ -425,13 +429,16 @@ export default function App() {
     }
   }, []);
 
+  // Normal data refresh: every 5 min when idle, every 8 s while scanning
+  // (so new stations appear quickly during the initial discovery scan)
   useEffect(() => {
     fetchData();
-    const id = setInterval(fetchData, REFRESH_INTERVAL);
+    const interval = scanning ? 8_000 : REFRESH_INTERVAL;
+    const id = setInterval(fetchData, interval);
     return () => clearInterval(id);
-  }, [fetchData]);
+  }, [fetchData, scanning]);
 
-  // Poll scan-status while a scan is running (i.e. during initial load)
+  // Poll /api/scan-status every 4 s to drive the progress bar
   useEffect(() => {
     let id;
     const poll = async () => {
@@ -775,35 +782,46 @@ export default function App() {
           <div className="error-box">Failed to load: {error}.{" "}<button onClick={fetchData}>Retry</button></div>
         )}
 
-        {loading && !data && (
+        {loading && !data && !scanning && (
           <div className="loading-box">
             <div className="spinner" />
-            {scanStatus?.running ? (
-              <>
-                <p>
-                  <strong>
-                    {scanStatus.mode === "discovery" ? "Discovering" : "Refreshing"} stations…
-                  </strong>{" "}
-                  {scanStatus.stations_found > 0 && `${scanStatus.stations_found} found so far`}
-                </p>
-                {scanStatus.zones_total > 0 && (
-                  <>
-                    <div className="scan-progress-bar">
-                      <div
-                        className="scan-progress-fill"
-                        style={{ width: `${Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}%` }}
-                      />
-                    </div>
-                    <p className="scan-progress-label">
-                      Zone {scanStatus.zones_done} / {scanStatus.zones_total}
-                      {scanStatus.session > 1 && ` · session ${scanStatus.session}`}
-                    </p>
-                  </>
-                )}
-              </>
-            ) : (
-              <p>Fetching gas prices across British Columbia…</p>
+            <p>Fetching gas prices across British Columbia…</p>
+          </div>
+        )}
+
+        {/* Scan progress banner — shown even when partial data is already visible */}
+        {(scanStatus?.running || scanning) && (
+          <div className="scan-banner">
+            <div className="spinner spinner-sm" />
+            <div className="scan-banner-text">
+              <span>
+                <strong>
+                  {scanStatus?.mode === "discovery" ? "Discovering" : "Refreshing"} stations
+                </strong>
+                {scanStatus?.stations_found > 0 && ` · ${scanStatus.stations_found} found`}
+              </span>
+              {scanStatus?.zones_total > 0 && (
+                <span className="scan-progress-label">
+                  {Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}% · zone {scanStatus.zones_done}/{scanStatus.zones_total}
+                  {scanStatus.session > 1 && ` · session ${scanStatus.session}`}
+                </span>
+              )}
+            </div>
+            {scanStatus?.zones_total > 0 && (
+              <div className="scan-progress-bar scan-banner-bar">
+                <div
+                  className="scan-progress-fill"
+                  style={{ width: `${Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}%` }}
+                />
+              </div>
             )}
+          </div>
+        )}
+
+        {loading && !data && scanning && (
+          <div className="loading-box">
+            <div className="spinner" />
+            <p>Waiting for first stations…</p>
           </div>
         )}
 
