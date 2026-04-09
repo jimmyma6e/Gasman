@@ -21,6 +21,8 @@ const VEHICLE_PRESETS = [
   { icon: "🛻", label: "Truck",    l100km: 14 },
 ];
 
+const VEHICLE_ICONS = ["🚗", "🚙", "🚐", "🛻", "⚡", "🛵", "🚌", "🏎️"];
+
 function VALID_PRICE(p) { return typeof p === "number" && p > 0; }
 
 function timeAgo(isoString) {
@@ -35,8 +37,7 @@ function timeAgo(isoString) {
 
 function shortName(displayName) {
   if (!displayName) return "";
-  const parts = displayName.split(",");
-  return parts.slice(0, 2).join(",").trim();
+  return displayName.split(",").slice(0, 2).join(",").trim();
 }
 
 // ── My Stations section ───────────────────────────────────────────────────────
@@ -134,6 +135,145 @@ function SavedRouteCard({ route, onLaunch, onDelete }) {
   );
 }
 
+// ── Vehicle Manager (used inside ProfileModal) ────────────────────────────────
+
+function VehicleManager() {
+  const [vehicles, setVehicles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-vehicles") || "[]"); }
+    catch { return []; }
+  });
+  const [activeId, setActiveId] = useState(() => localStorage.getItem("gasman-active-vehicle") || null);
+  const [adding, setAdding]     = useState(false);
+  const [newName, setNewName]   = useState("");
+  const [newL100, setNewL100]   = useState("10");
+  const [newIcon, setNewIcon]   = useState("🚗");
+  const [showTip, setShowTip]   = useState(false);
+
+  function selectVehicle(v) {
+    setActiveId(v.id);
+    localStorage.setItem("gasman-active-vehicle", v.id);
+    localStorage.setItem("gasman-consumption", String(v.l100km));
+  }
+
+  function addVehicle() {
+    const l100km = parseFloat(newL100);
+    if (!newName.trim() || isNaN(l100km) || l100km <= 0) return;
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      name: newName.trim(),
+      icon: newIcon,
+      l100km,
+    };
+    const next = [...vehicles, entry];
+    setVehicles(next);
+    localStorage.setItem("gasman-vehicles", JSON.stringify(next));
+    selectVehicle(entry);
+    setAdding(false);
+    setNewName(""); setNewL100("10"); setNewIcon("🚗");
+  }
+
+  function deleteVehicle(id) {
+    const next = vehicles.filter((v) => v.id !== id);
+    setVehicles(next);
+    localStorage.setItem("gasman-vehicles", JSON.stringify(next));
+    if (activeId === id) {
+      const fallback = next[0] || null;
+      if (fallback) selectVehicle(fallback);
+      else {
+        setActiveId(null);
+        localStorage.removeItem("gasman-active-vehicle");
+      }
+    }
+  }
+
+  return (
+    <div>
+      <div className="profile-section-row">
+        <h3 className="profile-section-label">🚗 My Vehicles</h3>
+        <button className="profile-tip-btn" onClick={() => setShowTip((o) => !o)} title="Why do I need this?">?</button>
+      </div>
+      {showTip && (
+        <div className="profile-tip-box">
+          Your vehicle's fuel economy (L/100km) lets GASMAN estimate how much a trip will cost you in dollars — so you can compare stations by actual savings, not just cents-per-litre.
+        </div>
+      )}
+
+      {vehicles.length > 0 && (
+        <div className="vehicle-list">
+          {vehicles.map((v) => (
+            <div
+              key={v.id}
+              className={`vehicle-row ${activeId === v.id ? "vehicle-active" : ""}`}
+              onClick={() => selectVehicle(v)}
+            >
+              <span className="vehicle-icon-display">{v.icon}</span>
+              <div className="vehicle-info">
+                <span className="vehicle-name">{v.name}</span>
+                <span className="vehicle-economy">{v.l100km} L/100km</span>
+              </div>
+              {activeId === v.id && <span className="vehicle-check">✓ Active</span>}
+              <button className="btn-delete-snapshot"
+                onClick={(e) => { e.stopPropagation(); deleteVehicle(v.id); }}
+                title="Remove vehicle">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding ? (
+        <div className="vehicle-add-form">
+          <div className="vehicle-icon-picker">
+            {VEHICLE_ICONS.map((ic) => (
+              <button key={ic}
+                className={`vehicle-icon-btn ${newIcon === ic ? "vehicle-icon-active" : ""}`}
+                onClick={() => setNewIcon(ic)}>{ic}</button>
+            ))}
+          </div>
+          <input className="route-save-input vehicle-name-input"
+            placeholder="Vehicle name (e.g. Honda Civic)"
+            value={newName} onChange={(e) => setNewName(e.target.value)}
+            maxLength={30} autoFocus />
+          <div className="vehicle-economy-row">
+            <span className="profile-unit" style={{ flexShrink: 0 }}>Fuel economy:</span>
+            <div className="vehicle-preset-chips">
+              {VEHICLE_PRESETS.map((p) => (
+                <button key={p.label}
+                  className={`vehicle-preset-chip ${parseFloat(newL100) === p.l100km ? "brand-chip-active" : "brand-chip"}`}
+                  onClick={() => setNewL100(String(p.l100km))}>
+                  {p.icon} {p.l100km}L
+                </button>
+              ))}
+            </div>
+            <input type="number" className="route-save-input" style={{ width: 68 }}
+              value={newL100} min={3} max={30} step={0.5}
+              onChange={(e) => setNewL100(e.target.value)} />
+            <span className="profile-unit">L/100km</span>
+          </div>
+          <div className="vehicle-add-actions">
+            <button className="btn-refresh"
+              disabled={!newName.trim() || !parseFloat(newL100)}
+              onClick={addVehicle}>Add Vehicle</button>
+            <button className="btn-clear-filters"
+              onClick={() => { setAdding(false); setNewName(""); setNewL100("10"); setNewIcon("🚗"); }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn-section-nav" style={{ marginTop: 10 }} onClick={() => setAdding(true)}>
+          + Add Vehicle
+        </button>
+      )}
+
+      {vehicles.length === 0 && !adding && (
+        <p className="dashboard-empty" style={{ marginTop: 6 }}>
+          No vehicles yet. Add one to get accurate trip cost estimates in Route Finder.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Profile Modal ─────────────────────────────────────────────────────────────
 
 function ProfileModal({ onClose }) {
@@ -141,20 +281,11 @@ function ProfileModal({ onClose }) {
     try { return JSON.parse(localStorage.getItem("gasman-saved-places") || "[]"); }
     catch { return []; }
   });
-  const [consumption, setConsumption] = useState(() => {
-    const v = parseFloat(localStorage.getItem("gasman-consumption"));
-    return isNaN(v) || v <= 0 ? 10 : v;
-  });
 
   function deletePlace(id) {
     const next = places.filter((p) => p.id !== id);
     setPlaces(next);
     localStorage.setItem("gasman-saved-places", JSON.stringify(next));
-  }
-
-  function updateConsumption(v) {
-    setConsumption(v);
-    localStorage.setItem("gasman-consumption", String(v));
   }
 
   return (
@@ -164,6 +295,8 @@ function ProfileModal({ onClose }) {
           <h2 className="modal-title">My Profile</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
+
+        <VehicleManager />
 
         <h3 className="profile-section-label">📍 Saved Places</h3>
         {places.length > 0 ? (
@@ -177,28 +310,6 @@ function ProfileModal({ onClose }) {
         ) : (
           <p className="dashboard-empty">No saved places yet. Add them in the 🗺️ Route Finder tab.</p>
         )}
-
-        <h3 className="profile-section-label">⛽ Gas Consumption</h3>
-        <div className="profile-consumption-row">
-          <input
-            type="number" className="route-save-input" style={{ width: 80 }}
-            value={consumption} min={3} max={30} step={0.5}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (!isNaN(v) && v > 0) updateConsumption(v);
-            }}
-          />
-          <span className="profile-unit">L/100km</span>
-        </div>
-        <div className="profile-vehicle-presets">
-          {VEHICLE_PRESETS.map((v) => (
-            <button key={v.label}
-              className={`save-place-preset ${Math.abs(consumption - v.l100km) < 0.1 ? "save-place-preset-active" : ""}`}
-              onClick={() => updateConsumption(v.l100km)}>
-              {v.icon} {v.label} ({v.l100km})
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -219,20 +330,55 @@ export default function Dashboard({
 
       {/* ── Profile row ── */}
       <div className="dashboard-profile-row">
-        <span className="dashboard-welcome">Your saved stations, prices & routes</span>
+        <span className="dashboard-welcome">Your gas tracker</span>
         <button className="btn-edit-profile" onClick={() => setShowProfile(true)}>⚙️ My Profile</button>
       </div>
 
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+
+      {/* ── Route Finder Hero ── */}
+      <div className="route-hero-card" onClick={() => onNavigate("route")}>
+        <div className="route-hero-left">
+          <div className="route-hero-title">🗺️ Route Finder</div>
+          <div className="route-hero-sub">
+            Enter A → B and we find the cheapest gas along your drive
+          </div>
+        </div>
+        <button className="route-hero-cta" onClick={(e) => { e.stopPropagation(); onNavigate("route"); }}>
+          Start →
+        </button>
+      </div>
+
+      {/* ── Saved Routes ── */}
+      <div>
+        <div className="dashboard-section-header">
+          <div className="dashboard-section-title">
+            🗺️ Saved Routes
+            {savedRoutes.length > 0 && <span className="tab-badge">{savedRoutes.length}</span>}
+          </div>
+          <button className="btn-section-nav" onClick={() => onNavigate("route")}>+ Plan a Route</button>
+        </div>
+        {savedRoutes.length === 0 ? (
+          <p className="dashboard-empty">
+            No saved routes yet. Run a search in Route Finder and click "★ Save this route".
+          </p>
+        ) : (
+          <div className="saved-route-list">
+            {savedRoutes.map((route) => (
+              <SavedRouteCard key={route.id} route={route}
+                onLaunch={onLaunchRoute}
+                onDelete={onDeleteRoute} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── My Stations ── */}
       <div>
         <div className="dashboard-section-header">
           <div className="dashboard-section-title">
             ★ My Stations
-            {favStations.length > 0 && (
-              <span className="tab-badge">{favStations.length}</span>
-            )}
+            {favStations.length > 0 && <span className="tab-badge">{favStations.length}</span>}
           </div>
           <button className="btn-section-nav" onClick={() => onNavigate("all")}>+ Browse Stations</button>
         </div>
@@ -257,15 +403,13 @@ export default function Dashboard({
         <div className="dashboard-section-header">
           <div className="dashboard-section-title">
             📷 Price Snapshots
-            {snapshots.length > 0 && (
-              <span className="tab-badge">{snapshots.length}</span>
-            )}
+            {snapshots.length > 0 && <span className="tab-badge">{snapshots.length}</span>}
           </div>
           <button className="btn-section-nav" onClick={() => onNavigate("all")}>+ Browse Stations</button>
         </div>
         {snapshots.length === 0 ? (
           <p className="dashboard-empty">
-            No snapshots yet. Click "📷 Save price" on any station card to save its current price and compare when you return.
+            No snapshots yet. Click "📷 Save price" on any station card to track price changes over time.
           </p>
         ) : (
           <div className="snapshot-list">
@@ -273,32 +417,6 @@ export default function Dashboard({
               <SnapshotCard key={snap.id} snap={snap}
                 stationsWithArea={stationsWithArea}
                 onDelete={onDeleteSnapshot} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Saved Routes ── */}
-      <div>
-        <div className="dashboard-section-header">
-          <div className="dashboard-section-title">
-            🗺️ Saved Routes
-            {savedRoutes.length > 0 && (
-              <span className="tab-badge">{savedRoutes.length}</span>
-            )}
-          </div>
-          <button className="btn-section-nav" onClick={() => onNavigate("route")}>+ Plan a Route</button>
-        </div>
-        {savedRoutes.length === 0 ? (
-          <p className="dashboard-empty">
-            No saved routes yet. Run a search in the 🗺️ Route Finder tab and click "★ Save this route".
-          </p>
-        ) : (
-          <div className="saved-route-list">
-            {savedRoutes.map((route) => (
-              <SavedRouteCard key={route.id} route={route}
-                onLaunch={onLaunchRoute}
-                onDelete={onDeleteRoute} />
             ))}
           </div>
         )}

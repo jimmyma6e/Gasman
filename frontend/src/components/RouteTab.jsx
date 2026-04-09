@@ -298,8 +298,16 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
   const [savingFor, setSavingFor]   = useState(null);  // "from" | "to" | null
   const [saveLabel, setSaveLabel]   = useState("");
 
-  // Vehicle consumption
+  // Vehicle consumption — read active vehicle first, fallback to raw gasman-consumption
   const [consumption, setConsumption] = useState(() => {
+    const activeId = localStorage.getItem("gasman-active-vehicle");
+    if (activeId) {
+      try {
+        const vehicles = JSON.parse(localStorage.getItem("gasman-vehicles") || "[]");
+        const active = vehicles.find((v) => v.id === activeId);
+        if (active?.l100km > 0) return active.l100km;
+      } catch { /* fall through */ }
+    }
     const v = parseFloat(localStorage.getItem("gasman-consumption"));
     return isNaN(v) || v <= 0 ? 10 : v;
   });

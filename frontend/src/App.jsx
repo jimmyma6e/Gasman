@@ -5,6 +5,7 @@ import InsightsPanel from "./components/InsightsPanel";
 import MapView from "./components/MapView";
 import RouteTab from "./components/RouteTab";
 import Dashboard from "./components/Dashboard";
+import Onboarding from "./components/Onboarding";
 
 // Region groupings for the area filter
 const BC_REGIONS = {
@@ -360,6 +361,10 @@ export default function App() {
   });
 
   const [activeRouteLoad, setActiveRouteLoad] = useState(null);
+
+  const [onboarded, setOnboarded] = useState(
+    () => !!localStorage.getItem("gasman-onboarded")
+  );
 
   const handleSnapshot = useCallback((station, fuelType) => {
     const price = station[fuelType]?.price;
@@ -975,6 +980,7 @@ export default function App() {
       </main>
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
+      {!onboarded && <Onboarding onDone={() => setOnboarded(true)} />}
     </div>
   );
 }

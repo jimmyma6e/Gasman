@@ -628,3 +628,118 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-brand-pref-row { margin-bottom: 14px; }
 .route-brand-pref-hint { font-size: 0.75rem; color: var(--text-dim); display: block; margin-top: 6px; }
 .route-save-input:focus { border-color: var(--accent); }
+
+/* ── Route Finder hero card (Dashboard) ── */
+.route-hero-card { background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.04));
+  border: 1.5px solid rgba(249,115,22,0.35); border-radius: var(--radius); padding: 18px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.route-hero-card:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
+.route-hero-left { flex: 1; min-width: 0; }
+.route-hero-title { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.route-hero-sub { font-size: 0.84rem; color: var(--text-dim); line-height: 1.4; }
+.route-hero-cta { background: var(--accent); color: #000; border: none; padding: 10px 20px;
+  border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  transition: opacity 0.15s; flex-shrink: 0; white-space: nowrap; }
+.route-hero-cta:hover { opacity: 0.85; }
+
+/* ── Profile tip ── */
+.profile-section-row { display: flex; align-items: center; gap: 8px; }
+.profile-tip-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  width: 20px; height: 20px; border-radius: 50%; font-size: 0.72rem; font-weight: 700;
+  cursor: pointer; padding: 0; line-height: 1; transition: all 0.15s; flex-shrink: 0; }
+.profile-tip-btn:hover { border-color: var(--accent); color: var(--accent); }
+.profile-tip-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; font-size: 0.82rem; color: var(--text-dim); line-height: 1.5;
+  margin-bottom: 12px; }
+
+/* ── Vehicle list ── */
+.vehicle-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.vehicle-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px;
+  cursor: pointer; transition: all 0.15s; }
+.vehicle-row:hover { border-color: var(--accent); }
+.vehicle-active { border-color: var(--accent); background: rgba(249,115,22,0.06); }
+.vehicle-icon-display { font-size: 1.4rem; flex-shrink: 0; }
+.vehicle-info { flex: 1; min-width: 0; }
+.vehicle-name { font-weight: 600; font-size: 0.9rem; display: block; }
+.vehicle-economy { font-size: 0.78rem; color: var(--text-dim); }
+.vehicle-check { font-size: 0.78rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
+  white-space: nowrap; }
+
+/* ── Add vehicle form ── */
+.vehicle-add-form { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px; }
+.vehicle-icon-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.vehicle-icon-btn { background: var(--surface); border: 1.5px solid var(--border); font-size: 1.3rem;
+  width: 38px; height: 38px; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center; }
+.vehicle-icon-btn:hover { border-color: var(--accent); }
+.vehicle-icon-active { border-color: var(--accent); background: rgba(249,115,22,0.1); }
+.vehicle-name-input { width: 100%; box-sizing: border-box; }
+.vehicle-economy-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vehicle-preset-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.vehicle-preset-chip { font-size: 0.78rem; padding: 4px 9px; border-radius: 6px; cursor: pointer;
+  transition: all 0.15s; }
+.vehicle-add-actions { display: flex; gap: 8px; }
+
+/* ── Onboarding overlay ── */
+.onboard-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  padding: 16px; backdrop-filter: blur(4px); }
+.onboard-modal { background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; width: 100%; max-width: 520px; max-height: 90vh;
+  overflow-y: auto; padding: 28px 28px 24px; box-shadow: 0 24px 64px rgba(0,0,0,0.4); }
+
+/* Onboarding step 1 */
+.onboard-hero { text-align: center; margin-bottom: 24px; }
+.onboard-logo { font-size: 2.8rem; margin-bottom: 10px; }
+.onboard-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 8px; color: var(--text); }
+.onboard-subtitle { font-size: 0.9rem; color: var(--text-dim); margin: 0; line-height: 1.5; }
+
+.onboard-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.onboard-feature { display: flex; gap: 14px; padding: 14px 16px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface2); align-items: flex-start; }
+.onboard-feature-highlight { border-color: rgba(249,115,22,0.45);
+  background: linear-gradient(135deg, rgba(249,115,22,0.1), rgba(249,115,22,0.03)); }
+.onboard-feature-icon { font-size: 1.6rem; flex-shrink: 0; margin-top: 1px; }
+.onboard-feature-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px;
+  display: flex; align-items: center; gap: 8px; }
+.onboard-feature-desc { font-size: 0.82rem; color: var(--text-dim); line-height: 1.4; }
+.onboard-badge { background: var(--accent); color: #000; font-size: 0.68rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px; letter-spacing: 0.02em; }
+
+/* Onboarding step 2 */
+.onboard-step-header { display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; }
+.onboard-back { background: none; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 0.85rem; padding: 0; transition: color 0.15s; }
+.onboard-back:hover { color: var(--text); }
+.onboard-step-label { font-size: 0.78rem; color: var(--text-dim); }
+.onboard-vehicle-section { margin-bottom: 22px; }
+.onboard-section-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 6px; }
+.onboard-section-sub { font-size: 0.84rem; color: var(--text-dim); line-height: 1.5; margin: 0 0 16px; }
+
+.onboard-vehicle-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.onboard-vehicle-btn { background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+.onboard-vehicle-btn:hover { border-color: var(--accent); }
+.onboard-vehicle-active { border-color: var(--accent); background: rgba(249,115,22,0.08); }
+.onboard-vehicle-icon { font-size: 1.5rem; }
+.onboard-vehicle-label { font-weight: 600; font-size: 0.88rem; display: block; }
+.onboard-vehicle-val { font-size: 0.75rem; color: var(--text-dim); }
+
+.onboard-vehicle-custom { display: flex; flex-direction: column; gap: 8px; }
+.onboard-custom-l100 { display: flex; align-items: center; gap: 8px; }
+
+/* Shared actions row */
+.onboard-actions { display: flex; flex-direction: column; gap: 8px; }
+.onboard-btn-primary { background: var(--accent); color: #000; border: none; padding: 13px 20px;
+  border-radius: 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+  transition: opacity 0.15s; width: 100%; }
+.onboard-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+.onboard-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.onboard-btn-skip { background: none; border: none; color: var(--text-dim); font-size: 0.84rem;
+  cursor: pointer; padding: 6px; transition: color 0.15s; width: 100%; text-align: center; }
+.onboard-btn-skip:hover { color: var(--text); }
