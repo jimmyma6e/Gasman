@@ -296,7 +296,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         <div className="card-footer-actions">
           {VALID_PRICE(fuelData?.price) && (
             <button className="btn-snapshot" onClick={() => onSnapshot(station, activeFuel)}
-              title="Save price snapshot">📷</button>
+              title="Save current price to My Dashboard">📷 Save price</button>
           )}
           <button className="btn-chart" onClick={() => onOpenChart(station)}>
             📈 Price History
@@ -312,15 +312,21 @@ export default function App() {
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
-  const [tab, setTab]           = useState("all");
-  const [sortBy, setSortBy]     = useState("price");
-  const [activeFuel, setActiveFuel] = useState("regular_gas");
+  const [tab, setTab]           = useState("dashboard");
+  const [sortBy, setSortBy]     = useState(() => localStorage.getItem("gasman-sort-by") || "price");
+  const [activeFuel, setActiveFuel] = useState(() => localStorage.getItem("gasman-active-fuel") || "regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);
   const [search, setSearch]     = useState("");
-  const [areaFilter, setAreaFilter]     = useState(new Set());
-  const [brandFilter, setBrandFilter]   = useState(new Set());
-  const [viewMode, setViewMode]         = useState("card");
+  const [areaFilter, setAreaFilter]     = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("gasman-area-filter") || "[]")); }
+    catch { return new Set(); }
+  });
+  const [brandFilter, setBrandFilter]   = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("gasman-brand-filter") || "[]")); }
+    catch { return new Set(); }
+  });
+  const [viewMode, setViewMode]         = useState(() => localStorage.getItem("gasman-view-mode") || "card");
   const [areaDropdownOpen, setAreaDropdownOpen]   = useState(false);
   const [areaSearch, setAreaSearch]               = useState("");
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
@@ -452,6 +458,13 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
+  // Persist All Stations filter state to localStorage
+  useEffect(() => { localStorage.setItem("gasman-sort-by",     sortBy);    }, [sortBy]);
+  useEffect(() => { localStorage.setItem("gasman-active-fuel", activeFuel); }, [activeFuel]);
+  useEffect(() => { localStorage.setItem("gasman-view-mode",   viewMode);  }, [viewMode]);
+  useEffect(() => { localStorage.setItem("gasman-area-filter",  JSON.stringify([...areaFilter]));  }, [areaFilter]);
+  useEffect(() => { localStorage.setItem("gasman-brand-filter", JSON.stringify([...brandFilter])); }, [brandFilter]);
+
   // Close area dropdown on outside click
   useEffect(() => {
     if (!areaDropdownOpen) return;
@@ -561,15 +574,15 @@ export default function App() {
         {/* Tabs */}
         <div className="tabs-row">
           <div className="tabs">
-            <button className={`tab-nav ${tab === "all"   ? "tab-nav-active" : ""}`} onClick={() => setTab("all")}>
-              All Stations
-              {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
-            </button>
             <button className={`tab-nav ${tab === "dashboard" ? "tab-nav-active" : ""}`} onClick={() => setTab("dashboard")}>
               📊 My Dashboard
               {(favourites.length + snapshots.length + savedRoutes.length) > 0 && (
                 <span className="tab-badge">{favourites.length + snapshots.length + savedRoutes.length}</span>
               )}
+            </button>
+            <button className={`tab-nav ${tab === "all"   ? "tab-nav-active" : ""}`} onClick={() => setTab("all")}>
+              All Stations
+              {allStations.length > 0 && <span className="tab-badge">{allStations.length}</span>}
             </button>
             <button className={`tab-nav ${tab === "route" ? "tab-nav-active" : ""}`} onClick={() => setTab("route")}>
               🗺️ Route Finder
@@ -598,6 +611,7 @@ export default function App() {
             onDeleteSnapshot={handleDeleteSnapshot}
             onDeleteRoute={handleDeleteRoute}
             onLaunchRoute={handleLaunchRoute}
+            onNavigate={setTab}
           />
         )}
 
@@ -789,8 +803,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Scan progress banner — shown even when partial data is already visible */}
-        {(scanStatus?.running || scanning) && (
+        {/* Scan progress banner — only shown during discovery (refresh runs silently) */}
+        {scanStatus?.mode === "discovery" && (scanStatus?.running || scanning) && (
           <div className="scan-banner">
             <div className="spinner spinner-sm" />
             <div className="scan-banner-text">
@@ -922,7 +936,7 @@ export default function App() {
                         ) : <span className="tbl-empty">—</span>}
                       </div>
                       {VALID_PRICE(fuelData?.price) && (
-                        <button className="btn-snapshot btn-chart-sm" onClick={() => handleSnapshot(station, activeFuel)} title="Save price snapshot">📷</button>
+                        <button className="btn-snapshot btn-chart-sm" onClick={() => handleSnapshot(station, activeFuel)} title="Save current price to My Dashboard">📷 Save</button>
                       )}
                       <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
                     </div>

@@ -265,8 +265,17 @@ function PlaceInput({ label, value, onSelect, placeholder, savedPlaces = [], onD
 
 // ── Main RouteTab ─────────────────────────────────────────────────────────────
 
-const DETOUR_THRESHOLD_KM = 5;
-const DETOUR_PENALTY_PER_KM = 0.4;
+const ROUTE_MODES = [
+  { id: "cheapest", label: "Cheapest",  emoji: "💰", penalty: 0.4, threshold: 5   },
+  { id: "rush",     label: "In a Rush", emoji: "⚡", penalty: 3.0, threshold: 1.5 },
+  { id: "chill",    label: "Chill",     emoji: "😎", penalty: 0.1, threshold: 15  },
+];
+
+const POPULAR_BRANDS_RT = [
+  "Petro-Canada", "Shell", "Chevron", "Esso", "Husky",
+  "Costco", "Canadian Tire", "7-Eleven", "Fas Gas", "Co-op",
+];
+
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
 export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute }) {
@@ -301,6 +310,12 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
   const [savingRoute, setSavingRoute] = useState(false);
   const [routeLabel, setRouteLabel]   = useState("");
 
+  const [routeMode, setRouteMode] = useState("cheapest");
+  const [preferredBrands, setPreferredBrands] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("gasman-preferred-brands") || "[]")); }
+    catch { return new Set(); }
+  });
+
   const markerRefs = useRef({});
 
   // Pre-load a saved route when launched from Dashboard
@@ -330,9 +345,14 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
     setRouteCoords(null);
     setRouteInfo(null);
     setSelectedStation(null);
-    setBrandFilter(new Set());
+    // Auto-seed brand filter from preferred brands; clear otherwise
+    setBrandFilter(preferredBrands.size > 0 ? new Set(preferredBrands) : new Set());
     setSavingFor(null);
     setSaveLabel("");
+
+    const mode = ROUTE_MODES.find((m) => m.id === routeMode) || ROUTE_MODES[0];
+    const DETOUR_THRESHOLD_KM = mode.threshold;
+    const DETOUR_PENALTY_PER_KM = mode.penalty;
 
     try {
       const polyline = await getOsrmRoute(fromPlace, toPlace);
@@ -367,7 +387,7 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
     } finally {
       setLoading(false);
     }
-  }, [fromPlace, toPlace, fuelType, stations]);
+  }, [fromPlace, toPlace, fuelType, stations, routeMode, preferredBrands]);
 
   const handleSavePlace = useCallback((place, emoji, label) => {
     if (!place || !label.trim()) return;
@@ -407,6 +427,13 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
   const availableBrands = results
     ? [...new Set(results.map((s) => s._brand || s.name).filter(Boolean))].sort()
     : [];
+
+  const stationBrands = [...new Set(stations.map((s) => s._brand || s.name).filter(Boolean))].sort((a, b) => {
+    const ai = POPULAR_BRANDS_RT.indexOf(a), bi = POPULAR_BRANDS_RT.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1; if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
 
   const displayedResults = results
     ? (brandFilter.size > 0
@@ -462,6 +489,46 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
             {FUEL_TYPES.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </div>
+        {/* Route mode */}
+        <div className="route-mode-row">
+          {ROUTE_MODES.map((m) => (
+            <button key={m.id}
+              className={`route-mode-btn ${routeMode === m.id ? "route-mode-active" : ""}`}
+              onClick={() => setRouteMode(m.id)}
+              title={m.id === "cheapest" ? "Best price, may detour up to 5km" :
+                     m.id === "rush"     ? "Only stations within 1.5km of route" :
+                                          "Willing to detour up to 15km for lower price"}>
+              {m.emoji} {m.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Brand preference */}
+        {stationBrands.filter((b) => POPULAR_BRANDS_RT.includes(b)).length > 0 && (
+          <div className="route-brand-pref-row">
+            <span className="filter-label">Brand preference</span>
+            <div className="chip-row">
+              {stationBrands.filter((b) => POPULAR_BRANDS_RT.includes(b)).map((b) => (
+                <button key={b}
+                  className={`brand-chip ${preferredBrands.has(b) ? "brand-chip-active" : ""}`}
+                  onClick={() => {
+                    setPreferredBrands((prev) => {
+                      const next = new Set(prev);
+                      next.has(b) ? next.delete(b) : next.add(b);
+                      localStorage.setItem("gasman-preferred-brands", JSON.stringify([...next]));
+                      return next;
+                    });
+                  }}>
+                  {b}
+                </button>
+              ))}
+            </div>
+            {preferredBrands.size > 0 && (
+              <span className="route-brand-pref-hint">Preferred brands will filter results when you search</span>
+            )}
+          </div>
+        )}
+
         <button className="btn-refresh route-find-btn" onClick={handleFind}
           disabled={!fromPlace || !toPlace || loading}>
           {loading ? "Finding…" : "Find Stations"}
@@ -632,9 +699,9 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
       {/* ── Results ── */}
       {results !== null && results.length === 0 && (
         <div className="empty-state">
-          <p>No stations found within {DETOUR_THRESHOLD_KM}km of this route.</p>
+          <p>No stations found within {(ROUTE_MODES.find((m) => m.id === routeMode) || ROUTE_MODES[0]).threshold}km of this route.</p>
           <p style={{ fontSize: "0.82rem", color: "var(--text-dim)", marginTop: 6 }}>
-            Try a different fuel type or route.
+            Try a different fuel type, route, or switch to "Chill" mode for a wider search.
           </p>
         </div>
       )}

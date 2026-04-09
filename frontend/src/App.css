@@ -532,15 +532,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Card footer actions ── */
 .card-footer-actions { display: flex; align-items: center; gap: 6px; }
 
-/* ── Snapshot button ── */
-.btn-snapshot { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
-  font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
-.btn-snapshot:hover { border-color: var(--accent); color: var(--accent); }
-
 /* ── Dashboard ── */
 .dashboard { display: flex; flex-direction: column; gap: 28px; padding-top: 8px; }
 .dashboard-section-title { font-size: 1rem; font-weight: 700; color: var(--text);
-  margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  display: flex; align-items: center; gap: 8px; }
 .dashboard-empty { color: var(--text-dim); font-size: 0.88rem; padding: 16px 0; line-height: 1.6; }
 
 /* Snapshot cards */
@@ -584,4 +579,52 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-save-input { background: var(--surface); border: 1px solid var(--border); color: var(--text);
   padding: 7px 12px; border-radius: 8px; font-size: 0.84rem; outline: none;
   transition: border-color 0.15s; min-width: 200px; }
+.route-save-input:focus { border-color: var(--accent); }
+
+/* ── Snapshot button with text ── */
+.btn-snapshot { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap; }
+.btn-snapshot:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Dashboard profile row ── */
+.dashboard-profile-row { display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; }
+.dashboard-welcome { font-size: 0.85rem; color: var(--text-dim); }
+.btn-edit-profile { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 6px 12px; border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; }
+.btn-edit-profile:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Dashboard section header (title + nav button) ── */
+.dashboard-section-header { display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; }
+.btn-section-nav { background: none; border: 1px solid var(--border); color: var(--text-dim);
+  font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap; flex-shrink: 0; }
+.btn-section-nav:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Profile modal ── */
+.profile-modal { max-width: 480px; }
+.profile-section-label { font-size: 0.9rem; font-weight: 700; margin: 18px 0 8px; color: var(--text); }
+.profile-place-row { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+.profile-place-addr { flex: 1; color: var(--text-dim); font-size: 0.75rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.profile-consumption-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.profile-unit { font-size: 0.85rem; color: var(--text-dim); }
+.profile-vehicle-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Route mode selector ── */
+.route-mode-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.route-mode-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; cursor: pointer;
+  transition: all 0.15s; flex: 1; min-width: 80px; text-align: center; }
+.route-mode-btn:hover { border-color: var(--accent); color: var(--text); }
+.route-mode-active { background: var(--accent); color: #000; border-color: var(--accent);
+  font-weight: 600; }
+.route-mode-active:hover { color: #000; }
+
+/* ── Route brand preference ── */
+.route-brand-pref-row { margin-bottom: 14px; }
+.route-brand-pref-hint { font-size: 0.75rem; color: var(--text-dim); display: block; margin-top: 6px; }
 .route-save-input:focus { border-color: var(--accent); }
