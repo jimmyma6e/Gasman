@@ -32,12 +32,13 @@ async def discovery_job() -> None:
     logger.info("discovery_job: starting full BC grid scan …")
     try:
         def on_flush(stations):
+            # Only persist station metadata during flush; prices are written
+            # once at scan completion to avoid millions of duplicate rows.
             database.upsert_stations(stations)
-            database.insert_prices(stations)
 
         stations, _ = await gb.discover_stations(on_flush=on_flush)
         database.upsert_stations(stations)
-        database.insert_prices(stations)
+        database.insert_prices(stations)   # single write at end of scan
         logger.info("discovery_job: done — %d stations", len(stations))
     except Exception:
         logger.exception("discovery_job failed")
@@ -54,13 +55,23 @@ async def price_refresh_job() -> None:
     logger.info("price_refresh_job: refreshing prices for %d known stations …", len(known))
     try:
         def on_flush(stations):
-            database.insert_prices(stations)
+            # Only upsert station metadata during flush; prices written at end.
+            database.upsert_stations(stations)
 
         stations, _ = await gb.refresh_prices(known, on_flush=on_flush)
-        database.insert_prices(stations)
+        database.insert_prices(stations)   # single write at end of scan
         logger.info("price_refresh_job: done — %d stations updated", len(stations))
     except Exception:
         logger.exception("price_refresh_job failed")
+
+
+async def cleanup_job() -> None:
+    """Delete price_history rows older than 30 days. Runs daily."""
+    try:
+        deleted = database.purge_old_prices(days=30)
+        logger.info("cleanup_job: deleted %d old price rows", deleted)
+    except Exception:
+        logger.exception("cleanup_job failed")
 
 
 scheduler = AsyncIOScheduler()
@@ -79,6 +90,7 @@ async def lifespan(app: FastAPI):
     # Schedule recurring jobs
     scheduler.add_job(price_refresh_job, "interval", minutes=30, id="price_refresh")
     scheduler.add_job(discovery_job,     "interval", days=1,     id="discovery")
+    scheduler.add_job(cleanup_job,       "interval", days=1,     id="cleanup")
     scheduler.start()
 
     # Kick off the right job immediately in the background (non-blocking)

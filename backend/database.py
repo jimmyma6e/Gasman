@@ -161,27 +161,58 @@ def get_known_stations() -> list:
 
 
 def insert_prices(stations: list):
+    """Insert price records, skipping rows where price hasn't changed.
+
+    Compares each (station_id, fuel_type, price) against the most recent
+    stored value.  Only changed prices are written, keeping the table small.
+    """
+    if not stations:
+        return
+
+    # Build candidate rows from the incoming scan data
     now = datetime.now(timezone.utc)
-    rows = []
+    candidates: list[tuple] = []
     for station in stations:
         for fuel_type in FUEL_TYPES:
             fuel_data = station.get(fuel_type)
             if fuel_data and fuel_data.get("price") is not None:
-                rows.append((
+                candidates.append((
                     station["station_id"],
+                    fuel_type,
+                    fuel_data["price"],
                     station.get("name"),
                     station.get("address"),
                     station.get("latitude"),
                     station.get("longitude"),
-                    fuel_type,
-                    fuel_data["price"],
                     station.get("currency"),
                     station.get("unit_of_measure"),
-                    now,
                 ))
-    if rows:
-        with _conn() as conn:
-            with conn.cursor() as cur:
+
+    if not candidates:
+        return
+
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            # Fetch the latest stored price for every (station, fuel) pair
+            # that appears in this batch — single query using ANY().
+            station_ids = list({r[0] for r in candidates})
+            cur.execute("""
+                SELECT DISTINCT ON (station_id, fuel_type)
+                    station_id, fuel_type, price
+                FROM price_history
+                WHERE station_id = ANY(%s)
+                ORDER BY station_id, fuel_type, recorded_at DESC
+            """, (station_ids,))
+            last_prices = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+
+            # Only keep rows where price differs from last stored value
+            rows = [
+                (sid, name, addr, lat, lng, fuel, price, currency, unit, now)
+                for sid, fuel, price, name, addr, lat, lng, currency, unit in candidates
+                if round(price, 2) != round(last_prices.get((sid, fuel), -1), 2)
+            ]
+
+            if rows:
                 psycopg2.extras.execute_values(cur, """
                     INSERT INTO price_history
                     (station_id, name, address, latitude, longitude,
@@ -331,6 +362,17 @@ def get_latest_stations() -> list:
             "last_updated": r["recorded_at"].isoformat(),
         }
     return list(stations.values())
+
+
+def purge_old_prices(days: int = 30) -> int:
+    """Delete price_history rows older than `days` days. Returns deleted count."""
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM price_history
+                WHERE recorded_at < NOW() - make_interval(days => %s)
+            """, (days,))
+            return cur.rowcount
 
 
 def get_station_history(station_id: str, hours: int = 24) -> list:
