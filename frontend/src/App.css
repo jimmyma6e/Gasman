@@ -614,19 +614,70 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .profile-unit { font-size: 0.85rem; color: var(--text-dim); }
 .profile-vehicle-presets { display: flex; flex-wrap: wrap; gap: 8px; }
 
-/* ── Route mode selector ── */
-.route-mode-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.route-mode-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
-  padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; cursor: pointer;
-  transition: all 0.15s; flex: 1; min-width: 80px; text-align: center; }
-.route-mode-btn:hover { border-color: var(--accent); color: var(--text); }
-.route-mode-active { background: var(--accent); color: #000; border-color: var(--accent);
-  font-weight: 600; }
-.route-mode-active:hover { color: #000; }
+/* ── Route form: options grid ── */
+.route-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 500px) { .route-options-grid { grid-template-columns: 1fr; } }
+.route-option-group { display: flex; flex-direction: column; gap: 6px; }
 
-/* ── Route brand preference ── */
-.route-brand-pref-row { margin-bottom: 14px; }
+/* Fuel type buttons */
+.route-fuel-btns { display: flex; gap: 4px; }
+.route-fuel-btn { flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); padding: 8px 4px; border-radius: 7px; font-size: 0.78rem;
+  cursor: pointer; transition: all 0.15s; text-align: center; }
+.route-fuel-btn:hover { border-color: var(--accent); color: var(--text); }
+.route-fuel-btn-active { background: var(--accent); color: #000; border-color: var(--accent);
+  font-weight: 700; }
+
+/* Mode buttons (compact, same row as fuel) */
+.route-mode-btns { display: flex; gap: 4px; }
+.route-mode-btn { flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); padding: 8px 4px; border-radius: 7px; font-size: 0.78rem;
+  cursor: pointer; transition: all 0.15s; text-align: center; }
+.route-mode-btn:hover { border-color: var(--accent); color: var(--text); }
+.route-mode-active { background: var(--surface); color: var(--text); border-color: var(--accent);
+  font-weight: 600; }
+.route-mode-hint { font-size: 0.75rem; color: var(--text-dim); margin: -4px 0 4px;
+  line-height: 1.4; }
+
+/* Vehicle section inside form */
+.route-vehicle-section { display: flex; flex-direction: column; gap: 6px; }
+.route-vehicle-header { display: flex; align-items: center; justify-content: space-between; }
+.route-vehicle-name-tag { color: var(--text-dim); font-weight: 400; }
+.consumption-presets-inline { display: flex; gap: 4px; }
+.consumption-presets-inline .consumption-preset { padding: 6px 8px; font-size: 0.75rem; }
+
+/* Brand preference — collapsible */
+.route-brand-pref-wrap { border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.route-brand-toggle-btn { width: 100%; display: flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: none; color: var(--text-dim);
+  padding: 10px 14px; font-size: 0.84rem; cursor: pointer; transition: background 0.15s; text-align: left; }
+.route-brand-toggle-btn:hover { background: var(--surface); color: var(--text); }
+.route-brand-pref-count { background: var(--accent); color: #000; font-size: 0.7rem;
+  font-weight: 700; padding: 1px 7px; border-radius: 20px; }
+.route-brand-toggle-arrow { margin-left: auto; font-size: 0.7rem; }
 .route-brand-pref-hint { font-size: 0.75rem; color: var(--text-dim); display: block; margin-top: 6px; }
+.route-brand-pref-wrap .chip-row { padding: 0 14px 12px; }
+
+/* Big find button */
+.route-find-btn-big { width: 100%; padding: 14px 20px; border-radius: 10px;
+  background: var(--accent); color: #000; border: none; font-size: 1rem;
+  font-weight: 700; cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.01em; }
+.route-find-btn-big:hover:not(:disabled) { opacity: 0.85; }
+.route-find-btn-big:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Results header */
+.route-results-header { display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 4px; }
+.route-results-hint { font-size: 0.75rem; color: var(--text-dim); }
+
+/* ── Result badges ── */
+.result-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.res-badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.res-badge-green  { background: rgba(22,163,74,0.15);  color: var(--green); }
+.res-badge-blue   { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.res-badge-orange { background: rgba(249,115,22,0.15); color: var(--accent); }
+.res-badge-purple { background: rgba(168,85,247,0.15); color: #c084fc; }
+
 .route-save-input:focus { border-color: var(--accent); }
 
 /* ── Route Finder hero card (Dashboard) ── */
