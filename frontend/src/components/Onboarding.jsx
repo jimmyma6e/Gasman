@@ -52,10 +52,10 @@ export default function Onboarding({ onDone }) {
             </div>
 
             <div className="onboard-features">
-              <div className="onboard-feature onboard-feature-highlight">
+              <div className="onboard-feature">
                 <div className="onboard-feature-icon">🗺️</div>
                 <div className="onboard-feature-body">
-                  <div className="onboard-feature-title">Route Finder <span className="onboard-badge">Key feature</span></div>
+                  <div className="onboard-feature-title">Route Finder</div>
                   <div className="onboard-feature-desc">
                     Enter your start &amp; end point. We rank the cheapest gas stations along your route — no unnecessary detours.
                   </div>

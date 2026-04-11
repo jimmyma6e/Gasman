@@ -66,9 +66,27 @@ async function nominatimSearch(q) {
   const url =
     `https://nominatim.openstreetmap.org/search` +
     `?q=${encodeURIComponent(q + " BC Canada")}` +
-    `&format=json&limit=5&addressdetails=0&countrycodes=ca`;
+    `&format=json&limit=5&addressdetails=1&countrycodes=ca`;
   const res = await fetch(url, { headers: { "User-Agent": "Gasman/1.0 (gasman-app)" } });
   return res.json();
+}
+
+function formatPlace(r) {
+  const a = r.address || {};
+  const name = a.amenity || a.shop || a.leisure || a.tourism || a.building || a.office || a.craft || null;
+  const houseNum = a.house_number || "";
+  const road = a.road || a.pedestrian || a.footway || null;
+  const city = a.city || a.town || a.village || a.municipality || a.county || "";
+  const parts = [];
+  if (name) parts.push(name);
+  if (road) parts.push(houseNum ? `${houseNum} ${road}` : road);
+  else if (houseNum) parts.push(houseNum);
+  if (city && city !== name) parts.push(city);
+  if (parts.length) return parts.join(", ");
+  // Fallback: strip noisy parts from display_name
+  return r.display_name.split(", ")
+    .filter((p) => !/Canada|British Columbia|Regional District|Regional Municipality/.test(p) && !/^[A-Z]\d[A-Z]/.test(p) && !/^\d[A-Z]\d/.test(p))
+    .slice(0, 3).join(", ");
 }
 
 async function getOsrmRoute(from, to) {
@@ -206,10 +224,11 @@ function PlaceInput({ label, value, onSelect, placeholder, savedPlaces = [], onD
   }
 
   function handleSelect(s) {
-    setQuery(s.display_name);
+    const label = formatPlace(s);
+    setQuery(label);
     setSuggestions([]);
     setOpen(false);
-    onSelect({ lat: parseFloat(s.lat), lng: parseFloat(s.lon), display_name: s.display_name });
+    onSelect({ lat: parseFloat(s.lat), lng: parseFloat(s.lon), display_name: label });
   }
 
   return (
@@ -254,7 +273,7 @@ function PlaceInput({ label, value, onSelect, placeholder, savedPlaces = [], onD
           )}
           {suggestions.map((s, i) => (
             <button key={i} className="route-suggestion-item" onMouseDown={() => handleSelect(s)}>
-              {s.display_name}
+              {formatPlace(s)}
             </button>
           ))}
         </div>
