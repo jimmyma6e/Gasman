@@ -341,9 +341,6 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
     const v = parseFloat(localStorage.getItem("gasman-consumption"));
     return isNaN(v) || v <= 0 ? 10 : v;
   });
-  const [showConsumptionHelper, setShowConsumptionHelper] = useState(false);
-  const [calcKm, setCalcKm]         = useState("");
-  const [calcLitres, setCalcLitres] = useState("");
 
   const [savingRoute, setSavingRoute] = useState(false);
   const [routeLabel, setRouteLabel]   = useState("");
@@ -379,13 +376,6 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
     setRouteInfo(null);
     onClearRouteLoad();
   }, [activeRouteLoad]);
-
-  function applyConsumption(v) {
-    setConsumption(v);
-    localStorage.setItem("gasman-consumption", String(v));
-    setShowConsumptionHelper(false);
-    setCalcKm(""); setCalcLitres("");
-  }
 
   const handleFind = useCallback(async () => {
     if (!fromPlace || !toPlace) return;
@@ -568,20 +558,10 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
 
         {/* Vehicle consumption */}
         <div className="route-vehicle-section">
-          <div className="route-vehicle-header">
-            <label className="route-place-label">
-              Your vehicle
-              {vehicleLabel && <span className="route-vehicle-name-tag"> · {vehicleLabel}</span>}
-            </label>
-            <button className="btn-consumption-help"
-              onClick={() => setShowConsumptionHelper((o) => !o)}
-              title="Why is this needed?">?</button>
-          </div>
-          {showConsumptionHelper && (
-            <div className="profile-tip-box" style={{ marginBottom: 8 }}>
-              Used to estimate your total fuel cost for the trip in dollars — so you can compare stations by actual savings.
-            </div>
-          )}
+          <label className="route-place-label">
+            Your vehicle
+            {vehicleLabel && <span className="route-vehicle-name-tag"> · {vehicleLabel}</span>}
+          </label>
           <div className="route-consumption-input-wrap">
             <input id="route-consumption" className="route-consumption-input"
               type="number" min="1" max="40" step="0.5" value={consumption}
@@ -593,34 +573,6 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
                 }
               }} />
             <span className="route-consumption-unit">L/100km</span>
-            <div className="consumption-presets consumption-presets-inline">
-              {VEHICLE_PRESETS.map((v) => (
-                <button key={v.label}
-                  className={`consumption-preset ${Math.abs(consumption - v.l100km) < 0.1 ? "consumption-preset-active" : ""}`}
-                  onClick={() => applyConsumption(v.l100km)}>
-                  {v.icon} {v.l100km}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="consumption-calc" style={{ marginTop: 8 }}>
-            <span className="consumption-calc-label">Calculate from last fill-up:</span>
-            <div className="consumption-calc-row">
-              <input className="route-consumption-input consumption-calc-input"
-                type="number" min="1" placeholder="km driven"
-                value={calcKm} onChange={(e) => setCalcKm(e.target.value)} />
-              <span className="route-consumption-unit">km ÷</span>
-              <input className="route-consumption-input consumption-calc-input"
-                type="number" min="1" placeholder="litres used"
-                value={calcLitres} onChange={(e) => setCalcLitres(e.target.value)} />
-              <span className="route-consumption-unit">L</span>
-              <button className="btn-refresh" style={{ padding: "7px 12px" }}
-                disabled={!calcKm || !calcLitres}
-                onClick={() => {
-                  const v = (parseFloat(calcLitres) / parseFloat(calcKm)) * 100;
-                  if (!isNaN(v) && v > 0) applyConsumption(Math.round(v * 10) / 10);
-                }}>Use</button>
-            </div>
           </div>
         </div>
 
@@ -659,6 +611,11 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
         )}
 
         {/* Find button */}
+        {stations.length === 0 && (
+          <p className="route-no-data-note">
+            ⚠️ No station data loaded yet — prices may still be fetching. Try refreshing the app first.
+          </p>
+        )}
         <button className="route-find-btn-big" onClick={handleFind}
           disabled={!fromPlace || !toPlace || loading}>
           {loading ? "Finding…" : "🔍 Find Stations Along Route"}

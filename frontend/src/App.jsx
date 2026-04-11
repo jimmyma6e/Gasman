@@ -361,6 +361,7 @@ export default function App() {
   });
 
   const [activeRouteLoad, setActiveRouteLoad] = useState(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   const [onboarded, setOnboarded] = useState(
     () => !!localStorage.getItem("gasman-onboarded")
@@ -565,6 +566,7 @@ export default function App() {
           </div>
           <div className="header-actions">
             {lastRefresh && <span className="refresh-time">Refreshed {timeAgo(lastRefresh.toISOString())}</span>}
+            <button className="btn-edit-profile" onClick={() => { setTab("dashboard"); setShowProfile(true); }} title="My Profile">⚙️</button>
             <button className="btn-refresh" onClick={fetchData} disabled={loading}>
               {loading ? "Loading..." : "Refresh"}
             </button>
@@ -617,6 +619,8 @@ export default function App() {
             onDeleteRoute={handleDeleteRoute}
             onLaunchRoute={handleLaunchRoute}
             onNavigate={setTab}
+            showProfile={showProfile}
+            onCloseProfile={() => setShowProfile(false)}
           />
         )}
 

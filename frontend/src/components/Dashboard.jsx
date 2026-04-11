@@ -1,4 +1,13 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+
+async function nominatimSearch(q) {
+  const url =
+    `https://nominatim.openstreetmap.org/search` +
+    `?q=${encodeURIComponent(q + " BC Canada")}` +
+    `&format=json&limit=5&addressdetails=0&countrycodes=ca`;
+  const res = await fetch(url, { headers: { "User-Agent": "Gasman/1.0 (gasman-app)" } });
+  return res.json();
+}
 
 const FUEL_LABELS = {
   regular_gas:  "Regular",
@@ -274,6 +283,82 @@ function VehicleManager() {
   );
 }
 
+// ── Add Place Form (inside ProfileModal) ──────────────────────────────────────
+
+const PLACE_PRESETS = [
+  { emoji: "🏠", label: "Home" },
+  { emoji: "💼", label: "Work" },
+  { emoji: "🎓", label: "School" },
+];
+
+function AddPlaceForm({ onAdd, onCancel }) {
+  const [label, setLabel]           = useState("");
+  const [emoji, setEmoji]           = useState("📍");
+  const [query, setQuery]           = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [selected, setSelected]     = useState(null);
+  const timer = useRef(null);
+
+  function handleQueryChange(e) {
+    const q = e.target.value;
+    setQuery(q);
+    setSelected(null);
+    clearTimeout(timer.current);
+    if (q.length < 2) { setSuggestions([]); return; }
+    timer.current = setTimeout(async () => {
+      try { setSuggestions(await nominatimSearch(q)); } catch { /* ignore */ }
+    }, 400);
+  }
+
+  function handleSelect(s) {
+    setQuery(s.display_name);
+    setSuggestions([]);
+    setSelected({ lat: parseFloat(s.lat), lng: parseFloat(s.lon), display_name: s.display_name });
+  }
+
+  function handleAdd() {
+    if (!label.trim() || !selected) return;
+    onAdd({ emoji, label: label.trim(), ...selected });
+  }
+
+  return (
+    <div className="add-place-form">
+      <div className="add-place-presets">
+        {PLACE_PRESETS.map((p) => (
+          <button key={p.label}
+            className={`save-place-preset ${label === p.label && emoji === p.emoji ? "save-place-preset-active" : ""}`}
+            onClick={() => { setLabel(p.label); setEmoji(p.emoji); }}>
+            {p.emoji} {p.label}
+          </button>
+        ))}
+      </div>
+      <input className="route-save-input" placeholder="Custom label (e.g. Gym)"
+        value={label} maxLength={32}
+        onChange={(e) => { setLabel(e.target.value); setEmoji("📍"); }} />
+      <div className="add-place-search-wrap">
+        <input className="route-save-input" placeholder="Search address in BC…"
+          value={query} autoComplete="off" onChange={handleQueryChange} />
+        {suggestions.length > 0 && (
+          <div className="route-suggestions">
+            {suggestions.map((s, i) => (
+              <button key={i} className="route-suggestion-item" onMouseDown={() => handleSelect(s)}>
+                {s.display_name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {selected && <p style={{ fontSize: "0.78rem", color: "var(--text-dim)", margin: 0 }}>📍 {selected.display_name}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn-refresh" disabled={!label.trim() || !selected} onClick={handleAdd}>
+          + Add Place
+        </button>
+        <button className="btn-clear-filters" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Profile Modal ─────────────────────────────────────────────────────────────
 
 function ProfileModal({ onClose }) {
@@ -281,11 +366,22 @@ function ProfileModal({ onClose }) {
     try { return JSON.parse(localStorage.getItem("gasman-saved-places") || "[]"); }
     catch { return []; }
   });
+  const [addingPlace, setAddingPlace] = useState(false);
 
   function deletePlace(id) {
     const next = places.filter((p) => p.id !== id);
     setPlaces(next);
     localStorage.setItem("gasman-saved-places", JSON.stringify(next));
+  }
+
+  function addPlace(entry) {
+    const next = [...places, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      ...entry,
+    }];
+    setPlaces(next);
+    localStorage.setItem("gasman-saved-places", JSON.stringify(next));
+    setAddingPlace(false);
   }
 
   return (
@@ -298,7 +394,12 @@ function ProfileModal({ onClose }) {
 
         <VehicleManager />
 
-        <h3 className="profile-section-label">📍 Saved Places</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 className="profile-section-label">📍 Saved Places</h3>
+          {!addingPlace && (
+            <button className="profile-add-btn" onClick={() => setAddingPlace(true)}>+ Add location</button>
+          )}
+        </div>
         {places.length > 0 ? (
           places.map((p) => (
             <div key={p.id} className="profile-place-row">
@@ -308,8 +409,9 @@ function ProfileModal({ onClose }) {
             </div>
           ))
         ) : (
-          <p className="dashboard-empty">No saved places yet. Add them in the 🗺️ Route Finder tab.</p>
+          !addingPlace && <p className="dashboard-empty">No saved places yet. Add home, work, or school for quick access in Route Finder.</p>
         )}
+        {addingPlace && <AddPlaceForm onAdd={addPlace} onCancel={() => setAddingPlace(false)} />}
       </div>
     </div>
   );
@@ -321,20 +423,14 @@ export default function Dashboard({
   snapshots, savedRoutes, stationsWithArea,
   favourites, activeFuel, cheapestPrices, onToggleFavourite,
   onDeleteSnapshot, onDeleteRoute, onLaunchRoute, onNavigate,
+  showProfile, onCloseProfile,
 }) {
-  const [showProfile, setShowProfile] = useState(false);
   const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
 
   return (
     <div className="dashboard">
 
-      {/* ── Profile row ── */}
-      <div className="dashboard-profile-row">
-        <span className="dashboard-welcome">Your gas tracker</span>
-        <button className="btn-edit-profile" onClick={() => setShowProfile(true)}>⚙️ My Profile</button>
-      </div>
-
-      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {showProfile && <ProfileModal onClose={onCloseProfile} />}
 
       {/* ── Route Finder Hero ── */}
       <div className="route-hero-card" onClick={() => onNavigate("route")}>

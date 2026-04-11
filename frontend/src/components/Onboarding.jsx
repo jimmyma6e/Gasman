@@ -103,8 +103,11 @@ export default function Onboarding({ onDone }) {
                     className={`onboard-vehicle-btn ${selectedPreset?.label === p.label ? "onboard-vehicle-active" : ""}`}
                     onClick={() => { setSelectedPreset(p); setCustomL100(""); }}>
                     <span className="onboard-vehicle-icon">{p.icon}</span>
-                    <span className="onboard-vehicle-label">{p.label}</span>
-                    <span className="onboard-vehicle-val">{p.l100km} L/100km</span>
+                    <div>
+                      <span className="onboard-vehicle-label">{p.label}</span>
+                      <span className="onboard-vehicle-val">{p.l100km} L/100km</span>
+                    </div>
+                    {selectedPreset?.label === p.label && <span className="onboard-vehicle-check">✓</span>}
                   </button>
                 ))}
               </div>
