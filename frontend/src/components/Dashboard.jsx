@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { CREDIT_CARDS } from "../creditCards.js";
 
 async function nominatimSearch(q) {
   const url =
@@ -386,6 +387,57 @@ function AddPlaceForm({ onAdd, onCancel }) {
   );
 }
 
+// ── Card Manager ──────────────────────────────────────────────────────────────
+
+function CardManager() {
+  const [selectedIds, setSelectedIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-cards") || "[]"); }
+    catch { return []; }
+  });
+
+  function toggle(id) {
+    setSelectedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      localStorage.setItem("gasman-cards", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  const byBank = CREDIT_CARDS.reduce((acc, c) => {
+    (acc[c.bank] = acc[c.bank] || []).push(c);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <h3 className="profile-section-label">💳 My Credit Cards</h3>
+      <p className="profile-tip-text">Select cards you own to see discounted prices at eligible stations.</p>
+      {Object.entries(byBank).map(([bank, cards]) => (
+        <div key={bank} className="card-bank-group">
+          <div className="card-bank-label">{bank}</div>
+          {cards.map((c) => {
+            const active = selectedIds.includes(c.id);
+            return (
+              <button key={c.id}
+                className={`card-row ${active ? "card-row-active" : ""}`}
+                onClick={() => toggle(c.id)}>
+                <div className="card-row-left">
+                  <span className="card-color-dot" style={{ background: c.color }} />
+                  <div>
+                    <div className="card-row-name">{c.name}</div>
+                    <div className="card-row-note">{c.note}</div>
+                  </div>
+                </div>
+                {active && <span className="card-row-check">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Profile Modal ─────────────────────────────────────────────────────────────
 
 function ProfileModal({ onClose }) {
@@ -420,6 +472,8 @@ function ProfileModal({ onClose }) {
         </div>
 
         <VehicleManager />
+
+        <CardManager />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 className="profile-section-label">📍 Saved Places</h3>

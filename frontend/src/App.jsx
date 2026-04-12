@@ -6,6 +6,7 @@ import MapView from "./components/MapView";
 import RouteTab from "./components/RouteTab";
 import Dashboard from "./components/Dashboard";
 import Onboarding from "./components/Onboarding";
+import { bestCardSavings } from "./creditCards.js";
 
 // Region groupings for the area filter
 const BC_REGIONS = {
@@ -234,7 +235,7 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
@@ -272,16 +273,30 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
             <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
               <span className="fuel-label">{label}</span>
               {VALID_PRICE(price) ? (
-                <div className="fuel-price-row">
-                  <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
-                    {formatPrice(price, station.unit_of_measure)}
-                  </span>
-                  {delta != null && (
-                    <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
-                      {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                <>
+                  <div className="fuel-price-row">
+                    <span className={`badge ${key === activeFuel && isCheapest ? "badge-cheapest" : ""}`}>
+                      {formatPrice(price, station.unit_of_measure)}
                     </span>
-                  )}
-                </div>
+                    {delta != null && (
+                      <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
+                        {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                  {key === activeFuel && showCardDiscounts && (() => {
+                    const brand = station._brand || station.name;
+                    const result = bestCardSavings(selectedCards, price, brand);
+                    if (!result) return null;
+                    const discounted = Math.round((price - result.savings) * 10) / 10;
+                    return (
+                      <div className="fuel-card-discount">
+                        <span className="fuel-card-price">💳 {discounted}¢</span>
+                        <span className="fuel-card-tag">–{result.savings}¢ {result.card.bank}</span>
+                      </div>
+                    );
+                  })()}
+                </>
               ) : (
                 <span className="badge badge-empty">—</span>
               )}
@@ -362,6 +377,14 @@ export default function App() {
 
   const [activeRouteLoad, setActiveRouteLoad] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
+
+  const [selectedCards, setSelectedCards] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-cards") || "[]"); }
+    catch { return []; }
+  });
+  const [showCardDiscounts, setShowCardDiscounts] = useState(
+    () => localStorage.getItem("gasman-show-card-discounts") === "1"
+  );
 
   const [onboarded, setOnboarded] = useState(
     () => !!localStorage.getItem("gasman-onboarded")
@@ -470,6 +493,14 @@ export default function App() {
   useEffect(() => { localStorage.setItem("gasman-view-mode",   viewMode);  }, [viewMode]);
   useEffect(() => { localStorage.setItem("gasman-area-filter",  JSON.stringify([...areaFilter]));  }, [areaFilter]);
   useEffect(() => { localStorage.setItem("gasman-brand-filter", JSON.stringify([...brandFilter])); }, [brandFilter]);
+  useEffect(() => { localStorage.setItem("gasman-show-card-discounts", showCardDiscounts ? "1" : "0"); }, [showCardDiscounts]);
+  // Sync selectedCards from localStorage when profile modal closes (cards may have changed)
+  useEffect(() => {
+    if (!showProfile) {
+      try { setSelectedCards(JSON.parse(localStorage.getItem("gasman-cards") || "[]")); }
+      catch { /* ignore */ }
+    }
+  }, [showProfile]);
 
   // Close area dropdown on outside click
   useEffect(() => {
@@ -602,7 +633,9 @@ export default function App() {
           <RouteTab stations={stationsWithArea}
             activeRouteLoad={activeRouteLoad}
             onClearRouteLoad={() => setActiveRouteLoad(null)}
-            onSaveRoute={handleSaveRoute} />
+            onSaveRoute={handleSaveRoute}
+            selectedCards={selectedCards}
+            showCardDiscounts={showCardDiscounts} />
         )}
 
         {/* Dashboard Tab */}
@@ -765,6 +798,14 @@ export default function App() {
             ))}
           </div>
           <div className="controls-right">
+            {selectedCards.length > 0 && (
+              <button
+                className={`btn-card-toggle ${showCardDiscounts ? "btn-card-toggle-on" : ""}`}
+                onClick={() => setShowCardDiscounts((o) => !o)}
+                title="Show discounted prices based on your credit cards">
+                💳 {showCardDiscounts ? "Card prices ON" : "Card prices"}
+              </button>
+            )}
             <button
               className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
               onClick={() => setShowMap((v) => !v)}
@@ -897,6 +938,8 @@ export default function App() {
                     onOpenChart={setChartStation}
                     onSnapshot={handleSnapshot}
                     showArea={sortBy === "city"}
+                    selectedCards={selectedCards}
+                    showCardDiscounts={showCardDiscounts}
                   />
                   </div>
                 ))}

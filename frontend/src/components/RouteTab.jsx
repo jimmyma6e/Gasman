@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { bestCardSavings } from "../creditCards.js";
 
 const FUEL_TYPES = [
   { key: "regular_gas",  label: "Regular (87)" },
@@ -337,7 +338,7 @@ const POPULAR_BRANDS_RT = [
 
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -824,6 +825,18 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
                     </div>
                     <div className="route-result-right">
                       <span className="route-result-price">{priceData.price}¢/L</span>
+                      {showCardDiscounts && (() => {
+                        const brand = s._brand || s.name;
+                        const result = bestCardSavings(selectedCards, priceData.price, brand);
+                        if (!result) return null;
+                        const discounted = Math.round((priceData.price - result.savings) * 10) / 10;
+                        return (
+                          <span className="route-card-discount">
+                            💳 {discounted}¢/L
+                            <span className="route-card-tag"> –{result.savings}¢ {result.card.bank}</span>
+                          </span>
+                        );
+                      })()}
                       <span className="route-result-detour">
                         {s.detour <= 0.3
                           ? `on route · ${totalMin} min`

@@ -615,6 +615,40 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .profile-consumption-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .profile-unit { font-size: 0.85rem; color: var(--text-dim); }
 .profile-vehicle-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-tip-text { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 10px; }
+
+/* ── Card Manager (Profile Modal) ── */
+.card-bank-group { margin-bottom: 14px; }
+.card-bank-label { font-size: 0.7rem; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
+.card-row { width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 9px;
+  padding: 9px 12px; margin-bottom: 5px; cursor: pointer; text-align: left;
+  transition: all 0.15s; }
+.card-row:hover { border-color: var(--accent); }
+.card-row-active { border-color: var(--accent); background: rgba(249,115,22,0.06); }
+.card-row-left { display: flex; align-items: center; gap: 10px; }
+.card-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.card-row-name { font-size: 0.84rem; font-weight: 600; color: var(--text); }
+.card-row-note { font-size: 0.72rem; color: var(--text-dim); margin-top: 1px; }
+.card-row-check { color: var(--accent); font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+
+/* ── Card discount toggle (All Stations toolbar) ── */
+.btn-card-toggle { background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); padding: 6px 11px; border-radius: 8px; font-size: 0.8rem;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-card-toggle:hover { border-color: var(--accent); }
+.btn-card-toggle-on { background: rgba(249,115,22,0.1); border-color: var(--accent);
+  color: var(--accent); font-weight: 600; }
+
+/* ── Discounted price display (station cards) ── */
+.fuel-card-discount { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+.fuel-card-price { font-size: 0.87rem; font-weight: 700; color: #4ade80; }
+.fuel-card-tag { font-size: 0.67rem; color: #4ade80; opacity: 0.85; }
+
+/* ── Discounted price display (route results) ── */
+.route-card-discount { font-size: 0.76rem; color: #4ade80; font-weight: 600; margin-top: 1px; }
+.route-card-tag { font-weight: 400; opacity: 0.85; }
 
 /* ── Add place form (inside profile modal) ── */
 .add-place-form { background: var(--surface2); border: 1px solid var(--border);
