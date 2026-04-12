@@ -985,6 +985,12 @@ export default function App() {
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
       {!onboarded && <Onboarding onDone={() => setOnboarded(true)} />}
+
+      <footer className="app-footer">
+        GASMAN is an independent, non-commercial project for academic &amp; personal use among friends and family only.
+        Price data is sourced from public listings and provided for informational purposes.
+        We make no guarantees of accuracy or completeness. Not affiliated with any fuel retailer or pricing service.
+      </footer>
     </div>
   );
 }

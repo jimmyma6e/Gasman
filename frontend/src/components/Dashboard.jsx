@@ -15,15 +15,17 @@ function formatPlace(r) {
   const houseNum = a.house_number || "";
   const road = a.road || a.pedestrian || a.footway || null;
   const city = a.city || a.town || a.village || a.municipality || a.county || "";
+  const postcode = a.postcode ? a.postcode.split(" ")[0] : "";
   const parts = [];
   if (name) parts.push(name);
   if (road) parts.push(houseNum ? `${houseNum} ${road}` : road);
   else if (houseNum) parts.push(houseNum);
   if (city && city !== name) parts.push(city);
+  if (postcode) parts.push(postcode);
   if (parts.length) return parts.join(", ");
   return r.display_name.split(", ")
-    .filter((p) => !/Canada|British Columbia|Regional District|Regional Municipality/.test(p) && !/^[A-Z]\d[A-Z]/.test(p) && !/^\d[A-Z]\d/.test(p))
-    .slice(0, 3).join(", ");
+    .filter((p) => !/Canada|British Columbia|Regional District|Regional Municipality/.test(p) && !/^\d[A-Z]\d/.test(p))
+    .slice(0, 4).join(", ");
 }
 
 const FUEL_LABELS = {

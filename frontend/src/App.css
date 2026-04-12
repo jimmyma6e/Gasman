@@ -30,6 +30,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Main ── */
 .main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.app-footer { max-width: 1200px; margin: 0 auto; padding: 16px 20px 24px;
+  font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; opacity: 0.6; }
 
 /* ── Trend Banner ── */
 .trend-banner { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: var(--radius); margin-bottom: 20px; font-size: 0.9rem; flex-wrap: wrap; }
