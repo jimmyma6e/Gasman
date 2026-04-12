@@ -11,17 +11,24 @@ async function nominatimSearch(q) {
 
 function formatPlace(r) {
   const a = r.address || {};
-  const name = a.amenity || a.shop || a.leisure || a.tourism || a.building || a.office || a.craft || null;
   const houseNum = a.house_number || "";
-  const road = a.road || a.pedestrian || a.footway || null;
-  const city = a.city || a.town || a.village || a.municipality || a.county || "";
+  const road     = a.road || a.pedestrian || a.footway || null;
+  const city     = a.city || a.town || a.village || a.municipality || a.county || "";
   const postcode = a.postcode ? a.postcode.split(" ")[0] : "";
+
+  const isStreetAddr = r.type === "house" || (!!houseNum && !r.name);
+  const isRoad       = r.class === "highway";
+
   const parts = [];
-  if (name) parts.push(name);
-  if (road) parts.push(houseNum ? `${houseNum} ${road}` : road);
-  else if (houseNum) parts.push(houseNum);
-  if (city && city !== name) parts.push(city);
+  if (!isStreetAddr && !isRoad && r.name) {
+    parts.push(r.name);
+    if (houseNum && road) parts.push(`${houseNum} ${road}`);
+  } else if (road) {
+    parts.push(houseNum ? `${houseNum} ${road}` : road);
+  }
+  if (city && city !== r.name) parts.push(city);
   if (postcode) parts.push(postcode);
+
   if (parts.length) return parts.join(", ");
   return r.display_name.split(", ")
     .filter((p) => !/Canada|British Columbia|Regional District|Regional Municipality/.test(p) && !/^\d[A-Z]\d/.test(p))
