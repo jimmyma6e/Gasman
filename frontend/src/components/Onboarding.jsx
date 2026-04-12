@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CREDIT_CARDS } from "../creditCards.js";
 
 const VEHICLE_PRESETS = [
   { icon: "🚗", label: "Compact",  l100km: 7  },
@@ -7,11 +8,25 @@ const VEHICLE_PRESETS = [
   { icon: "🛻", label: "Truck",    l100km: 14 },
 ];
 
+// Group cards by bank for the onboarding picker
+const CARDS_BY_BANK = CREDIT_CARDS.reduce((acc, c) => {
+  (acc[c.bank] = acc[c.bank] || []).push(c);
+  return acc;
+}, {});
+
 export default function Onboarding({ onDone }) {
   const [step, setStep] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [vehicleName, setVehicleName] = useState("");
   const [customL100, setCustomL100]   = useState("");
+  const [selectedCardIds, setSelectedCardIds] = useState([]);
+  const [openBank, setOpenBank] = useState(null);
+
+  function toggleCard(id) {
+    setSelectedCardIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   function finish(skipVehicle = false) {
     if (!skipVehicle && (selectedPreset || parseFloat(customL100) > 0)) {
@@ -32,6 +47,9 @@ export default function Onboarding({ onDone }) {
         localStorage.setItem("gasman-active-vehicle", entry.id);
         localStorage.setItem("gasman-consumption", String(l100km));
       }
+    }
+    if (selectedCardIds.length > 0) {
+      localStorage.setItem("gasman-cards", JSON.stringify(selectedCardIds));
     }
     localStorage.setItem("gasman-onboarded", "1");
     onDone();
@@ -88,7 +106,7 @@ export default function Onboarding({ onDone }) {
           <>
             <div className="onboard-step-header">
               <button className="onboard-back" onClick={() => setStep(0)}>← Back</button>
-              <span className="onboard-step-label">Step 2 of 2</span>
+              <span className="onboard-step-label">Step 2 of 3</span>
             </div>
 
             <div className="onboard-vehicle-section">
@@ -130,8 +148,74 @@ export default function Onboarding({ onDone }) {
             </div>
 
             <div className="onboard-actions">
-              <button className="onboard-btn-primary" onClick={() => finish(false)}
-                disabled={!selectedPreset && !parseFloat(customL100)}>
+              <button className="onboard-btn-primary" onClick={() => setStep(2)}>
+                Next →
+              </button>
+              <button className="onboard-btn-skip" onClick={() => setStep(2)}>Skip</button>
+            </div>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <div className="onboard-step-header">
+              <button className="onboard-back" onClick={() => setStep(1)}>← Back</button>
+              <span className="onboard-step-label">Step 3 of 3</span>
+            </div>
+
+            <div className="onboard-card-section">
+              <h2 className="onboard-section-title">💳 Do you have a gas rewards card?</h2>
+              <p className="onboard-section-sub">
+                Select any cards you own — we'll show your effective price after cashback or partner discounts.
+                {selectedCardIds.length > 0 && (
+                  <span className="onboard-card-count"> {selectedCardIds.length} selected</span>
+                )}
+              </p>
+
+              <div className="onboard-card-scroll">
+                {Object.entries(CARDS_BY_BANK).map(([bank, cards]) => {
+                  const activeCount = cards.filter((c) => selectedCardIds.includes(c.id)).length;
+                  const isOpen = openBank === bank;
+                  return (
+                    <div key={bank} className="card-bank-group">
+                      <button
+                        className={`card-bank-header ${activeCount > 0 ? "card-bank-has-active" : ""}`}
+                        onClick={() => setOpenBank(isOpen ? null : bank)}>
+                        <span className="card-bank-name">{bank}</span>
+                        <span className="card-bank-right">
+                          {activeCount > 0 && <span className="card-bank-count">{activeCount} selected</span>}
+                          <span className="card-bank-arrow">{isOpen ? "▴" : "▾"}</span>
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="card-bank-panel">
+                          {cards.map((c) => {
+                            const active = selectedCardIds.includes(c.id);
+                            return (
+                              <button key={c.id}
+                                className={`card-row ${active ? "card-row-active" : ""}`}
+                                onClick={() => toggleCard(c.id)}>
+                                <div className="card-row-left">
+                                  <span className="card-color-dot" style={{ background: c.color }} />
+                                  <div>
+                                    <div className="card-row-name">{c.name}</div>
+                                    <div className="card-row-note">{c.note}</div>
+                                  </div>
+                                </div>
+                                {active && <span className="card-row-check">✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="onboard-actions">
+              <button className="onboard-btn-primary" onClick={() => finish(false)}>
                 Get Started →
               </button>
               <button className="onboard-btn-skip" onClick={() => finish(true)}>Skip for now</button>

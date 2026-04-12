@@ -394,6 +394,7 @@ function CardManager() {
     try { return JSON.parse(localStorage.getItem("gasman-cards") || "[]"); }
     catch { return []; }
   });
+  const [openBank, setOpenBank] = useState(null);
 
   function toggle(id) {
     setSelectedIds((prev) => {
@@ -412,35 +413,51 @@ function CardManager() {
     <div>
       <h3 className="profile-section-label">💳 My Credit Cards</h3>
       <p className="profile-tip-text">Select cards you own to see discounted prices at eligible stations.</p>
-      {Object.entries(byBank).map(([bank, cards]) => (
-        <div key={bank} className="card-bank-group">
-          <div className="card-bank-label">{bank}</div>
-          {cards.map((c) => {
-            const active = selectedIds.includes(c.id);
-            return (
-              <button key={c.id}
-                className={`card-row ${active ? "card-row-active" : ""}`}
-                onClick={() => toggle(c.id)}>
-                <div className="card-row-left">
-                  <span className="card-color-dot" style={{ background: c.color }} />
-                  <div>
-                    <div className="card-row-name">{c.name}</div>
-                    <div className="card-row-note">{c.note}</div>
-                  </div>
-                </div>
-                {active && <span className="card-row-check">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      ))}
+      {Object.entries(byBank).map(([bank, cards]) => {
+        const activeCount = cards.filter((c) => selectedIds.includes(c.id)).length;
+        const isOpen = openBank === bank;
+        return (
+          <div key={bank} className="card-bank-group">
+            <button
+              className={`card-bank-header ${activeCount > 0 ? "card-bank-has-active" : ""}`}
+              onClick={() => setOpenBank(isOpen ? null : bank)}>
+              <span className="card-bank-name">{bank}</span>
+              <span className="card-bank-right">
+                {activeCount > 0 && <span className="card-bank-count">{activeCount} selected</span>}
+                <span className="card-bank-arrow">{isOpen ? "▴" : "▾"}</span>
+              </span>
+            </button>
+            {isOpen && (
+              <div className="card-bank-panel">
+                {cards.map((c) => {
+                  const active = selectedIds.includes(c.id);
+                  return (
+                    <button key={c.id}
+                      className={`card-row ${active ? "card-row-active" : ""}`}
+                      onClick={() => toggle(c.id)}>
+                      <div className="card-row-left">
+                        <span className="card-color-dot" style={{ background: c.color }} />
+                        <div>
+                          <div className="card-row-name">{c.name}</div>
+                          <div className="card-row-note">{c.note}</div>
+                        </div>
+                      </div>
+                      {active && <span className="card-row-check">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ── Profile Modal ─────────────────────────────────────────────────────────────
 
-function ProfileModal({ onClose }) {
+export function ProfileModal({ onClose }) {
   const [places, setPlaces] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-saved-places") || "[]"); }
     catch { return []; }
@@ -504,14 +521,11 @@ export default function Dashboard({
   snapshots, savedRoutes, stationsWithArea,
   favourites, activeFuel, cheapestPrices, onToggleFavourite,
   onDeleteSnapshot, onDeleteRoute, onLaunchRoute, onNavigate,
-  showProfile, onCloseProfile,
 }) {
   const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
 
   return (
     <div className="dashboard">
-
-      {showProfile && <ProfileModal onClose={onCloseProfile} />}
 
       {/* ── Route Finder Hero ── */}
       <div className="route-hero-card" onClick={() => onNavigate("route")}>

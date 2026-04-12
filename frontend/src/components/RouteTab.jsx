@@ -338,7 +338,7 @@ const POPULAR_BRANDS_RT = [
 
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts, fillLitres }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -850,6 +850,22 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
                           )}
                         </span>
                       )}
+                      {parseFloat(fillLitres) > 0 && (() => {
+                        const litres = parseFloat(fillLitres);
+                        const fillCost = (priceData.price * litres / 100).toFixed(2);
+                        const cardResult = showCardDiscounts
+                          ? bestCardSavings(selectedCards, priceData.price, s._brand || s.name)
+                          : null;
+                        const cardFillCost = cardResult
+                          ? ((priceData.price - cardResult.savings) * litres / 100).toFixed(2)
+                          : null;
+                        return (
+                          <span className="route-fill-cost">
+                            ⛽ {litres}L: ${fillCost}
+                            {cardFillCost && <span className="route-card-fill"> · 💳 ${cardFillCost}</span>}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 );

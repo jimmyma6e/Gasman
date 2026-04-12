@@ -617,14 +617,26 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .profile-vehicle-presets { display: flex; flex-wrap: wrap; gap: 8px; }
 .profile-tip-text { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 10px; }
 
-/* ── Card Manager (Profile Modal) ── */
-.card-bank-group { margin-bottom: 14px; }
-.card-bank-label { font-size: 0.7rem; font-weight: 700; color: var(--text-dim);
-  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
-.card-row { width: 100%; display: flex; align-items: center; justify-content: space-between;
+/* ── Card Manager (accordion) ── */
+.card-bank-group { margin-bottom: 6px; }
+.card-bank-header { width: 100%; display: flex; align-items: center; justify-content: space-between;
   background: var(--surface2); border: 1px solid var(--border); border-radius: 9px;
-  padding: 9px 12px; margin-bottom: 5px; cursor: pointer; text-align: left;
+  padding: 9px 12px; cursor: pointer; text-align: left; transition: all 0.15s; }
+.card-bank-header:hover { border-color: var(--accent); }
+.card-bank-has-active { border-color: var(--accent); background: rgba(249,115,22,0.05); }
+.card-bank-name { font-size: 0.87rem; font-weight: 600; color: var(--text); }
+.card-bank-right { display: flex; align-items: center; gap: 8px; }
+.card-bank-count { font-size: 0.72rem; background: var(--accent); color: #fff;
+  border-radius: 20px; padding: 1px 7px; font-weight: 600; }
+.card-bank-arrow { font-size: 0.72rem; color: var(--text-dim); }
+.card-bank-panel { border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 9px 9px; padding: 6px 8px 8px; margin-top: -2px;
+  background: var(--surface); }
+.card-row { width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 10px; margin-bottom: 4px; cursor: pointer; text-align: left;
   transition: all 0.15s; }
+.card-row:last-child { margin-bottom: 0; }
 .card-row:hover { border-color: var(--accent); }
 .card-row-active { border-color: var(--accent); background: rgba(249,115,22,0.06); }
 .card-row-left { display: flex; align-items: center; gap: 10px; }
@@ -649,6 +661,25 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Discounted price display (route results) ── */
 .route-card-discount { font-size: 0.76rem; color: #4ade80; font-weight: 600; margin-top: 1px; }
 .route-card-tag { font-weight: 400; opacity: 0.85; }
+
+/* ── Fill litres control (All Stations toolbar) ── */
+.fill-control { display: flex; align-items: center; gap: 5px; }
+.fill-label { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.fill-input { width: 54px; padding: 4px 6px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+  font-size: 0.82rem; text-align: center; }
+.fill-input:focus { outline: none; border-color: var(--accent); }
+.fill-unit { font-size: 0.8rem; color: var(--text-dim); }
+
+/* ── Fill cost on station cards ── */
+.fuel-fill-cost { display: flex; align-items: center; gap: 8px; margin-top: 3px;
+  font-size: 0.82rem; color: var(--text-dim); }
+.fuel-fill-cost strong { color: var(--text); }
+.fuel-fill-card { color: #4ade80; font-weight: 600; }
+
+/* ── Fill cost in route results ── */
+.route-fill-cost { font-size: 0.76rem; color: var(--text-dim); margin-top: 2px; }
+.route-card-fill { color: #4ade80; font-weight: 600; }
 
 /* ── Add place form (inside profile modal) ── */
 .add-place-form { background: var(--surface2); border: 1px solid var(--border);
@@ -835,6 +866,11 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 .onboard-vehicle-custom { display: flex; flex-direction: column; gap: 8px; }
 .onboard-custom-l100 { display: flex; align-items: center; gap: 8px; }
+
+/* Onboarding card step */
+.onboard-card-section { margin-bottom: 16px; }
+.onboard-card-scroll { max-height: 280px; overflow-y: auto; padding-right: 2px; }
+.onboard-card-count { font-weight: 700; color: var(--accent); }
 
 /* Shared actions row */
 .onboard-actions { display: flex; flex-direction: column; gap: 8px; }

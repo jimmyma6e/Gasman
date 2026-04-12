@@ -4,7 +4,7 @@ import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
 import MapView from "./components/MapView";
 import RouteTab from "./components/RouteTab";
-import Dashboard from "./components/Dashboard";
+import Dashboard, { ProfileModal } from "./components/Dashboard";
 import Onboarding from "./components/Onboarding";
 import { bestCardSavings } from "./creditCards.js";
 
@@ -235,7 +235,7 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
@@ -293,6 +293,22 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
                       <div className="fuel-card-discount">
                         <span className="fuel-card-price">💳 {discounted}¢</span>
                         <span className="fuel-card-tag">–{result.savings}¢ {result.card.bank}</span>
+                      </div>
+                    );
+                  })()}
+                  {key === activeFuel && parseFloat(fillLitres) > 0 && (() => {
+                    const litres = parseFloat(fillLitres);
+                    const total = (price * litres / 100).toFixed(2);
+                    const cardResult = showCardDiscounts
+                      ? bestCardSavings(selectedCards, price, station._brand || station.name)
+                      : null;
+                    const cardTotal = cardResult
+                      ? ((price - cardResult.savings) * litres / 100).toFixed(2)
+                      : null;
+                    return (
+                      <div className="fuel-fill-cost">
+                        <span>{litres}L: <strong>${total}</strong></span>
+                        {cardTotal && <span className="fuel-fill-card">💳 ${cardTotal}</span>}
                       </div>
                     );
                   })()}
@@ -385,6 +401,7 @@ export default function App() {
   const [showCardDiscounts, setShowCardDiscounts] = useState(
     () => localStorage.getItem("gasman-show-card-discounts") === "1"
   );
+  const [fillLitres, setFillLitres] = useState("");
 
   const [onboarded, setOnboarded] = useState(
     () => !!localStorage.getItem("gasman-onboarded")
@@ -597,7 +614,7 @@ export default function App() {
           </div>
           <div className="header-actions">
             {lastRefresh && <span className="refresh-time">Refreshed {timeAgo(lastRefresh.toISOString())}</span>}
-            <button className="btn-edit-profile" onClick={() => { setTab("dashboard"); setShowProfile(true); }} title="My Profile">⚙️</button>
+            <button className="btn-edit-profile" onClick={() => setShowProfile(true)} title="My Profile">⚙️</button>
             <button className="btn-refresh" onClick={fetchData} disabled={loading}>
               {loading ? "Loading..." : "Refresh"}
             </button>
@@ -635,7 +652,8 @@ export default function App() {
             onClearRouteLoad={() => setActiveRouteLoad(null)}
             onSaveRoute={handleSaveRoute}
             selectedCards={selectedCards}
-            showCardDiscounts={showCardDiscounts} />
+            showCardDiscounts={showCardDiscounts}
+            fillLitres={fillLitres} />
         )}
 
         {/* Dashboard Tab */}
@@ -652,8 +670,6 @@ export default function App() {
             onDeleteRoute={handleDeleteRoute}
             onLaunchRoute={handleLaunchRoute}
             onNavigate={setTab}
-            showProfile={showProfile}
-            onCloseProfile={() => setShowProfile(false)}
           />
         )}
 
@@ -798,6 +814,21 @@ export default function App() {
             ))}
           </div>
           <div className="controls-right">
+            <div className="fill-control">
+              <label className="fill-label" htmlFor="fill-input">⛽ Fill</label>
+              <input
+                id="fill-input"
+                type="number"
+                className="fill-input"
+                placeholder="—"
+                min={1}
+                max={200}
+                step={5}
+                value={fillLitres}
+                onChange={(e) => setFillLitres(e.target.value)}
+              />
+              <span className="fill-unit">L</span>
+            </div>
             {selectedCards.length > 0 && (
               <button
                 className={`btn-card-toggle ${showCardDiscounts ? "btn-card-toggle-on" : ""}`}
@@ -940,6 +971,7 @@ export default function App() {
                     showArea={sortBy === "city"}
                     selectedCards={selectedCards}
                     showCardDiscounts={showCardDiscounts}
+                    fillLitres={fillLitres}
                   />
                   </div>
                 ))}
@@ -1027,6 +1059,7 @@ export default function App() {
       </main>
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {!onboarded && <Onboarding onDone={() => setOnboarded(true)} />}
 
       <footer className="app-footer">
