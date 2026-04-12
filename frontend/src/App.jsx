@@ -653,7 +653,8 @@ export default function App() {
             onSaveRoute={handleSaveRoute}
             selectedCards={selectedCards}
             showCardDiscounts={showCardDiscounts}
-            fillLitres={fillLitres} />
+            fillLitres={fillLitres}
+            onOpenProfile={() => setShowProfile(true)} />
         )}
 
         {/* Dashboard Tab */}
@@ -829,12 +830,17 @@ export default function App() {
               />
               <span className="fill-unit">L</span>
             </div>
-            {selectedCards.length > 0 && (
+            {selectedCards.length > 0 ? (
               <button
                 className={`btn-card-toggle ${showCardDiscounts ? "btn-card-toggle-on" : ""}`}
                 onClick={() => setShowCardDiscounts((o) => !o)}
                 title="Show discounted prices based on your credit cards">
                 💳 {showCardDiscounts ? "Card prices ON" : "Card prices"}
+              </button>
+            ) : (
+              <button className="btn-card-toggle" onClick={() => setShowProfile(true)}
+                title="Add a credit card to see discounted prices">
+                💳 Add a card
               </button>
             )}
             <button

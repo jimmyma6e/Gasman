@@ -186,6 +186,45 @@ function VehicleManager() {
   const [newIcon, setNewIcon]   = useState("🚗");
   const [showTip, setShowTip]   = useState(false);
 
+  // Edit state
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName]   = useState("");
+  const [editL100, setEditL100]   = useState("");
+  const [editTank, setEditTank]   = useState("");
+  const [editIcon, setEditIcon]   = useState("🚗");
+
+  function startEdit(v) {
+    setEditingId(v.id);
+    setEditName(v.name);
+    setEditL100(String(v.l100km));
+    setEditTank(String(v.tank_litres || ""));
+    setEditIcon(v.icon);
+    setAdding(false);
+  }
+
+  function saveEdit() {
+    const l100km = parseFloat(editL100);
+    if (!editName.trim() || isNaN(l100km) || l100km <= 0) return;
+    const tank_litres = parseFloat(editTank) > 0 ? parseFloat(editTank) : undefined;
+    const next = vehicles.map((v) =>
+      v.id !== editingId ? v : {
+        ...v,
+        name: editName.trim(),
+        icon: editIcon,
+        l100km,
+        ...(tank_litres ? { tank_litres } : { tank_litres: undefined }),
+      }
+    );
+    setVehicles(next);
+    localStorage.setItem("gasman-vehicles", JSON.stringify(next));
+    if (activeId === editingId) {
+      localStorage.setItem("gasman-consumption", String(l100km));
+    }
+    setEditingId(null);
+  }
+
+  function cancelEdit() { setEditingId(null); }
+
   function selectVehicle(v) {
     setActiveId(v.id);
     localStorage.setItem("gasman-active-vehicle", v.id);
@@ -240,22 +279,72 @@ function VehicleManager() {
       {vehicles.length > 0 && (
         <div className="vehicle-list">
           {vehicles.map((v) => (
-            <div
-              key={v.id}
-              className={`vehicle-row ${activeId === v.id ? "vehicle-active" : ""}`}
-              onClick={() => selectVehicle(v)}
-            >
-              <span className="vehicle-icon-display">{v.icon}</span>
-              <div className="vehicle-info">
-                <span className="vehicle-name">{v.name}</span>
-                <span className="vehicle-economy">
-                  {v.l100km} L/100km{v.tank_litres ? ` · ${v.tank_litres}L tank` : ""}
-                </span>
-              </div>
-              {activeId === v.id && <span className="vehicle-check">✓ Active</span>}
-              <button className="btn-delete-snapshot"
-                onClick={(e) => { e.stopPropagation(); deleteVehicle(v.id); }}
-                title="Remove vehicle">×</button>
+            <div key={v.id}>
+              {editingId === v.id ? (
+                <div className="vehicle-add-form">
+                  <div className="vehicle-icon-picker">
+                    {VEHICLE_ICONS.map((ic) => (
+                      <button key={ic}
+                        className={`vehicle-icon-btn ${editIcon === ic ? "vehicle-icon-active" : ""}`}
+                        onClick={() => setEditIcon(ic)}>{ic}</button>
+                    ))}
+                  </div>
+                  <input className="route-save-input vehicle-name-input"
+                    placeholder="Vehicle name"
+                    value={editName} onChange={(e) => setEditName(e.target.value)}
+                    maxLength={30} autoFocus />
+                  <div className="vehicle-economy-row">
+                    <span className="profile-unit" style={{ flexShrink: 0 }}>Fuel economy:</span>
+                    <div className="vehicle-preset-chips">
+                      {VEHICLE_PRESETS.map((p) => (
+                        <button key={p.label}
+                          className={`vehicle-preset-chip ${parseFloat(editL100) === p.l100km ? "brand-chip-active" : "brand-chip"}`}
+                          onClick={() => setEditL100(String(p.l100km))}>
+                          {p.icon} {p.l100km}L
+                        </button>
+                      ))}
+                    </div>
+                    <input type="number" className="route-save-input" style={{ width: 68 }}
+                      value={editL100} min={3} max={30} step={0.5}
+                      onChange={(e) => setEditL100(e.target.value)} />
+                    <span className="profile-unit">L/100km</span>
+                  </div>
+                  <div className="vehicle-economy-row" style={{ marginTop: 6 }}>
+                    <span className="profile-unit" style={{ flexShrink: 0 }}>Full tank:</span>
+                    <input type="number" className="route-save-input" style={{ width: 68 }}
+                      placeholder="e.g. 50"
+                      value={editTank} min={10} max={200} step={1}
+                      onChange={(e) => setEditTank(e.target.value)} />
+                    <span className="profile-unit">L (optional)</span>
+                  </div>
+                  <div className="vehicle-add-actions">
+                    <button className="btn-refresh"
+                      disabled={!editName.trim() || !parseFloat(editL100)}
+                      onClick={saveEdit}>Save</button>
+                    <button className="btn-clear-filters" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`vehicle-row ${activeId === v.id ? "vehicle-active" : ""}`}
+                  onClick={() => selectVehicle(v)}
+                >
+                  <span className="vehicle-icon-display">{v.icon}</span>
+                  <div className="vehicle-info">
+                    <span className="vehicle-name">{v.name}</span>
+                    <span className="vehicle-economy">
+                      {v.l100km} L/100km{v.tank_litres ? ` · ${v.tank_litres}L tank` : ""}
+                    </span>
+                  </div>
+                  {activeId === v.id && <span className="vehicle-check">✓ Active</span>}
+                  <button className="btn-vehicle-edit"
+                    onClick={(e) => { e.stopPropagation(); startEdit(v); }}
+                    title="Edit vehicle">✎</button>
+                  <button className="btn-delete-snapshot"
+                    onClick={(e) => { e.stopPropagation(); deleteVehicle(v.id); }}
+                    title="Remove vehicle">×</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

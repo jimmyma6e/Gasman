@@ -244,7 +244,6 @@ function PlaceInput({ label, value, onSelect, placeholder, savedPlaces = [], onD
 
   return (
     <div className="route-place-wrap" ref={wrapRef}>
-      <label className="route-place-label">{label}</label>
       <input
         className="route-place-input"
         type="text"
@@ -338,7 +337,7 @@ const POPULAR_BRANDS_RT = [
 
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts, fillLitres: fillLitresProp }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts: showCardDiscountsProp, fillLitres: fillLitresProp, onOpenProfile }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -401,6 +400,9 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
     catch { return new Set(); }
   });
   const [brandPrefOpen, setBrandPrefOpen] = useState(false);
+
+  // Local card discount toggle (independent from All Stations toggle)
+  const [showCardDiscounts, setShowCardDiscounts] = useState(showCardDiscountsProp ?? false);
 
   const markerRefs = useRef({});
 
@@ -530,13 +532,18 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
 
         {/* From */}
         <div className="route-place-with-save">
-          <PlaceInput label="From" value={fromPlace} onSelect={setFromPlace}
-            placeholder="e.g. Vancouver, BC"
-            savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
-          {fromPlace && (
-            <button className="btn-save-place" title="Save this location"
-              onClick={() => setSavingFor(savingFor === "from" ? null : "from")}>💾</button>
-          )}
+          <div className="route-place-label">From</div>
+          <div className="route-place-input-row">
+            <div className="route-place-wrap">
+              <PlaceInput value={fromPlace} onSelect={setFromPlace}
+                placeholder="e.g. Vancouver, BC"
+                savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+            </div>
+            {fromPlace && (
+              <button className="btn-save-place" title="Save this location"
+                onClick={() => setSavingFor(savingFor === "from" ? null : "from")}>💾</button>
+            )}
+          </div>
           {savingFor === "from" && (
             <SavePlacePanel
               onSave={(emoji, label) => handleSavePlace(fromPlace, emoji, label)}
@@ -547,13 +554,18 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
 
         {/* To */}
         <div className="route-place-with-save">
-          <PlaceInput label="To" value={toPlace} onSelect={setToPlace}
-            placeholder="e.g. Whistler, BC"
-            savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
-          {toPlace && (
-            <button className="btn-save-place" title="Save this location"
-              onClick={() => setSavingFor(savingFor === "to" ? null : "to")}>💾</button>
-          )}
+          <div className="route-place-label">To</div>
+          <div className="route-place-input-row">
+            <div className="route-place-wrap">
+              <PlaceInput value={toPlace} onSelect={setToPlace}
+                placeholder="e.g. Whistler, BC"
+                savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+            </div>
+            {toPlace && (
+              <button className="btn-save-place" title="Save this location"
+                onClick={() => setSavingFor(savingFor === "to" ? null : "to")}>💾</button>
+            )}
+          </div>
           {savingFor === "to" && (
             <SavePlacePanel
               onSave={(emoji, label) => handleSavePlace(toPlace, emoji, label)}
@@ -643,6 +655,29 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Card discount toggle */}
+          <div className="route-card-toggle-row">
+            {selectedCards.length > 0 ? (
+              <>
+                <button
+                  className={`btn-card-toggle ${showCardDiscounts ? "btn-card-toggle-on" : ""}`}
+                  onClick={() => setShowCardDiscounts((o) => !o)}>
+                  💳 {showCardDiscounts ? "Card prices ON" : "Card prices"}
+                </button>
+                {showCardDiscounts && (
+                  <span className="route-add-card-hint">Showing best discount per station</span>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="route-add-card-hint">Have a gas rewards card?</span>
+                <button className="btn-route-add-card" onClick={onOpenProfile}>
+                  + Add card for discounts
+                </button>
+              </>
+            )}
           </div>
         </div>
 

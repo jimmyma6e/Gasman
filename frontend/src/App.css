@@ -307,10 +307,18 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Route Tab ── */
 .route-tab { display: flex; flex-direction: column; gap: 16px; }
 
-.route-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-.route-place-wrap { position: relative; flex: 1; min-width: 0; }
+.route-form { display: flex; flex-direction: column; gap: 10px; }
+/* Each from/to row: label above, input + 💾 button side by side */
+.route-place-with-save { width: 100%; }
+.route-place-input-row { display: flex; align-items: stretch; gap: 6px; }
+.route-place-input-row .route-place-wrap { flex: 1; min-width: 0; }
+.btn-save-place { flex-shrink: 0; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); padding: 0 12px; border-radius: 8px; font-size: 0.9rem;
+  cursor: pointer; transition: all 0.15s; }
+.btn-save-place:hover { border-color: var(--accent); color: var(--accent); }
+.route-place-wrap { position: relative; width: 100%; }
 .route-place-label { display: block; font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
-.route-place-input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
+.route-place-input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; outline: none; transition: border-color 0.15s; box-sizing: border-box; }
 .route-place-input:focus { border-color: var(--accent); }
 .route-suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 9999; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); overflow: hidden; }
 .route-suggestion-item { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 0.83rem; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
@@ -348,10 +356,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-results-note { font-size: 0.75rem; color: var(--text-dim); padding-top: 4px; }
 
 /* ── Saved places ── */
-.route-place-with-save { position: relative; flex: 1; min-width: 180px; }
-.btn-save-place { position: absolute; top: 0; right: 0; background: none; border: none;
-  font-size: 0.9rem; cursor: pointer; color: var(--text-dim); padding: 0 2px; transition: color 0.15s; }
-.btn-save-place:hover { color: var(--accent); }
+.save-place-panel { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 10px 12px; margin-top: 6px; }
 .save-place-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 9998;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -745,11 +751,19 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   line-height: 1.4; }
 
 /* Vehicle section inside form */
-.route-vehicle-section { display: flex; flex-direction: column; gap: 6px; }
-.route-vehicle-header { display: flex; align-items: center; justify-content: space-between; }
-.route-vehicle-name-tag { color: var(--text-dim); font-weight: 400; }
-.consumption-presets-inline { display: flex; gap: 4px; }
-.consumption-presets-inline .consumption-preset { padding: 6px 8px; font-size: 0.75rem; }
+.route-vehicle-section { display: flex; flex-direction: column; gap: 8px; }
+.route-consumption-input-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.route-fill-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-top: 4px; border-top: 1px solid var(--border); }
+.route-fill-inputs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Card discount toggle inside route form */
+.route-card-toggle-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding-top: 4px; border-top: 1px solid var(--border); }
+.route-add-card-hint { font-size: 0.78rem; color: var(--text-dim); }
+.btn-route-add-card { background: none; border: 1px dashed var(--border); color: var(--accent);
+  font-size: 0.78rem; padding: 4px 10px; border-radius: 7px; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap; }
+.btn-route-add-card:hover { border-color: var(--accent); background: rgba(249,115,22,0.07); }
 
 /* Brand preference — collapsible */
 .route-brand-pref-wrap { border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
@@ -822,6 +836,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .vehicle-economy { font-size: 0.78rem; color: var(--text-dim); }
 .vehicle-check { font-size: 0.78rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
   white-space: nowrap; }
+.btn-vehicle-edit { background: none; border: none; color: var(--text-dim); font-size: 0.95rem;
+  cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: color 0.15s; flex-shrink: 0; line-height: 1; }
+.btn-vehicle-edit:hover { color: var(--accent); }
 
 /* ── Add vehicle form ── */
 .vehicle-add-form { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
