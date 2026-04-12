@@ -1,14 +1,39 @@
 // Canadian credit card gas discount data
-// Two benefit types:
-//   "partner"  — fixed cents/litre at specific station brands
-//   "cashback" — percentage back at any station (converted to effective ¢/L at display time)
+// Three benefit types:
+//   "partner"  — fixed ¢/L at specific station brands only
+//   "cashback" — % back at any station (converted to effective ¢/L)
+//   "combo"    — partner discount at specific brands + cashback anywhere (stacked)
 
 export const CREDIT_CARDS = [
-  // ── Partner discounts ────────────────────────────────────────────────────────
+  // ── Combo cards (partner discount + cashback, stacked) ───────────────────────
+  {
+    id: "rbc-avion-petro",
+    bank: "RBC",
+    name: "RBC Avion Visa Infinite",
+    type: "combo",
+    discount_cpl: 3,
+    partner_brands: ["Petro-Canada"],
+    cashback_pct: 1.5,
+    color: "#005daa",
+    note: "3¢/L at Petro-Canada + 1.5% Avion pts anywhere",
+  },
+  {
+    id: "cibc-dividend-journie",
+    bank: "CIBC",
+    name: "CIBC Dividend + Journie",
+    type: "combo",
+    discount_cpl: 3,
+    partner_brands: ["Fas Gas", "Chevron", "Ultramar"],
+    cashback_pct: 4,
+    color: "#c41230",
+    note: "4% cashback + 3¢/L at Fas Gas, Chevron & Ultramar",
+  },
+
+  // ── Partner discounts (fixed ¢/L at specific brands only) ───────────────────
   {
     id: "rbc-petro",
     bank: "RBC",
-    name: "RBC Credit Card",
+    name: "RBC Credit Card (basic)",
     type: "partner",
     discount_cpl: 3,
     partner_brands: ["Petro-Canada"],
@@ -18,12 +43,12 @@ export const CREDIT_CARDS = [
   {
     id: "cibc-journie",
     bank: "CIBC",
-    name: "CIBC + Journie Rewards",
+    name: "CIBC + Journie only",
     type: "partner",
     discount_cpl: 3,
     partner_brands: ["Fas Gas", "Chevron", "Ultramar"],
     color: "#c41230",
-    note: "3¢/L at Fas Gas, Chevron & Ultramar",
+    note: "3¢/L at Fas Gas, Chevron & Ultramar (no cashback)",
   },
   {
     id: "ct-triangle",
@@ -46,7 +71,7 @@ export const CREDIT_CARDS = [
     note: "~7¢/L in PC Optimum points at Esso",
   },
 
-  // ── General cashback (any station) ──────────────────────────────────────────
+  // ── General cashback (% back at any station) ─────────────────────────────────
   {
     id: "cibc-dividend-infinite",
     bank: "CIBC",
@@ -68,7 +93,7 @@ export const CREDIT_CARDS = [
   {
     id: "bmo-cashback-world-elite",
     bank: "BMO",
-    name: "BMO CashBack World Elite Mastercard",
+    name: "BMO CashBack World Elite MC",
     type: "cashback",
     cashback_pct: 3,
     color: "#0079c1",
@@ -113,7 +138,7 @@ export const CREDIT_CARDS = [
   {
     id: "simplii-cashback",
     bank: "Simplii",
-    name: "Simplii Financial Cash Back Visa",
+    name: "Simplii Cash Back Visa",
     type: "cashback",
     cashback_pct: 1.5,
     color: "#e51b24",
@@ -139,22 +164,37 @@ export const CREDIT_CARDS = [
   },
 ];
 
-// Effective savings in ¢/L for a given card and pump price
-export function effectiveSavings(card, priceCpl) {
+// Effective savings in ¢/L for a card at a given price.
+// atPartnerBrand matters for combo cards (stacks partner + cashback).
+export function effectiveSavings(card, priceCpl, atPartnerBrand = false) {
   if (card.type === "partner") return card.discount_cpl;
-  return Math.round(priceCpl * (card.cashback_pct / 100) * 10) / 10;
+  const cashback = Math.round(priceCpl * (card.cashback_pct / 100) * 10) / 10;
+  if (card.type === "cashback") return cashback;
+  if (card.type === "combo") {
+    // At a partner brand: stack the fixed ¢/L discount on top of cashback
+    if (atPartnerBrand) return Math.round((card.discount_cpl + cashback) * 10) / 10;
+    return cashback;
+  }
+  return 0;
 }
 
-// Best applicable card + savings for a station (highest savings wins)
-// partner cards only apply to their listed brands; cashback applies everywhere
+// Best applicable card + savings for a station.
+// Returns { card, savings, atPartner } or null.
 export function bestCardSavings(selectedCardIds, priceCpl, stationBrand) {
   if (!selectedCardIds || !selectedCardIds.length || !priceCpl) return null;
   let best = null;
   for (const card of CREDIT_CARDS) {
     if (!selectedCardIds.includes(card.id)) continue;
-    if (card.type === "partner" && !card.partner_brands.includes(stationBrand)) continue;
-    const savings = effectiveSavings(card, priceCpl);
-    if (!best || savings > best.savings) best = { card, savings };
+
+    let atPartner = false;
+    if (card.type === "partner") {
+      if (!card.partner_brands.includes(stationBrand)) continue; // not applicable
+    } else if (card.type === "combo") {
+      atPartner = card.partner_brands.includes(stationBrand);
+    }
+
+    const savings = effectiveSavings(card, priceCpl, atPartner);
+    if (!best || savings > best.savings) best = { card, savings, atPartner };
   }
-  return best; // { card, savings } or null
+  return best;
 }

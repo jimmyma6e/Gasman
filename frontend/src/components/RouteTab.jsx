@@ -338,7 +338,7 @@ const POPULAR_BRANDS_RT = [
 
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts, fillLitres }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts, fillLitres: fillLitresProp }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -358,19 +358,39 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
   const [savingFor, setSavingFor]   = useState(null);  // "from" | "to" | null
   const [saveLabel, setSaveLabel]   = useState("");
 
-  // Vehicle consumption — read active vehicle first, fallback to raw gasman-consumption
+  // Saved vehicles
+  const [vehicles, setVehicles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-vehicles") || "[]"); }
+    catch { return []; }
+  });
+  const [activeVehicleId, setActiveVehicleId] = useState(
+    () => localStorage.getItem("gasman-active-vehicle") || null
+  );
+  const activeVehicle = vehicles.find((v) => v.id === activeVehicleId) || null;
+
+  function pickVehicle(v) {
+    setActiveVehicleId(v.id);
+    setConsumption(v.l100km);
+    localStorage.setItem("gasman-active-vehicle", v.id);
+    localStorage.setItem("gasman-consumption", String(v.l100km));
+  }
+
+  // Vehicle consumption — init from active vehicle or localStorage
   const [consumption, setConsumption] = useState(() => {
     const activeId = localStorage.getItem("gasman-active-vehicle");
     if (activeId) {
       try {
-        const vehicles = JSON.parse(localStorage.getItem("gasman-vehicles") || "[]");
-        const active = vehicles.find((v) => v.id === activeId);
+        const vs = JSON.parse(localStorage.getItem("gasman-vehicles") || "[]");
+        const active = vs.find((v) => v.id === activeId);
         if (active?.l100km > 0) return active.l100km;
       } catch { /* fall through */ }
     }
     const v = parseFloat(localStorage.getItem("gasman-consumption"));
     return isNaN(v) || v <= 0 ? 10 : v;
   });
+
+  // Local fill litres — init from All Stations prop, kept in sync
+  const [fillLitres, setFillLitres] = useState(fillLitresProp || "");
 
   const [savingRoute, setSavingRoute] = useState(false);
   const [routeLabel, setRouteLabel]   = useState("");
@@ -381,17 +401,6 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
     catch { return new Set(); }
   });
   const [brandPrefOpen, setBrandPrefOpen] = useState(false);
-
-  // Active vehicle display name (read once on mount)
-  const [vehicleLabel] = useState(() => {
-    const activeId = localStorage.getItem("gasman-active-vehicle");
-    if (!activeId) return null;
-    try {
-      const vehicles = JSON.parse(localStorage.getItem("gasman-vehicles") || "[]");
-      const v = vehicles.find((vv) => vv.id === activeId);
-      return v ? `${v.icon} ${v.name}` : null;
-    } catch { return null; }
-  });
 
   const markerRefs = useRef({});
 
@@ -586,12 +595,21 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
           {ROUTE_MODES.find((m) => m.id === routeMode)?.hint}
         </p>
 
-        {/* Vehicle consumption */}
+        {/* Vehicle picker */}
         <div className="route-vehicle-section">
-          <label className="route-place-label">
-            Your vehicle
-            {vehicleLabel && <span className="route-vehicle-name-tag"> · {vehicleLabel}</span>}
-          </label>
+          <label className="route-place-label">Your vehicle</label>
+          {vehicles.length > 0 && (
+            <div className="route-vehicle-chips">
+              {vehicles.map((v) => (
+                <button key={v.id}
+                  className={`route-vehicle-chip ${activeVehicle?.id === v.id ? "route-vehicle-chip-active" : ""}`}
+                  onClick={() => pickVehicle(v)}>
+                  {v.icon} {v.name}
+                  <span className="route-vehicle-chip-l100">{v.l100km}L</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="route-consumption-input-wrap">
             <input id="route-consumption" className="route-consumption-input"
               type="number" min="1" max="40" step="0.5" value={consumption}
@@ -603,6 +621,28 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
                 }
               }} />
             <span className="route-consumption-unit">L/100km</span>
+          </div>
+
+          {/* Fill litres */}
+          <div className="route-fill-row">
+            <span className="route-place-label" style={{ marginBottom: 0 }}>⛽ Fill at pump</span>
+            <div className="route-fill-inputs">
+              <input
+                type="number"
+                className="route-consumption-input"
+                placeholder="—"
+                min={1} max={200} step={5}
+                value={fillLitres}
+                onChange={(e) => setFillLitres(e.target.value)}
+              />
+              <span className="route-consumption-unit">L</span>
+              {activeVehicle?.tank_litres && (
+                <button className="btn-fill-tank"
+                  onClick={() => setFillLitres(String(activeVehicle.tank_litres))}>
+                  Full tank ({activeVehicle.tank_litres}L)
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -710,7 +750,16 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
             const lo = Math.min(...costs).toFixed(2);
             const hi = Math.max(...costs).toFixed(2);
             return (
-              <span>💰 ~<strong>{lo === hi ? `$${lo}` : `$${lo}–$${hi}`}</strong> for full trip</span>
+              <span>💰 ~<strong>{lo === hi ? `$${lo}` : `$${lo}–$${hi}`}</strong> trip fuel</span>
+            );
+          })()}
+          {parseFloat(fillLitres) > 0 && results?.length > 0 && (() => {
+            const litres = parseFloat(fillLitres);
+            const prices = results.map((s) => s[fuelType]?.price || 0).filter(Boolean);
+            const lo = (Math.min(...prices) * litres / 100).toFixed(2);
+            const hi = (Math.max(...prices) * litres / 100).toFixed(2);
+            return (
+              <span>⛽ Fill {litres}L: ~<strong>{lo === hi ? `$${lo}` : `$${lo}–$${hi}`}</strong></span>
             );
           })()}
         </div>

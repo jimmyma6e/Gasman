@@ -617,21 +617,22 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .profile-vehicle-presets { display: flex; flex-wrap: wrap; gap: 8px; }
 .profile-tip-text { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 10px; }
 
-/* ── Card Manager (accordion) ── */
-.card-bank-group { margin-bottom: 6px; }
-.card-bank-header { width: 100%; display: flex; align-items: center; justify-content: space-between;
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 9px;
-  padding: 9px 12px; cursor: pointer; text-align: left; transition: all 0.15s; }
-.card-bank-header:hover { border-color: var(--accent); }
-.card-bank-has-active { border-color: var(--accent); background: rgba(249,115,22,0.05); }
-.card-bank-name { font-size: 0.87rem; font-weight: 600; color: var(--text); }
-.card-bank-right { display: flex; align-items: center; gap: 8px; }
-.card-bank-count { font-size: 0.72rem; background: var(--accent); color: #fff;
-  border-radius: 20px; padding: 1px 7px; font-weight: 600; }
-.card-bank-arrow { font-size: 0.72rem; color: var(--text-dim); }
-.card-bank-panel { border: 1px solid var(--border); border-top: none;
-  border-radius: 0 0 9px 9px; padding: 6px 8px 8px; margin-top: -2px;
-  background: var(--surface); }
+/* ── Card Manager — bank chip grid ── */
+.card-bank-chips-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.card-bank-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px;
+  border: 1.5px solid var(--border); border-radius: 20px; background: var(--surface2);
+  cursor: pointer; font-size: 0.79rem; font-weight: 500; color: var(--text-dim);
+  transition: all 0.15s; white-space: nowrap; }
+.card-bank-chip:hover { border-color: var(--text-dim); color: var(--text); }
+.card-bank-chip-open { border-color: var(--accent) !important; color: var(--text);
+  background: rgba(249,115,22,0.07); }
+.card-bank-chip-has { color: var(--text); font-weight: 600; }
+.card-bank-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.card-bank-chip-name { }
+.card-bank-chip-count { font-size: 0.68rem; color: #fff; border-radius: 20px;
+  padding: 1px 6px; font-weight: 700; margin-left: 2px; }
+.card-bank-panel { border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px; background: var(--surface); margin-bottom: 4px; }
 .card-row { width: 100%; display: flex; align-items: center; justify-content: space-between;
   background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
   padding: 8px 10px; margin-bottom: 4px; cursor: pointer; text-align: left;
@@ -644,6 +645,30 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .card-row-name { font-size: 0.84rem; font-weight: 600; color: var(--text); }
 .card-row-note { font-size: 0.72rem; color: var(--text-dim); margin-top: 1px; }
 .card-row-check { color: var(--accent); font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+
+/* ── Combo card badge ── */
+.card-type-badge { font-size: 0.62rem; font-weight: 700; border-radius: 4px;
+  padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+.card-type-combo { background: rgba(249,115,22,0.15); color: var(--accent); }
+
+/* ── Route Finder — vehicle chips ── */
+.route-vehicle-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.route-vehicle-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px;
+  border: 1.5px solid var(--border); border-radius: 20px; background: var(--surface2);
+  cursor: pointer; font-size: 0.81rem; color: var(--text-dim); transition: all 0.15s; }
+.route-vehicle-chip:hover { border-color: var(--accent); }
+.route-vehicle-chip-active { border-color: var(--accent); color: var(--text);
+  background: rgba(249,115,22,0.08); font-weight: 600; }
+.route-vehicle-chip-l100 { font-size: 0.7rem; color: var(--text-dim); margin-left: 2px; }
+
+/* ── Route Finder — fill at pump row ── */
+.route-fill-row { display: flex; align-items: center; gap: 12px; margin-top: 10px;
+  flex-wrap: wrap; }
+.route-fill-inputs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.btn-fill-tank { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 7px;
+  background: rgba(249,115,22,0.08); color: var(--accent); font-size: 0.76rem;
+  font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-fill-tank:hover { background: rgba(249,115,22,0.18); }
 
 /* ── Card discount toggle (All Stations toolbar) ── */
 .btn-card-toggle { background: var(--surface2); border: 1px solid var(--border);

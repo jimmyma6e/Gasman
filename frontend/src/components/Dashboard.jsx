@@ -182,6 +182,7 @@ function VehicleManager() {
   const [adding, setAdding]     = useState(false);
   const [newName, setNewName]   = useState("");
   const [newL100, setNewL100]   = useState("10");
+  const [newTank, setNewTank]   = useState("");
   const [newIcon, setNewIcon]   = useState("🚗");
   const [showTip, setShowTip]   = useState(false);
 
@@ -194,18 +195,20 @@ function VehicleManager() {
   function addVehicle() {
     const l100km = parseFloat(newL100);
     if (!newName.trim() || isNaN(l100km) || l100km <= 0) return;
+    const tank_litres = parseFloat(newTank) > 0 ? parseFloat(newTank) : undefined;
     const entry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       name: newName.trim(),
       icon: newIcon,
       l100km,
+      ...(tank_litres ? { tank_litres } : {}),
     };
     const next = [...vehicles, entry];
     setVehicles(next);
     localStorage.setItem("gasman-vehicles", JSON.stringify(next));
     selectVehicle(entry);
     setAdding(false);
-    setNewName(""); setNewL100("10"); setNewIcon("🚗");
+    setNewName(""); setNewL100("10"); setNewTank(""); setNewIcon("🚗");
   }
 
   function deleteVehicle(id) {
@@ -245,7 +248,9 @@ function VehicleManager() {
               <span className="vehicle-icon-display">{v.icon}</span>
               <div className="vehicle-info">
                 <span className="vehicle-name">{v.name}</span>
-                <span className="vehicle-economy">{v.l100km} L/100km</span>
+                <span className="vehicle-economy">
+                  {v.l100km} L/100km{v.tank_litres ? ` · ${v.tank_litres}L tank` : ""}
+                </span>
               </div>
               {activeId === v.id && <span className="vehicle-check">✓ Active</span>}
               <button className="btn-delete-snapshot"
@@ -285,12 +290,20 @@ function VehicleManager() {
               onChange={(e) => setNewL100(e.target.value)} />
             <span className="profile-unit">L/100km</span>
           </div>
+          <div className="vehicle-economy-row" style={{ marginTop: 6 }}>
+            <span className="profile-unit" style={{ flexShrink: 0 }}>Full tank:</span>
+            <input type="number" className="route-save-input" style={{ width: 68 }}
+              placeholder="e.g. 50"
+              value={newTank} min={10} max={200} step={1}
+              onChange={(e) => setNewTank(e.target.value)} />
+            <span className="profile-unit">L (optional)</span>
+          </div>
           <div className="vehicle-add-actions">
             <button className="btn-refresh"
               disabled={!newName.trim() || !parseFloat(newL100)}
               onClick={addVehicle}>Add Vehicle</button>
             <button className="btn-clear-filters"
-              onClick={() => { setAdding(false); setNewName(""); setNewL100("10"); setNewIcon("🚗"); }}>
+              onClick={() => { setAdding(false); setNewName(""); setNewL100("10"); setNewTank(""); setNewIcon("🚗"); }}>
               Cancel
             </button>
           </div>
@@ -389,12 +402,70 @@ function AddPlaceForm({ onAdd, onCancel }) {
 
 // ── Card Manager ──────────────────────────────────────────────────────────────
 
+function CardPicker({ selectedIds, onToggle }) {
+  const [openBank, setOpenBank] = useState(null);
+
+  const byBank = CREDIT_CARDS.reduce((acc, c) => {
+    (acc[c.bank] = acc[c.bank] || []).push(c);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      {/* Bank chip grid */}
+      <div className="card-bank-chips-row">
+        {Object.entries(byBank).map(([bank, cards]) => {
+          const count = cards.filter((c) => selectedIds.includes(c.id)).length;
+          const isOpen = openBank === bank;
+          // Use the first card's color as the bank color indicator
+          const bankColor = cards[0].color;
+          return (
+            <button key={bank}
+              className={`card-bank-chip ${isOpen ? "card-bank-chip-open" : ""} ${count > 0 ? "card-bank-chip-has" : ""}`}
+              style={count > 0 ? { borderColor: bankColor } : {}}
+              onClick={() => setOpenBank(isOpen ? null : bank)}>
+              <span className="card-bank-chip-dot" style={{ background: bankColor }} />
+              <span className="card-bank-chip-name">{bank}</span>
+              {count > 0 && <span className="card-bank-chip-count" style={{ background: bankColor }}>{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Card list for selected bank */}
+      {openBank && byBank[openBank] && (
+        <div className="card-bank-panel">
+          {byBank[openBank].map((c) => {
+            const active = selectedIds.includes(c.id);
+            return (
+              <button key={c.id}
+                className={`card-row ${active ? "card-row-active" : ""}`}
+                onClick={() => onToggle(c.id)}>
+                <div className="card-row-left">
+                  <span className="card-color-dot" style={{ background: c.color }} />
+                  <div>
+                    <div className="card-row-name">
+                      {c.name}
+                      {c.type === "combo" && <span className="card-type-badge card-type-combo">combo</span>}
+                    </div>
+                    <div className="card-row-note">{c.note}</div>
+                  </div>
+                </div>
+                {active && <span className="card-row-check">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CardManager() {
   const [selectedIds, setSelectedIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-cards") || "[]"); }
     catch { return []; }
   });
-  const [openBank, setOpenBank] = useState(null);
 
   function toggle(id) {
     setSelectedIds((prev) => {
@@ -404,53 +475,14 @@ function CardManager() {
     });
   }
 
-  const byBank = CREDIT_CARDS.reduce((acc, c) => {
-    (acc[c.bank] = acc[c.bank] || []).push(c);
-    return acc;
-  }, {});
-
   return (
     <div>
       <h3 className="profile-section-label">💳 My Credit Cards</h3>
-      <p className="profile-tip-text">Select cards you own to see discounted prices at eligible stations.</p>
-      {Object.entries(byBank).map(([bank, cards]) => {
-        const activeCount = cards.filter((c) => selectedIds.includes(c.id)).length;
-        const isOpen = openBank === bank;
-        return (
-          <div key={bank} className="card-bank-group">
-            <button
-              className={`card-bank-header ${activeCount > 0 ? "card-bank-has-active" : ""}`}
-              onClick={() => setOpenBank(isOpen ? null : bank)}>
-              <span className="card-bank-name">{bank}</span>
-              <span className="card-bank-right">
-                {activeCount > 0 && <span className="card-bank-count">{activeCount} selected</span>}
-                <span className="card-bank-arrow">{isOpen ? "▴" : "▾"}</span>
-              </span>
-            </button>
-            {isOpen && (
-              <div className="card-bank-panel">
-                {cards.map((c) => {
-                  const active = selectedIds.includes(c.id);
-                  return (
-                    <button key={c.id}
-                      className={`card-row ${active ? "card-row-active" : ""}`}
-                      onClick={() => toggle(c.id)}>
-                      <div className="card-row-left">
-                        <span className="card-color-dot" style={{ background: c.color }} />
-                        <div>
-                          <div className="card-row-name">{c.name}</div>
-                          <div className="card-row-note">{c.note}</div>
-                        </div>
-                      </div>
-                      {active && <span className="card-row-check">✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <p className="profile-tip-text">
+        Tap a bank to see its cards. Select any you own to see discounted prices.
+        {selectedIds.length > 0 && <strong> {selectedIds.length} selected.</strong>}
+      </p>
+      <CardPicker selectedIds={selectedIds} onToggle={toggle} />
     </div>
   );
 }

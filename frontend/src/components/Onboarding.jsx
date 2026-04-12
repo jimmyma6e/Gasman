@@ -8,11 +8,60 @@ const VEHICLE_PRESETS = [
   { icon: "🛻", label: "Truck",    l100km: 14 },
 ];
 
-// Group cards by bank for the onboarding picker
 const CARDS_BY_BANK = CREDIT_CARDS.reduce((acc, c) => {
   (acc[c.bank] = acc[c.bank] || []).push(c);
   return acc;
 }, {});
+
+// Reusable bank-chip card picker (same UX as Profile modal)
+function CardPicker({ selectedIds, onToggle }) {
+  const [openBank, setOpenBank] = useState(null);
+  return (
+    <div>
+      <div className="card-bank-chips-row">
+        {Object.entries(CARDS_BY_BANK).map(([bank, cards]) => {
+          const count = cards.filter((c) => selectedIds.includes(c.id)).length;
+          const isOpen = openBank === bank;
+          const bankColor = cards[0].color;
+          return (
+            <button key={bank}
+              className={`card-bank-chip ${isOpen ? "card-bank-chip-open" : ""} ${count > 0 ? "card-bank-chip-has" : ""}`}
+              style={count > 0 ? { borderColor: bankColor } : {}}
+              onClick={() => setOpenBank(isOpen ? null : bank)}>
+              <span className="card-bank-chip-dot" style={{ background: bankColor }} />
+              <span className="card-bank-chip-name">{bank}</span>
+              {count > 0 && <span className="card-bank-chip-count" style={{ background: bankColor }}>{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+      {openBank && CARDS_BY_BANK[openBank] && (
+        <div className="card-bank-panel">
+          {CARDS_BY_BANK[openBank].map((c) => {
+            const active = selectedIds.includes(c.id);
+            return (
+              <button key={c.id}
+                className={`card-row ${active ? "card-row-active" : ""}`}
+                onClick={() => onToggle(c.id)}>
+                <div className="card-row-left">
+                  <span className="card-color-dot" style={{ background: c.color }} />
+                  <div>
+                    <div className="card-row-name">
+                      {c.name}
+                      {c.type === "combo" && <span className="card-type-badge card-type-combo">combo</span>}
+                    </div>
+                    <div className="card-row-note">{c.note}</div>
+                  </div>
+                </div>
+                {active && <span className="card-row-check">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Onboarding({ onDone }) {
   const [step, setStep] = useState(0);
@@ -164,53 +213,15 @@ export default function Onboarding({ onDone }) {
             </div>
 
             <div className="onboard-card-section">
-              <h2 className="onboard-section-title">💳 Do you have a gas rewards card?</h2>
+              <h2 className="onboard-section-title">💳 Gas rewards cards?</h2>
               <p className="onboard-section-sub">
-                Select any cards you own — we'll show your effective price after cashback or partner discounts.
+                Tap a bank to see its cards. Select any you own — we'll show your effective discounted price.
                 {selectedCardIds.length > 0 && (
-                  <span className="onboard-card-count"> {selectedCardIds.length} selected</span>
+                  <span className="onboard-card-count"> {selectedCardIds.length} selected.</span>
                 )}
               </p>
-
               <div className="onboard-card-scroll">
-                {Object.entries(CARDS_BY_BANK).map(([bank, cards]) => {
-                  const activeCount = cards.filter((c) => selectedCardIds.includes(c.id)).length;
-                  const isOpen = openBank === bank;
-                  return (
-                    <div key={bank} className="card-bank-group">
-                      <button
-                        className={`card-bank-header ${activeCount > 0 ? "card-bank-has-active" : ""}`}
-                        onClick={() => setOpenBank(isOpen ? null : bank)}>
-                        <span className="card-bank-name">{bank}</span>
-                        <span className="card-bank-right">
-                          {activeCount > 0 && <span className="card-bank-count">{activeCount} selected</span>}
-                          <span className="card-bank-arrow">{isOpen ? "▴" : "▾"}</span>
-                        </span>
-                      </button>
-                      {isOpen && (
-                        <div className="card-bank-panel">
-                          {cards.map((c) => {
-                            const active = selectedCardIds.includes(c.id);
-                            return (
-                              <button key={c.id}
-                                className={`card-row ${active ? "card-row-active" : ""}`}
-                                onClick={() => toggleCard(c.id)}>
-                                <div className="card-row-left">
-                                  <span className="card-color-dot" style={{ background: c.color }} />
-                                  <div>
-                                    <div className="card-row-name">{c.name}</div>
-                                    <div className="card-row-note">{c.note}</div>
-                                  </div>
-                                </div>
-                                {active && <span className="card-row-check">✓</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                <CardPicker selectedIds={selectedCardIds} onToggle={toggleCard} />
               </div>
             </div>
 
