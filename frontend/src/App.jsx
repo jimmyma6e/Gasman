@@ -538,9 +538,33 @@ export default function App() {
   // PostHog — fire on every tab change including first render (no duplicate risk).
   useEffect(() => {
     const path = TAB_PATHS[tab] || "/";
-    console.log("[PostHog] capturing $pageview for tab:", tab, path);
-    posthog.capture("$pageview", { $current_url: window.location.origin + path });
+    posthog.capture("$pageview", { $current_url: window.location.origin + path, tab });
   }, [tab]);
+
+  // Track last station_view to avoid duplicate fires when clicking the same card twice
+  const lastViewedStation = useRef(null);
+
+  function handleSelectStation(station, rank) {
+    setSelectedStation(station);
+    if (!station || lastViewedStation.current === station.station_id) return;
+    lastViewedStation.current = station.station_id;
+    const price = station[activeFuel]?.price ?? null;
+    posthog.capture("station_view", {
+      station_id:   station.station_id,
+      station_name: station.name,
+      price,
+      rank,
+      is_featured:  station.is_featured ?? false,
+    });
+    if (station.is_featured) {
+      posthog.capture("featured_station_click", {
+        station_id:   station.station_id,
+        station_name: station.name,
+        position:     rank,
+        price,
+      });
+    }
+  }
 
   // Close area dropdown on outside click
   useEffect(() => {
@@ -983,11 +1007,11 @@ export default function App() {
 
             {viewMode === "card" && (
               <div className="grid">
-                {sorted.map((station) => (
+                {sorted.map((station, i) => (
                   <div
                     key={station.station_id}
                     className={selectedStation?.station_id === station.station_id ? "card-selected" : ""}
-                    onClick={() => setSelectedStation(station)}
+                    onClick={() => handleSelectStation(station, i + 1)}
                   >
                   <StationCard
                     station={station}
@@ -1009,14 +1033,14 @@ export default function App() {
 
             {viewMode === "compact" && (
               <div className="compact-list">
-                {sorted.map((station) => {
+                {sorted.map((station, i) => {
                   const fuelData = station[activeFuel];
                   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
                   const delta = station.price_delta?.[activeFuel];
                   const isFav = favourites.includes(station.station_id);
                   const isSelected = selectedStation?.station_id === station.station_id;
                   return (
-                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => setSelectedStation(station)}>
+                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => handleSelectStation(station, i + 1)}>
                       <button
                         className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
                         onClick={() => toggleFavourite(station.station_id)}

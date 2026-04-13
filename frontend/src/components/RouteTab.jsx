@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import posthog from "posthog-js";
 import { bestCardSavings } from "../creditCards.js";
 
 const FUEL_TYPES = [
@@ -462,7 +463,19 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
         .filter((s) => s.detour <= DETOUR_THRESHOLD_KM)
         .sort((a, b) => a.effective - b.effective);
 
-      setResults(candidates.slice(0, 10));
+      const top = candidates.slice(0, 10);
+      setResults(top);
+
+      // Analytics: route_search fires once per search, after results are known
+      const prices = top.map((s) => s[fuelType]?.price).filter(Boolean);
+      posthog.capture("route_search", {
+        origin:            fromPlace.display_name,
+        destination:       toPlace.display_name,
+        stations_found:    top.length,
+        estimated_savings: prices.length > 1
+          ? Math.round((Math.max(...prices) - Math.min(...prices)) * 10) / 10
+          : 0,
+      });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -494,7 +507,26 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
   }, []);
 
   function handleSelectStation(s) {
-    setSelectedStation((prev) => prev?.station_id === s.station_id ? null : s);
+    const wasSelected = selectedStation?.station_id === s.station_id;
+    setSelectedStation(wasSelected ? null : s);
+    if (wasSelected) return; // deselect — don't re-fire
+    const rank = results ? results.indexOf(s) + 1 : null;
+    const price = s[fuelType]?.price ?? null;
+    posthog.capture("station_view", {
+      station_id:   s.station_id,
+      station_name: s.name,
+      price,
+      rank,
+      is_featured:  s.is_featured ?? false,
+    });
+    if (s.is_featured) {
+      posthog.capture("featured_station_click", {
+        station_id:   s.station_id,
+        station_name: s.name,
+        position:     rank,
+        price,
+      });
+    }
   }
 
   function toggleBrand(b) {
