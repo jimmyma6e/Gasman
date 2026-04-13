@@ -12,7 +12,7 @@
 import { useEffect } from "react";
 import posthog from "posthog-js";
 
-const POSTHOG_KEY  = import.meta.env.VITE_POSTHOG_KEY;
+const POSTHOG_KEY  = import.meta.env.VITE_POSTHOG_KEY  || "phc_BnKv7kR833Qfds7oojpoXXLShMNxoQjixsy7pV5iog5z";
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
 
 export default function PostHogProvider({ children }) {
