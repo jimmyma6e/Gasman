@@ -17,8 +17,13 @@ const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.
 
 export default function PostHogProvider({ children }) {
   useEffect(() => {
+    console.log("[PostHog] provider mounted. KEY present:", !!POSTHOG_KEY, "| already loaded:", !!posthog.__loaded);
+
     // Skip if no key configured or already initialised
-    if (!POSTHOG_KEY || posthog.__loaded) return;
+    if (!POSTHOG_KEY || posthog.__loaded) {
+      console.warn("[PostHog] skipping init — KEY missing or already loaded");
+      return;
+    }
 
     posthog.init(POSTHOG_KEY, {
       api_host: POSTHOG_HOST,
@@ -26,6 +31,14 @@ export default function PostHogProvider({ children }) {
       capture_pageview: false,   // we fire $pageview manually on tab changes
       capture_pageleave: true,
       autocapture: true,         // clicks, inputs, rage-clicks etc.
+      loaded: (ph) => {
+        console.log("[PostHog] init complete. Distinct ID:", ph.get_distinct_id());
+        // Expose on window for DevTools inspection
+        window.posthog = ph;
+        // Fire a test event to confirm delivery end-to-end
+        ph.capture("test_event", { source: "debug_init" });
+        console.log("[PostHog] test_event fired — check Network tab for POST to", POSTHOG_HOST);
+      },
     });
   }, []); // runs once on mount
 

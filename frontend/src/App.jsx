@@ -528,13 +528,17 @@ export default function App() {
     }
   }, [showProfile]);
 
-  // GA4 + PostHog — track virtual pageviews on tab changes.
-  // Skip first render: the gtag snippet in index.html already fires the initial page_view.
+  // GA4 — skip first render because index.html gtag snippet already fires the hit.
   const gaTabMounted = useRef(false);
   useEffect(() => {
     if (!gaTabMounted.current) { gaTabMounted.current = true; return; }
+    pageview(TAB_PATHS[tab] || "/");
+  }, [tab]);
+
+  // PostHog — fire on every tab change including first render (no duplicate risk).
+  useEffect(() => {
     const path = TAB_PATHS[tab] || "/";
-    pageview(path);
+    console.log("[PostHog] capturing $pageview for tab:", tab, path);
     posthog.capture("$pageview", { $current_url: window.location.origin + path });
   }, [tab]);
 
