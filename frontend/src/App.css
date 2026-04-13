@@ -436,8 +436,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .header-title h1 { font-size: 1.15rem; }
   .header-icon { font-size: 1.6rem; }
 
-  /* Main */
-  .main { padding: 12px 14px; }
+  /* Main — extra bottom padding so content clears the bottom nav */
+  .main { padding: 12px 14px 88px; }
 
   /* Search */
   .search-row { gap: 8px; }
@@ -924,3 +924,101 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .onboard-btn-skip { background: none; border: none; color: var(--text-dim); font-size: 0.84rem;
   cursor: pointer; padding: 6px; transition: color 0.15s; width: 100%; text-align: center; }
 .onboard-btn-skip:hover { color: var(--text); }
+
+/* ── Near Me ─────────────────────────────────────────────────────────────────── */
+.btn-near-me { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap; }
+.btn-near-me:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn-near-me-active { background: rgba(249,115,22,0.1); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.btn-near-me:disabled { opacity: 0.5; cursor: not-allowed; }
+.near-me-error { font-size: 0.75rem; color: var(--red); white-space: nowrap; }
+
+/* Distance badge on station card */
+.dist-badge { display: inline-block; margin-left: 6px; font-size: 0.68rem; font-weight: 600;
+  color: var(--accent); background: rgba(249,115,22,0.1); border-radius: 6px;
+  padding: 1px 5px; vertical-align: middle; }
+
+/* ── Fill-up button ───────────────────────────────────────────────────────────── */
+.btn-fillup { background: var(--accent); color: #fff; border: none; padding: 6px 11px;
+  border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: opacity 0.15s; white-space: nowrap; }
+.btn-fillup:hover { opacity: 0.85; }
+
+/* ── FillupModal ─────────────────────────────────────────────────────────────── */
+.fillup-modal { max-width: 480px; }
+.fillup-form { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+.fillup-field { display: flex; flex-direction: column; gap: 4px; }
+.fillup-label { font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
+  display: flex; align-items: center; gap: 8px; }
+.fillup-input { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px; font-size: 0.9rem; color: var(--text);
+  transition: border-color 0.15s; }
+.fillup-input:focus { outline: none; border-color: var(--accent); }
+.fillup-select { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px; font-size: 0.9rem; color: var(--text); }
+.fillup-hint { font-size: 0.73rem; color: var(--green); margin-top: 2px; }
+.fillup-total { background: rgba(249,115,22,0.07); border: 1px solid rgba(249,115,22,0.2);
+  border-radius: 8px; padding: 10px 14px; font-size: 0.9rem; }
+.fillup-total-sub { font-size: 0.75rem; color: var(--text-dim); margin-left: 6px; }
+.fillup-contrib-tag { font-size: 0.68rem; background: rgba(22,163,74,0.12); color: var(--green);
+  border-radius: 5px; padding: 1px 6px; font-weight: 600; }
+.fillup-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/* ── Fill-up list in Dashboard ───────────────────────────────────────────────── */
+.fillup-list { display: flex; flex-direction: column; gap: 8px; }
+.fillup-row { display: flex; align-items: flex-start; justify-content: space-between;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px 14px; gap: 10px; }
+.fillup-row-left { flex: 1; min-width: 0; }
+.fillup-row-station { font-size: 0.88rem; font-weight: 600; }
+.fillup-row-meta { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+.fillup-row-cost { font-size: 0.8rem; color: var(--green); font-weight: 600; margin-top: 2px; }
+.fillup-row-notes { font-size: 0.73rem; color: var(--text-dim); font-style: italic; margin-top: 2px; }
+.fillup-contrib-badge { display: inline-block; margin-left: 6px; font-size: 0.65rem;
+  color: var(--green); font-weight: 600; }
+
+/* ── Route savings banner ────────────────────────────────────────────────────── */
+.route-savings-banner { background: rgba(22,163,74,0.1); border: 1px solid rgba(22,163,74,0.25);
+  border-radius: 10px; padding: 10px 16px; font-size: 0.88rem; color: var(--green);
+  margin-bottom: 10px; text-align: center; }
+
+/* ── Log Fill-up button on route result rows ─────────────────────────────────── */
+.btn-route-fillup { background: var(--accent); color: #fff; border: none;
+  padding: 5px 10px; border-radius: 7px; font-size: 0.73rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; margin-top: 6px; transition: opacity 0.15s; }
+.btn-route-fillup:hover { opacity: 0.85; }
+
+/* ── Bottom navigation ───────────────────────────────────────────────────────── */
+.bottom-nav { display: none; }
+
+@media (max-width: 640px) {
+  /* Show bottom nav, hide top tabs */
+  .tabs-row { display: none; }
+  .bottom-nav {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .bottom-nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 2px; padding: 8px 4px; border: none; background: none;
+    color: var(--text-dim); cursor: pointer; transition: color 0.15s;
+    min-height: 56px;
+  }
+  .bottom-nav-active { color: var(--accent); }
+  .bottom-nav-icon { position: relative; font-size: 1.4rem; line-height: 1; }
+  .bottom-nav-label { font-size: 0.68rem; font-weight: 500; }
+  .bottom-nav-badge { position: absolute; top: -4px; right: -6px;
+    background: var(--accent); color: #fff; border-radius: 99px;
+    font-size: 0.55rem; font-weight: 700; padding: 1px 4px; min-width: 14px;
+    text-align: center; }
+
+  /* Larger touch targets on key interactive rows */
+  .compact-row { min-height: 52px; }
+  .brand-chip, .area-more-btn { min-height: 36px; padding: 7px 12px; }
+  .route-result-row { min-height: 64px; padding: 12px 10px; }
+
+  /* Route map below results on mobile */
+  .route-map-wrap { order: 2; }
+}

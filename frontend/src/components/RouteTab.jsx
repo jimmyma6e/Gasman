@@ -338,7 +338,7 @@ const POPULAR_BRANDS_RT = [
 
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts: showCardDiscountsProp, fillLitres: fillLitresProp, onOpenProfile }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts: showCardDiscountsProp, fillLitres: fillLitresProp, onOpenProfile, onLogFillup }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -886,10 +886,18 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
       )}
 
       {displayedResults?.length > 0 && (() => {
-        const maxCost = Math.max(...displayedResults.map((s) =>
-          calcTripCost(routeInfo?.distanceKm || 0, consumption, s[fuelType]?.price || 0)));
+        const allCosts = displayedResults.map((s) =>
+          calcTripCost(routeInfo?.distanceKm || 0, consumption, s[fuelType]?.price || 0));
+        const maxCost = Math.max(...allCosts);
+        const minCost = Math.min(...allCosts);
+        const topSaving = maxCost - minCost;
         return (
           <div className="route-results">
+            {topSaving >= 0.5 && (
+              <div className="route-savings-banner">
+                💸 You save <strong>${topSaving.toFixed(2)}</strong> by choosing the best station
+              </div>
+            )}
             <div className="route-results-header">
               <p className="route-results-title">
                 Best <strong>{fuelLabel}</strong> stations along your route
@@ -983,6 +991,13 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
                         );
                       })()}
                     </div>
+                    {onLogFillup && (
+                      <button className="btn-route-fillup"
+                        onClick={(e) => { e.stopPropagation(); onLogFillup(s, fuelType); }}
+                        title="Log a fill-up at this station">
+                        ⛽ Log Fill-up
+                      </button>
+                    )}
                   </div>
                 );
               })}

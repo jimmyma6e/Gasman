@@ -6,6 +6,8 @@ import MapView from "./components/MapView";
 import RouteTab from "./components/RouteTab";
 import Dashboard, { ProfileModal } from "./components/Dashboard";
 import Onboarding from "./components/Onboarding";
+import FillupModal from "./components/FillupModal";
+import BottomNav from "./components/BottomNav";
 import { bestCardSavings } from "./creditCards.js";
 import { pageview } from "./analytics.js";
 import posthog from "posthog-js";
@@ -182,6 +184,15 @@ function toggleSet(set, value) {
   return next;
 }
 
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // ---------- Trend Banner ----------
 function TrendBanner({ trend }) {
   if (!trend?.length) return null;
@@ -244,10 +255,13 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, userCoords, onLogFillup }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
+  const distKm = userCoords && station.latitude
+    ? haversineKm(userCoords.lat, userCoords.lng, station.latitude, station.longitude)
+    : null;
 
   return (
     <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
@@ -255,7 +269,12 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
 
       <div className="card-top">
         <div className="card-header">
-          <div className="station-name">{station.name}</div>
+          <div className="station-name">
+            {station.name}
+            {distKm != null && (
+              <span className="dist-badge">{distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`}</span>
+            )}
+          </div>
           <a
             className="station-address"
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
@@ -336,11 +355,15 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         )}
         <div className="card-footer-actions">
           {VALID_PRICE(fuelData?.price) && (
+            <button className="btn-fillup" onClick={(e) => { e.stopPropagation(); onLogFillup(station); }}
+              title="Log a fill-up at this station">⛽ Log Fill-up</button>
+          )}
+          {VALID_PRICE(fuelData?.price) && (
             <button className="btn-snapshot" onClick={() => onSnapshot(station, activeFuel)}
-              title="Save current price to My Dashboard">📷 Save price</button>
+              title="Snapshot price to My Dashboard">📷</button>
           )}
           <button className="btn-chart" onClick={() => onOpenChart(station)}>
-            📈 Price History
+            📈
           </button>
         </div>
       </div>
@@ -415,6 +438,48 @@ export default function App() {
   const [onboarded, setOnboarded] = useState(
     () => !!localStorage.getItem("gasman-onboarded")
   );
+
+  // Near Me
+  const [userCoords, setUserCoords] = useState(null);
+  const [nearMeLoading, setNearMeLoading] = useState(false);
+  const [nearMeError, setNearMeError] = useState(null);
+
+  const getNearMe = useCallback(() => {
+    if (!navigator.geolocation) { setNearMeError("not-supported"); return; }
+    setNearMeLoading(true); setNearMeError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setSortBy("distance");
+        setNearMeLoading(false);
+      },
+      () => { setNearMeError("denied"); setNearMeLoading(false); }
+    );
+  }, []);
+
+  // Fill-up log
+  const [fillups, setFillups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gasman-fillups") || "[]"); }
+    catch { return []; }
+  });
+  const [fillupTarget, setFillupTarget] = useState(null); // { station, fuelType }
+
+  const handleSaveFillup = useCallback((entry) => {
+    setFillups((prev) => {
+      const next = [entry, ...prev];
+      localStorage.setItem("gasman-fillups", JSON.stringify(next));
+      return next;
+    });
+    setFillupTarget(null);
+  }, []);
+
+  const handleDeleteFillup = useCallback((id) => {
+    setFillups((prev) => {
+      const next = prev.filter((f) => f.id !== id);
+      localStorage.setItem("gasman-fillups", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const handleSnapshot = useCallback((station, fuelType) => {
     const price = station[fuelType]?.price;
@@ -633,6 +698,11 @@ export default function App() {
     const bHas = VALID_PRICE(bPrice);
     if (aHas !== bHas) return aHas ? -1 : 1;
 
+    if (sortBy === "distance" && userCoords) {
+      const aDist = haversineKm(userCoords.lat, userCoords.lng, a.latitude, a.longitude);
+      const bDist = haversineKm(userCoords.lat, userCoords.lng, b.latitude, b.longitude);
+      return aDist - bDist;
+    }
     if (sortBy === "price") {
       return (aPrice ?? Infinity) - (bPrice ?? Infinity);
     }
@@ -701,7 +771,8 @@ export default function App() {
             selectedCards={selectedCards}
             showCardDiscounts={showCardDiscounts}
             fillLitres={fillLitres}
-            onOpenProfile={() => setShowProfile(true)} />
+            onOpenProfile={() => setShowProfile(true)}
+            onLogFillup={(s, ft) => setFillupTarget({ station: s, fuelType: ft })} />
         )}
 
         {/* Dashboard Tab */}
@@ -718,6 +789,8 @@ export default function App() {
             onDeleteRoute={handleDeleteRoute}
             onLaunchRoute={handleLaunchRoute}
             onNavigate={setTab}
+            fillups={fillups}
+            onDeleteFillup={handleDeleteFillup}
           />
         )}
 
@@ -891,6 +964,15 @@ export default function App() {
               </button>
             )}
             <button
+              className={`btn-near-me ${userCoords ? "btn-near-me-active" : ""}`}
+              onClick={userCoords ? () => { setUserCoords(null); setSortBy("price"); } : getNearMe}
+              title={userCoords ? "Clear Near Me" : "Find stations near you"}
+              disabled={nearMeLoading}
+            >
+              {nearMeLoading ? "Locating…" : userCoords ? "📍 Near Me ✓" : "📍 Near Me"}
+            </button>
+            {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
+            <button
               className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
               onClick={() => setShowMap((v) => !v)}
             >
@@ -904,6 +986,7 @@ export default function App() {
                   <option value="updated">Latest Update</option>
                   <option value="name">Name</option>
                   <option value="city">City / Area</option>
+                  {userCoords && <option value="distance">Distance</option>}
                 </select>
               </div>
             )}
@@ -1025,6 +1108,8 @@ export default function App() {
                     selectedCards={selectedCards}
                     showCardDiscounts={showCardDiscounts}
                     fillLitres={fillLitres}
+                    userCoords={userCoords}
+                    onLogFillup={(s) => setFillupTarget({ station: s, fuelType: activeFuel })}
                   />
                   </div>
                 ))}
@@ -1113,7 +1198,16 @@ export default function App() {
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {fillupTarget && (
+        <FillupModal
+          station={fillupTarget.station}
+          fuelType={fillupTarget.fuelType}
+          onSave={handleSaveFillup}
+          onClose={() => setFillupTarget(null)}
+        />
+      )}
       {!onboarded && <Onboarding onDone={() => setOnboarded(true)} />}
+      <BottomNav tab={tab} setTab={setTab} fillupCount={fillups.length} />
 
       <footer className="app-footer">
         GASMAN is an independent, non-commercial project for academic &amp; personal use among friends and family only.

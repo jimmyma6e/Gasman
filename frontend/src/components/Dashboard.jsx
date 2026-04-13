@@ -638,10 +638,18 @@ export function ProfileModal({ onClose }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
+const FUEL_LABELS_FULL = {
+  regular_gas:  "Regular (87)",
+  midgrade_gas: "Mid (89)",
+  premium_gas:  "Premium (91)",
+  diesel:       "Diesel",
+};
+
 export default function Dashboard({
   snapshots, savedRoutes, stationsWithArea,
   favourites, activeFuel, cheapestPrices, onToggleFavourite,
   onDeleteSnapshot, onDeleteRoute, onLaunchRoute, onNavigate,
+  fillups = [], onDeleteFillup,
 }) {
   const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
 
@@ -710,6 +718,43 @@ export default function Dashboard({
         )}
       </div>
 
+      {/* ── Fill-up Log ── */}
+      <div>
+        <div className="dashboard-section-header">
+          <div className="dashboard-section-title">
+            ⛽ Fill-up Log
+            {fillups.length > 0 && <span className="tab-badge">{fillups.length}</span>}
+          </div>
+          <button className="btn-section-nav" onClick={() => onNavigate("all")}>+ Find Stations</button>
+        </div>
+        {fillups.length === 0 ? (
+          <p className="dashboard-empty">
+            No fill-ups logged yet. Tap "⛽ Log Fill-up" on any station to track your spending.
+          </p>
+        ) : (
+          <div className="fillup-list">
+            {fillups.map((f) => (
+              <div key={f.id} className="fillup-row">
+                <div className="fillup-row-left">
+                  <div className="fillup-row-station">{f.station_name}</div>
+                  <div className="fillup-row-meta">
+                    {f.date} · {FUEL_LABELS_FULL[f.fuel_type] || f.fuel_type} · {f.price_cpl}¢/L
+                    {f.price_was_edited && <span className="fillup-contrib-badge">📝 reported</span>}
+                  </div>
+                  {f.litres && (
+                    <div className="fillup-row-cost">
+                      {f.litres}L{f.total_cost ? ` · $${f.total_cost.toFixed(2)}` : ""}
+                    </div>
+                  )}
+                  {f.notes && <div className="fillup-row-notes">{f.notes}</div>}
+                </div>
+                <button className="btn-delete-snapshot" onClick={() => onDeleteFillup(f.id)} title="Delete">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Price Snapshots ── */}
       <div>
         <div className="dashboard-section-header">
@@ -721,7 +766,7 @@ export default function Dashboard({
         </div>
         {snapshots.length === 0 ? (
           <p className="dashboard-empty">
-            No snapshots yet. Click "📷 Save price" on any station card to track price changes over time.
+            No snapshots yet. Click 📷 on any station card to track price changes over time.
           </p>
         ) : (
           <div className="snapshot-list">
