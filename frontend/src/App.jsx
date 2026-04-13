@@ -8,6 +8,7 @@ import Dashboard, { ProfileModal } from "./components/Dashboard";
 import Onboarding from "./components/Onboarding";
 import { bestCardSavings } from "./creditCards.js";
 import { pageview } from "./analytics.js";
+import posthog from "posthog-js";
 
 // Virtual paths per tab — used for GA4 pageview tracking
 const TAB_PATHS = {
@@ -527,12 +528,14 @@ export default function App() {
     }
   }, [showProfile]);
 
-  // GA4 — track virtual pageviews on tab changes.
+  // GA4 + PostHog — track virtual pageviews on tab changes.
   // Skip first render: the gtag snippet in index.html already fires the initial page_view.
   const gaTabMounted = useRef(false);
   useEffect(() => {
     if (!gaTabMounted.current) { gaTabMounted.current = true; return; }
-    pageview(TAB_PATHS[tab] || "/");
+    const path = TAB_PATHS[tab] || "/";
+    pageview(path);
+    posthog.capture("$pageview", { $current_url: window.location.origin + path });
   }, [tab]);
 
   // Close area dropdown on outside click
