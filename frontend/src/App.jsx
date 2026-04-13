@@ -7,6 +7,14 @@ import RouteTab from "./components/RouteTab";
 import Dashboard, { ProfileModal } from "./components/Dashboard";
 import Onboarding from "./components/Onboarding";
 import { bestCardSavings } from "./creditCards.js";
+import { pageview } from "./analytics.js";
+
+// Virtual paths per tab — used for GA4 pageview tracking
+const TAB_PATHS = {
+  dashboard: "/dashboard",
+  all:       "/all-stations",
+  route:     "/route-finder",
+};
 
 // Region groupings for the area filter
 const BC_REGIONS = {
@@ -518,6 +526,14 @@ export default function App() {
       catch { /* ignore */ }
     }
   }, [showProfile]);
+
+  // GA4 — track virtual pageviews on tab changes.
+  // Skip first render: the gtag snippet in index.html already fires the initial page_view.
+  const gaTabMounted = useRef(false);
+  useEffect(() => {
+    if (!gaTabMounted.current) { gaTabMounted.current = true; return; }
+    pageview(TAB_PATHS[tab] || "/");
+  }, [tab]);
 
   // Close area dropdown on outside click
   useEffect(() => {
