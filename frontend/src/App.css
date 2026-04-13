@@ -1022,3 +1022,81 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   /* Route map below results on mobile */
   .route-map-wrap { order: 2; }
 }
+
+/* ── Dashboard savings row ──────────────────────────────────────────────────── */
+.dash-savings-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.dash-saving-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; cursor: pointer; transition: border-color 0.15s; }
+.dash-saving-card:hover { border-color: var(--accent); }
+.dash-saving-green { background: rgba(22,163,74,0.06); border-color: rgba(22,163,74,0.2); }
+.dash-saving-cta { background: rgba(249,115,22,0.06); border-color: rgba(249,115,22,0.2); }
+.dash-saving-label { font-size: 0.72rem; color: var(--text-dim); font-weight: 600; margin-bottom: 4px; }
+.dash-saving-value { font-size: 1.4rem; font-weight: 800; color: var(--text); line-height: 1; }
+.dash-saving-green .dash-saving-value { color: var(--green); }
+.dash-saving-sub { font-size: 0.68rem; color: var(--text-dim); margin-top: 3px; }
+@media (max-width: 480px) { .dash-savings-row { grid-template-columns: 1fr 1fr; }
+  .dash-saving-cta { grid-column: span 2; } }
+
+/* ── Logs Tab ───────────────────────────────────────────────────────────────── */
+.logs-tab { padding: 0; }
+.logs-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.logs-stat-card { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; }
+.logs-stat-highlight { background: rgba(22,163,74,0.07); border-color: rgba(22,163,74,0.25); }
+.logs-stat-label { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
+.logs-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--text); line-height: 1; }
+.logs-stat-highlight .logs-stat-value { color: var(--green); }
+.logs-stat-sub { font-size: 0.68rem; color: var(--text-dim); margin-top: 4px; }
+
+.logs-empty { text-align: center; padding: 48px 20px; }
+.logs-empty-icon { font-size: 3rem; margin-bottom: 12px; }
+.logs-empty-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+.logs-empty-sub { font-size: 0.83rem; color: var(--text-dim); max-width: 280px; margin: 0 auto; }
+
+.logs-month-group { margin-bottom: 20px; }
+.logs-month-header { display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px; }
+.logs-month-label { font-size: 0.78rem; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.logs-month-meta { font-size: 0.75rem; color: var(--text-dim); }
+.logs-month-saved { color: var(--green); font-weight: 600; }
+
+.logs-entries { display: flex; flex-direction: column; gap: 6px; }
+.log-entry { display: flex; align-items: flex-start; justify-content: space-between;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px 14px; gap: 10px; }
+.log-entry-left { flex: 1; min-width: 0; }
+.log-entry-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.log-entry-station { font-size: 0.88rem; font-weight: 600; }
+.log-entry-date { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
+.log-entry-meta { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+.log-entry-vehicle { }
+.log-entry-cost { font-size: 0.8rem; margin-top: 3px; }
+.log-entry-saved { color: var(--green); font-weight: 600; }
+.log-entry-notes { font-size: 0.73rem; color: var(--text-dim); font-style: italic; margin-top: 2px; }
+
+/* ── FillupModal vehicle chips ───────────────────────────────────────────────── */
+.fillup-vehicle-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.fillup-vehicle-chip { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; cursor: pointer;
+  transition: all 0.15s; color: var(--text); }
+.fillup-vehicle-active { border-color: var(--accent); background: rgba(249,115,22,0.08);
+  color: var(--accent); font-weight: 600; }
+.fillup-saved { color: var(--green); font-weight: 600; font-size: 0.85rem; margin-top: 4px; }
+.fillup-hint-warn { color: var(--text-dim) !important; }
+
+/* ── App-like tweaks ─────────────────────────────────────────────────────────── */
+/* Prevent text selection on tap-heavy elements */
+.tab-nav, .brand-chip, .bottom-nav-item, .btn-near-me, .btn-fillup, .btn-route-fillup {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+/* Full-height app shell */
+html, body, #root { height: 100%; }
+.app { min-height: 100%; display: flex; flex-direction: column; }
+.main { flex: 1; }
+/* Smooth momentum scroll on iOS */
+.modal { -webkit-overflow-scrolling: touch; }
+/* Ensure safe areas on notched phones */
+.header { padding-top: env(safe-area-inset-top, 0); }
+.app-footer { padding-bottom: calc(env(safe-area-inset-bottom, 0) + 16px); }

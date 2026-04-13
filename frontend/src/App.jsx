@@ -7,6 +7,7 @@ import RouteTab from "./components/RouteTab";
 import Dashboard, { ProfileModal } from "./components/Dashboard";
 import Onboarding from "./components/Onboarding";
 import FillupModal from "./components/FillupModal";
+import LogsTab from "./components/LogsTab";
 import BottomNav from "./components/BottomNav";
 import { bestCardSavings } from "./creditCards.js";
 import { pageview } from "./analytics.js";
@@ -17,6 +18,7 @@ const TAB_PATHS = {
   dashboard: "/dashboard",
   all:       "/all-stations",
   route:     "/route-finder",
+  logs:      "/logs",
 };
 
 // Region groupings for the area filter
@@ -606,6 +608,23 @@ export default function App() {
     posthog.capture("$pageview", { $current_url: window.location.origin + path, tab });
   }, [tab]);
 
+  // Auto Near Me — request on first visit to All Stations if not already active
+  const nearMeRequested = useRef(false);
+  useEffect(() => {
+    if (tab === "all" && !userCoords && !nearMeRequested.current) {
+      nearMeRequested.current = true;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            setSortBy("distance");
+          },
+          () => {} // silent — manual Near Me button still available
+        );
+      }
+    }
+  }, [tab, userCoords]);
+
   // Track last station_view to avoid duplicate fires when clicking the same card twice
   const lastViewedStation = useRef(null);
 
@@ -681,9 +700,11 @@ export default function App() {
 
   // Cheapest within filtered set (valid prices only) — drives "Cheapest" badge
   const cheapestPrices = {};
+  const avgPrices = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = filtered.map((s) => s[key]?.price).filter(VALID_PRICE);
+    const prices = stationsWithArea.map((s) => s[key]?.price).filter(VALID_PRICE);
     cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
+    avgPrices[key] = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 10) / 10 : null;
   }
 
   function latestUpdate(s) {
@@ -759,8 +780,21 @@ export default function App() {
             <button className={`tab-nav ${tab === "route" ? "tab-nav-active" : ""}`} onClick={() => setTab("route")}>
               🗺️ Route Finder
             </button>
+            <button className={`tab-nav ${tab === "logs" ? "tab-nav-active" : ""}`} onClick={() => setTab("logs")}>
+              ⛽ Logs
+              {fillups.length > 0 && <span className="tab-badge">{fillups.length}</span>}
+            </button>
           </div>
         </div>
+
+        {/* Logs Tab */}
+        {tab === "logs" && (
+          <LogsTab
+            fillups={fillups}
+            onDelete={handleDeleteFillup}
+            onNavigate={setTab}
+          />
+        )}
 
         {/* Route Tab */}
         {tab === "route" && (
@@ -1202,6 +1236,7 @@ export default function App() {
         <FillupModal
           station={fillupTarget.station}
           fuelType={fillupTarget.fuelType}
+          avgPriceAtLog={avgPrices[fillupTarget.fuelType] ?? null}
           onSave={handleSaveFillup}
           onClose={() => setFillupTarget(null)}
         />

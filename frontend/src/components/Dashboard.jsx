@@ -653,8 +653,37 @@ export default function Dashboard({
 }) {
   const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
 
+  // Savings stats from fill-up log
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthFillups = fillups.filter((f) => f.date?.startsWith(monthKey));
+  const monthSaved   = monthFillups.reduce((s, f) => s + (f.total_saved > 0 ? f.total_saved : 0), 0);
+  const overallSaved = fillups.reduce((s, f) => s + (f.total_saved > 0 ? f.total_saved : 0), 0);
+  const overallSpent = fillups.reduce((s, f) => s + (f.total_cost || 0), 0);
+
   return (
     <div className="dashboard">
+
+      {/* ── Savings summary (only when there are logs) ── */}
+      {fillups.length > 0 && (
+        <div className="dash-savings-row">
+          <div className="dash-saving-card dash-saving-green" onClick={() => onNavigate("logs")}>
+            <div className="dash-saving-label">💸 Saved this month</div>
+            <div className="dash-saving-value">${monthSaved.toFixed(2)}</div>
+            <div className="dash-saving-sub">vs avg price</div>
+          </div>
+          <div className="dash-saving-card" onClick={() => onNavigate("logs")}>
+            <div className="dash-saving-label">📊 Total saved</div>
+            <div className="dash-saving-value">${overallSaved.toFixed(2)}</div>
+            <div className="dash-saving-sub">${overallSpent.toFixed(2)} spent overall</div>
+          </div>
+          <div className="dash-saving-card dash-saving-cta" onClick={() => onNavigate("logs")}>
+            <div className="dash-saving-label">⛽ Fill-ups</div>
+            <div className="dash-saving-value">{fillups.length}</div>
+            <div className="dash-saving-sub">View all →</div>
+          </div>
+        </div>
+      )}
 
       {/* ── Route Finder Hero ── */}
       <div className="route-hero-card" onClick={() => onNavigate("route")}>
@@ -713,43 +742,6 @@ export default function Dashboard({
                 activeFuel={activeFuel}
                 cheapestPrices={cheapestPrices}
                 onToggleFavourite={onToggleFavourite} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Fill-up Log ── */}
-      <div>
-        <div className="dashboard-section-header">
-          <div className="dashboard-section-title">
-            ⛽ Fill-up Log
-            {fillups.length > 0 && <span className="tab-badge">{fillups.length}</span>}
-          </div>
-          <button className="btn-section-nav" onClick={() => onNavigate("all")}>+ Find Stations</button>
-        </div>
-        {fillups.length === 0 ? (
-          <p className="dashboard-empty">
-            No fill-ups logged yet. Tap "⛽ Log Fill-up" on any station to track your spending.
-          </p>
-        ) : (
-          <div className="fillup-list">
-            {fillups.map((f) => (
-              <div key={f.id} className="fillup-row">
-                <div className="fillup-row-left">
-                  <div className="fillup-row-station">{f.station_name}</div>
-                  <div className="fillup-row-meta">
-                    {f.date} · {FUEL_LABELS_FULL[f.fuel_type] || f.fuel_type} · {f.price_cpl}¢/L
-                    {f.price_was_edited && <span className="fillup-contrib-badge">📝 reported</span>}
-                  </div>
-                  {f.litres && (
-                    <div className="fillup-row-cost">
-                      {f.litres}L{f.total_cost ? ` · $${f.total_cost.toFixed(2)}` : ""}
-                    </div>
-                  )}
-                  {f.notes && <div className="fillup-row-notes">{f.notes}</div>}
-                </div>
-                <button className="btn-delete-snapshot" onClick={() => onDeleteFillup(f.id)} title="Delete">×</button>
-              </div>
             ))}
           </div>
         )}

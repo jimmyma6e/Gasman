@@ -1,8 +1,9 @@
 export default function BottomNav({ tab, setTab, fillupCount }) {
   const items = [
-    { id: "dashboard", icon: "📊", label: "Dashboard" },
-    { id: "all",       icon: "⛽", label: "Stations"  },
-    { id: "route",     icon: "🗺️", label: "Route"     },
+    { id: "dashboard", icon: "📊", label: "Home"   },
+    { id: "all",       icon: "⛽", label: "Stations"},
+    { id: "route",     icon: "🗺️", label: "Route"   },
+    { id: "logs",      icon: "📋", label: "Logs"    },
   ];
 
   return (
@@ -15,7 +16,7 @@ export default function BottomNav({ tab, setTab, fillupCount }) {
         >
           <span className="bottom-nav-icon">
             {icon}
-            {id === "dashboard" && fillupCount > 0 && (
+            {id === "logs" && fillupCount > 0 && (
               <span className="bottom-nav-badge">{fillupCount > 9 ? "9+" : fillupCount}</span>
             )}
           </span>

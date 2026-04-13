@@ -7,16 +7,24 @@ const FUEL_LABELS = {
   diesel:       "Diesel",
 };
 
-export default function FillupModal({ station, fuelType, onSave, onClose }) {
+export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose }) {
   const stationPrice = station[fuelType]?.price ?? null;
 
-  const [fuel,     setFuel]     = useState(fuelType);
-  const [priceCpl, setPriceCpl] = useState(stationPrice != null ? String(stationPrice) : "");
-  const [litres,   setLitres]   = useState("");
-  const [date,     setDate]     = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes,    setNotes]    = useState("");
+  // Load saved vehicles from localStorage
+  const vehicles = (() => {
+    try { return JSON.parse(localStorage.getItem("gasman-vehicles") || "[]"); }
+    catch { return []; }
+  })();
+  const defaultVehicle = vehicles[0] ?? null;
 
-  // Recalculate when fuel type changes (update pre-filled price)
+  const [fuel,        setFuel]        = useState(fuelType);
+  const [priceCpl,    setPriceCpl]    = useState(stationPrice != null ? String(stationPrice) : "");
+  const [litres,      setLitres]      = useState("");
+  const [date,        setDate]        = useState(() => new Date().toISOString().slice(0, 10));
+  const [notes,       setNotes]       = useState("");
+  const [vehicleId,   setVehicleId]   = useState(defaultVehicle?.id ?? "");
+
+  // Recalculate pre-filled price when fuel type changes
   useEffect(() => {
     const p = station[fuel]?.price;
     setPriceCpl(p != null ? String(p) : "");
@@ -28,23 +36,35 @@ export default function FillupModal({ station, fuelType, onSave, onClose }) {
     ? (priceNum * litresNum / 100).toFixed(2)
     : null;
 
+  // Savings vs avg price at time of log
+  const savedCpl = avgPriceAtLog && !isNaN(priceNum) ? avgPriceAtLog - priceNum : null;
+  const totalSaved = savedCpl && !isNaN(litresNum) && litresNum > 0
+    ? (savedCpl * litresNum / 100).toFixed(2)
+    : null;
+
   const priceEdited = stationPrice != null && parseFloat(priceCpl) !== stationPrice;
 
   function handleSave() {
     if (!priceCpl || isNaN(priceNum)) return;
+    const selectedVehicle = vehicles.find((v) => v.id === vehicleId) ?? null;
     const entry = {
-      id:             `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      station_id:     station.station_id,
-      station_name:   station.name,
-      station_address: station.address,
-      fuel_type:      fuel,
-      price_cpl:      priceNum,
-      price_was_edited: priceEdited,
-      litres:         litresNum || null,
-      total_cost:     totalCost ? parseFloat(totalCost) : null,
+      id:                `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      station_id:        station.station_id,
+      station_name:      station.name,
+      station_address:   station.address,
+      fuel_type:         fuel,
+      price_cpl:         priceNum,
+      price_was_edited:  priceEdited,
+      avg_price_at_log:  avgPriceAtLog ?? null,
+      saved_cpl:         savedCpl ?? null,
+      litres:            litresNum || null,
+      total_cost:        totalCost ? parseFloat(totalCost) : null,
+      total_saved:       totalSaved ? parseFloat(totalSaved) : null,
+      vehicle_id:        selectedVehicle?.id ?? null,
+      vehicle_name:      selectedVehicle ? `${selectedVehicle.icon || "🚗"} ${selectedVehicle.name}` : null,
       date,
-      notes:          notes.trim() || null,
-      logged_at:      new Date().toISOString(),
+      notes:             notes.trim() || null,
+      logged_at:         new Date().toISOString(),
     };
     onSave(entry);
   }
@@ -67,6 +87,32 @@ export default function FillupModal({ station, fuelType, onSave, onClose }) {
         </div>
 
         <div className="fillup-form">
+          {/* Vehicle picker */}
+          {vehicles.length > 0 && (
+            <div className="fillup-field">
+              <label className="fillup-label">Vehicle</label>
+              <div className="fillup-vehicle-row">
+                {vehicles.map((v) => (
+                  <button
+                    key={v.id}
+                    className={`fillup-vehicle-chip ${vehicleId === v.id ? "fillup-vehicle-active" : ""}`}
+                    onClick={() => setVehicleId(v.id)}
+                    type="button"
+                  >
+                    {v.icon || "🚗"} {v.name}
+                  </button>
+                ))}
+                <button
+                  className={`fillup-vehicle-chip ${vehicleId === "" ? "fillup-vehicle-active" : ""}`}
+                  onClick={() => setVehicleId("")}
+                  type="button"
+                >
+                  Other
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Fuel type */}
           <div className="fillup-field">
             <label className="fillup-label">Fuel Type</label>
@@ -93,8 +139,17 @@ export default function FillupModal({ station, fuelType, onSave, onClose }) {
               value={priceCpl}
               onChange={(e) => setPriceCpl(e.target.value)}
             />
+            {avgPriceAtLog && !isNaN(priceNum) && (
+              <p className={`fillup-hint ${savedCpl > 0 ? "" : "fillup-hint-warn"}`}>
+                {savedCpl > 0
+                  ? `${savedCpl.toFixed(1)}¢/L below avg (${avgPriceAtLog.toFixed(1)}¢/L) — nice find!`
+                  : savedCpl < 0
+                  ? `${Math.abs(savedCpl).toFixed(1)}¢/L above avg (${avgPriceAtLog.toFixed(1)}¢/L)`
+                  : `At the average price (${avgPriceAtLog.toFixed(1)}¢/L)`}
+              </p>
+            )}
             {priceEdited && (
-              <p className="fillup-hint">Your price differs from what we have — it'll help update our data. Thanks!</p>
+              <p className="fillup-hint">Price differs from our data — thanks for the report!</p>
             )}
           </div>
 
@@ -113,11 +168,15 @@ export default function FillupModal({ station, fuelType, onSave, onClose }) {
             />
           </div>
 
-          {/* Total cost — auto-calculated */}
+          {/* Total cost + savings summary */}
           {totalCost && (
             <div className="fillup-total">
-              Total: <strong>${totalCost}</strong>
-              <span className="fillup-total-sub">({litres}L × {priceNum}¢/L)</span>
+              <div>Total: <strong>${totalCost}</strong>
+                <span className="fillup-total-sub">({litres}L × {priceNum}¢/L)</span>
+              </div>
+              {totalSaved && parseFloat(totalSaved) > 0 && (
+                <div className="fillup-saved">💸 You saved <strong>${totalSaved}</strong> vs avg</div>
+              )}
             </div>
           )}
 
@@ -139,7 +198,7 @@ export default function FillupModal({ station, fuelType, onSave, onClose }) {
             <input
               className="fillup-input"
               type="text"
-              placeholder="e.g. Almost empty, paid by card"
+              placeholder="e.g. Almost empty, used CIBC card"
               maxLength={120}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
