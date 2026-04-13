@@ -468,7 +468,6 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
 
       // Analytics: route_search fires once per search, after results are known
       const prices = top.map((s) => s[fuelType]?.price).filter(Boolean);
-      console.log("[PostHog] capturing route_search", fromPlace.display_name, "→", toPlace.display_name, "stations:", top.length);
       posthog.capture("route_search", {
         origin:            fromPlace.display_name,
         destination:       toPlace.display_name,

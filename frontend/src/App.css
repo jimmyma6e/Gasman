@@ -194,7 +194,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-chart:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Modal ── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; padding: 24px; }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
 .modal-title { font-size: 1.2rem; font-weight: 700; }
@@ -261,7 +261,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Split view (list + map panel) ── */
 .split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .split-list { min-width: 0; }
-.split-map { position: sticky; top: 76px; height: calc(100vh - 96px); }
+.split-map { position: sticky; top: 76px; height: calc(100vh - 96px); isolation: isolate; }
 .split-map > div { height: 100%; }
 .split-map .leaflet-container { height: 100% !important; border-radius: var(--radius); }
 
@@ -329,7 +329,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-fuel-select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; outline: none; }
 .route-find-btn { align-self: flex-end; padding: 9px 20px; white-space: nowrap; }
 
-.route-map-wrap { height: 340px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.route-map-wrap { height: 340px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); isolation: isolate; }
 
 .route-summary { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-size: 0.88rem; color: var(--text-dim); }
 .route-summary strong { color: var(--text); }
