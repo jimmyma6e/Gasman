@@ -22,6 +22,7 @@ export default function PostHogProvider({ children }) {
 
     posthog.init(POSTHOG_KEY, {
       api_host: POSTHOG_HOST,
+      defaults: "2026-01-30",    // pin to recommended defaults as of this date
       capture_pageview: false,   // we fire $pageview manually on tab changes
       capture_pageleave: true,
       autocapture: true,         // clicks, inputs, rage-clicks etc.
