@@ -549,6 +549,7 @@ export default function App() {
     if (!station || lastViewedStation.current === station.station_id) return;
     lastViewedStation.current = station.station_id;
     const price = station[activeFuel]?.price ?? null;
+    console.log("[PostHog] capturing station_view", station.station_id, station.name, "rank:", rank);
     posthog.capture("station_view", {
       station_id:   station.station_id,
       station_name: station.name,
