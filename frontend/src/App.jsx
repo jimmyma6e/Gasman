@@ -134,6 +134,7 @@ const POPULAR_BRANDS = [
   "Petro-Canada", "Shell", "Chevron", "Esso", "Husky",
   "Costco", "Canadian Tire", "7-Eleven", "Fas Gas", "Co-op",
 ];
+const QUICK_BRANDS = ["Shell", "Petro-Canada", "Chevron", "Esso"];
 
 // Normalize raw GasBuddy brand names to canonical versions
 const BRAND_ALIASES = {
@@ -702,9 +703,10 @@ export default function App() {
   const cheapestPrices = {};
   const avgPrices = {};
   for (const { key } of FUEL_TYPES) {
-    const prices = stationsWithArea.map((s) => s[key]?.price).filter(VALID_PRICE);
-    cheapestPrices[key] = prices.length ? Math.min(...prices) : null;
-    avgPrices[key] = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 10) / 10 : null;
+    const allPrices  = stationsWithArea.map((s) => s[key]?.price).filter(VALID_PRICE);
+    const filtPrices = filtered.map((s) => s[key]?.price).filter(VALID_PRICE);
+    cheapestPrices[key] = filtPrices.length ? Math.min(...filtPrices) : null;
+    avgPrices[key]      = allPrices.length  ? Math.round(allPrices.reduce((a, b) => a + b, 0) / allPrices.length * 10) / 10 : null;
   }
 
   function latestUpdate(s) {
@@ -903,31 +905,49 @@ export default function App() {
           </div>
         </div>
 
-        {/* Brand filter — popular as chips, rest in dropdown */}
+        {/* Brand filter — single-select quick chips + More dropdown */}
         {brands.length > 0 && (
           <div className="filter-section">
             <span className="filter-label">Brand</span>
             <div className="chip-row">
-              {/* Popular brand chips (always visible) */}
-              {POPULAR_BRANDS.filter((b) => brands.includes(b)).map((b) => (
+              {/* All chip — clears brand filter */}
+              <button
+                className={`brand-chip ${brandFilter.size === 0 ? "brand-chip-active" : ""}`}
+                onClick={() => setBrandFilter(new Set())}
+              >
+                All
+              </button>
+
+              {/* Quick brand chips — single-select */}
+              {QUICK_BRANDS.filter((b) => brands.includes(b)).map((b) => (
                 <button key={b}
                   className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
-                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}>
+                  onClick={() => {
+                    if (brandFilter.has(b)) {
+                      setBrandFilter(new Set());
+                    } else {
+                      setBrandFilter(new Set([b]));
+                      setSortBy("price");
+                    }
+                  }}
+                >
                   {b}
                 </button>
               ))}
-              {/* Selected non-popular brands as dismissible chips */}
-              {[...brandFilter].filter((b) => !POPULAR_BRANDS.includes(b)).map((b) => (
+
+              {/* Selected non-quick brands as dismissible chips */}
+              {[...brandFilter].filter((b) => !QUICK_BRANDS.includes(b)).map((b) => (
                 <button key={b} className="brand-chip brand-chip-active"
-                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}>
+                  onClick={() => setBrandFilter(new Set())}>
                   {b} ×
                 </button>
               ))}
-              {/* "More" dropdown for non-popular brands */}
-              {brands.filter((b) => !POPULAR_BRANDS.includes(b)).length > 0 && (
+
+              {/* "More" dropdown for brands not in QUICK_BRANDS */}
+              {brands.filter((b) => !QUICK_BRANDS.includes(b)).length > 0 && (
                 <div className="area-more-wrap" ref={brandDropdownRef}>
                   <button
-                    className={`area-more-btn ${[...brandFilter].some((b) => !POPULAR_BRANDS.includes(b)) ? "brand-chip-active" : ""}`}
+                    className={`area-more-btn ${[...brandFilter].some((b) => !QUICK_BRANDS.includes(b)) ? "brand-chip-active" : ""}`}
                     onClick={() => { setBrandDropdownOpen((o) => !o); setBrandSearch(""); }}
                   >
                     More {brandDropdownOpen ? "▴" : "▾"}
@@ -936,11 +956,15 @@ export default function App() {
                     <div className="area-dropdown brand-dropdown">
                       <input className="area-search-input" type="text" placeholder="Search brand…"
                         value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} autoFocus />
-                      {brands.filter((b) => !POPULAR_BRANDS.includes(b) &&
+                      {brands.filter((b) => !QUICK_BRANDS.includes(b) &&
                         b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
                         <label key={b} className="area-dropdown-item">
                           <input type="checkbox" checked={brandFilter.has(b)}
-                            onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
+                            onChange={() => {
+                              const next = brandFilter.has(b) ? new Set() : new Set([b]);
+                              setBrandFilter(next);
+                              if (next.size > 0) setSortBy("price");
+                            }} />
                           {b}
                         </label>
                       ))}
