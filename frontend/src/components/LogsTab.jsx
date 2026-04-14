@@ -16,7 +16,7 @@ function formatDate(iso) {
   return d.toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 }
 
-export default function LogsTab({ fillups, onDelete, onNavigate }) {
+export default function LogsTab({ fillups, onDelete, onNavigate, onAddLog }) {
   const month = thisMonth();
 
   // ── Stats ────────────────────────────────────────────────────────────────────
@@ -39,6 +39,13 @@ export default function LogsTab({ fillups, onDelete, onNavigate }) {
 
   return (
     <div className="logs-tab">
+
+      {/* ── Primary CTA ── */}
+      {onAddLog && (
+        <div className="logs-top-cta">
+          <button className="btn-add-log" onClick={onAddLog}>+ Add Fuel Log</button>
+        </div>
+      )}
 
       {/* ── Stats cards ── */}
       <div className="logs-stats-grid">

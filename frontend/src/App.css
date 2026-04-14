@@ -1093,10 +1093,63 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 }
 /* Full-height app shell */
 html, body, #root { height: 100%; }
-.app { min-height: 100%; display: flex; flex-direction: column; }
+/* Prevent horizontal layout expansion after interaction */
+html { overflow-x: hidden; }
+.app { min-height: 100%; display: flex; flex-direction: column; max-width: 100vw; overflow-x: hidden; }
 .main { flex: 1; }
 /* Smooth momentum scroll on iOS */
 .modal { -webkit-overflow-scrolling: touch; }
 /* Ensure safe areas on notched phones */
 .header { padding-top: env(safe-area-inset-top, 0); }
 .app-footer { padding-bottom: calc(env(safe-area-inset-bottom, 0) + 16px); }
+
+/* ── Station summary bar (All Stations top quick stats) ─────────────────────── */
+.station-summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.summary-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; cursor: default; transition: border-color 0.15s; overflow: hidden; }
+.summary-price { font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1; }
+.summary-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.05em; margin: 3px 0 2px; }
+.summary-name { font-size: 0.76rem; color: var(--text-dim); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) {
+  .station-summary-bar { grid-template-columns: 1fr 1fr; }
+  .station-summary-bar .summary-item:last-child:nth-child(odd) { grid-column: span 2; }
+}
+
+/* ── Show more button ────────────────────────────────────────────────────────── */
+.btn-show-more { display: block; width: 100%; padding: 12px; margin-top: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 0.85rem; color: var(--text-dim); cursor: pointer; text-align: center;
+  transition: all 0.15s; }
+.btn-show-more:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Crowdsource prompt (inline after selected card) ────────────────────────── */
+.crowdsource-wrap { grid-column: 1 / -1; }
+.crowdsource-prompt { background: var(--surface); border: 1.5px solid var(--accent);
+  border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column;
+  gap: 8px; animation: cs-slide-in 0.18s ease; }
+@keyframes cs-slide-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.crowdsource-top { display: flex; justify-content: space-between; align-items: center; }
+.crowdsource-title { font-size: 0.86rem; font-weight: 700; }
+.crowdsource-dismiss { background: none; border: none; color: var(--text-dim); font-size: 1.1rem;
+  cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; transition: color 0.15s; }
+.crowdsource-dismiss:hover { color: var(--text); }
+.crowdsource-body { font-size: 0.82rem; color: var(--text-dim); }
+.crowdsource-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.crowdsource-btn-yes { background: var(--green); color: #fff; border: none; padding: 7px 13px;
+  border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+.crowdsource-btn-yes:hover { opacity: 0.85; }
+.crowdsource-btn-update { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  padding: 7px 13px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.crowdsource-btn-update:hover { border-color: var(--accent); color: var(--accent); }
+.crowdsource-btn-skip { background: none; border: none; color: var(--text-dim); font-size: 0.8rem;
+  cursor: pointer; padding: 7px 4px; transition: color 0.15s; }
+.crowdsource-btn-skip:hover { color: var(--text); }
+
+/* ── Logs: Add fuel log CTA ──────────────────────────────────────────────────── */
+.logs-top-cta { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+.btn-add-log { background: var(--accent); color: #000; border: none; padding: 10px 20px;
+  border-radius: 10px; font-size: 0.88rem; font-weight: 700; cursor: pointer;
+  transition: opacity 0.15s; -webkit-tap-highlight-color: transparent; }
+.btn-add-log:hover { opacity: 0.85; }

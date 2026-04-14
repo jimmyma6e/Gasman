@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import PriceChart from "./components/PriceChart";
 import StationTable from "./components/StationTable";
 import InsightsPanel from "./components/InsightsPanel";
@@ -374,6 +374,74 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
   );
 }
 
+// ---------- Station Summary Bar ----------
+function StationSummaryBar({ sorted, cheapestPrices, userCoords }) {
+  if (!sorted?.length) return null;
+
+  const cheapReg = VALID_PRICE(cheapestPrices?.regular_gas)
+    ? sorted.find((s) => s.regular_gas?.price === cheapestPrices.regular_gas) : null;
+  const cheapPrem = VALID_PRICE(cheapestPrices?.premium_gas)
+    ? sorted.find((s) => s.premium_gas?.price === cheapestPrices.premium_gas) : null;
+
+  let closest = null;
+  if (userCoords) {
+    let minDist = Infinity;
+    for (const s of sorted) {
+      if (!s.latitude || !s.longitude) continue;
+      const d = haversineKm(userCoords.lat, userCoords.lng, s.latitude, s.longitude);
+      if (d < minDist) { minDist = d; closest = { station: s, dist: d }; }
+    }
+  }
+
+  if (!cheapReg && !cheapPrem && !closest) return null;
+
+  return (
+    <div className="station-summary-bar">
+      {cheapReg && (
+        <div className="summary-item">
+          <div className="summary-price">{cheapReg.regular_gas.price.toFixed(1)}¢</div>
+          <div className="summary-label">Cheapest Regular</div>
+          <div className="summary-name">{cheapReg.name}</div>
+        </div>
+      )}
+      {cheapPrem && (
+        <div className="summary-item">
+          <div className="summary-price">{cheapPrem.premium_gas.price.toFixed(1)}¢</div>
+          <div className="summary-label">Cheapest Premium</div>
+          <div className="summary-name">{cheapPrem.name}</div>
+        </div>
+      )}
+      {closest && (
+        <div className="summary-item">
+          <div className="summary-price">
+            {closest.dist < 1 ? `${Math.round(closest.dist * 1000)}m` : `${closest.dist.toFixed(1)}km`}
+          </div>
+          <div className="summary-label">Closest Station</div>
+          <div className="summary-name">{closest.station.name}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Crowdsource Prompt ----------
+function CrowdsourcePrompt({ onConfirm, onUpdate, onDismiss }) {
+  return (
+    <div className="crowdsource-prompt">
+      <div className="crowdsource-top">
+        <span className="crowdsource-title">Help keep Gasman accurate</span>
+        <button className="crowdsource-dismiss" onClick={onDismiss} aria-label="Dismiss">×</button>
+      </div>
+      <p className="crowdsource-body">Is this price still correct?</p>
+      <div className="crowdsource-actions">
+        <button className="crowdsource-btn-yes" onClick={onConfirm}>✓ Yes, looks right</button>
+        <button className="crowdsource-btn-update" onClick={onUpdate}>✏️ Update price</button>
+        <button className="crowdsource-btn-skip" onClick={onDismiss}>Not now</button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- App ----------
 export default function App() {
   const [data, setData]         = useState(null);
@@ -467,11 +535,26 @@ export default function App() {
   });
   const [fillupTarget, setFillupTarget] = useState(null); // { station, fuelType }
 
+  const [showAllStations, setShowAllStations] = useState(false);
+  const [crowdsourceFor, setCrowdsourceFor]   = useState(null); // station_id or null
+  const crowdsourceShown = useRef(new Set());
+
   const handleSaveFillup = useCallback((entry) => {
     setFillups((prev) => {
       const next = [entry, ...prev];
       localStorage.setItem("gasman-fillups", JSON.stringify(next));
       return next;
+    });
+    posthog.capture("log_added", {
+      fuel_type:    entry.fuel_type,
+      has_station:  !!entry.station_id,
+      has_litres:   !!entry.litres,
+      price_edited: entry.price_was_edited,
+    });
+    posthog.capture("station_log_completed", {
+      station_id:   entry.station_id,
+      station_name: entry.station_name,
+      fuel_type:    entry.fuel_type,
     });
     setFillupTarget(null);
   }, []);
@@ -631,6 +714,17 @@ export default function App() {
 
   function handleSelectStation(station, rank) {
     setSelectedStation(station);
+    // Show crowdsource prompt once per station per session
+    if (station && !crowdsourceShown.current.has(station.station_id)) {
+      crowdsourceShown.current.add(station.station_id);
+      setCrowdsourceFor(station.station_id);
+      posthog.capture("crowdsource_prompt_shown", {
+        station_id:   station.station_id,
+        station_name: station.name,
+      });
+    } else {
+      setCrowdsourceFor(null);
+    }
     if (!station || lastViewedStation.current === station.station_id) return;
     lastViewedStation.current = station.station_id;
     const price = station[activeFuel]?.price ?? null;
@@ -650,6 +744,12 @@ export default function App() {
       });
     }
   }
+
+  // Reset "show more" and crowdsource prompt when tab or filters change
+  useEffect(() => {
+    setShowAllStations(false);
+    setCrowdsourceFor(null);
+  }, [tab, areaFilter, brandFilter, search]);
 
   // Close area dropdown on outside click
   useEffect(() => {
@@ -741,6 +841,9 @@ export default function App() {
 
   const hasFilters = areaFilter.size > 0 || brandFilter.size > 0 || q;
 
+  // Limit initial station list to 10 to reduce cognitive load
+  const displayedStations = showAllStations ? sorted : sorted.slice(0, 10);
+
   return (
     <div className="app">
       <header className="header">
@@ -795,6 +898,10 @@ export default function App() {
             fillups={fillups}
             onDelete={handleDeleteFillup}
             onNavigate={setTab}
+            onAddLog={() => {
+              setFillupTarget({ station: null, fuelType: activeFuel });
+              posthog.capture("station_log_started", { source: "logs_tab" });
+            }}
           />
         )}
 
@@ -830,8 +937,8 @@ export default function App() {
           />
         )}
 
-        {/* Station list — hidden on route/dashboard tabs */}
-        {tab !== "route" && tab !== "dashboard" && (<>
+        {/* Station list — All Stations tab only */}
+        {tab === "all" && (<>
         <div className="search-row">
           <input
             className="search-input"
@@ -1141,6 +1248,7 @@ export default function App() {
 
         {data && sorted.length > 0 && (
           <>
+            <StationSummaryBar sorted={sorted} cheapestPrices={cheapestPrices} userCoords={userCoords} />
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
 
             <div className={showMap ? "split-view" : ""}>
@@ -1148,78 +1256,120 @@ export default function App() {
 
             {viewMode === "card" && (
               <div className="grid">
-                {sorted.map((station, i) => (
-                  <div
-                    key={station.station_id}
-                    className={selectedStation?.station_id === station.station_id ? "card-selected" : ""}
-                    onClick={() => handleSelectStation(station, i + 1)}
-                  >
-                  <StationCard
-                    station={station}
-                    activeFuel={activeFuel}
-                    cheapestPrices={cheapestPrices}
-                    isFavourite={favourites.includes(station.station_id)}
-                    onToggleFavourite={toggleFavourite}
-                    onOpenChart={setChartStation}
-                    onSnapshot={handleSnapshot}
-                    showArea={sortBy === "city"}
-                    selectedCards={selectedCards}
-                    showCardDiscounts={showCardDiscounts}
-                    fillLitres={fillLitres}
-                    userCoords={userCoords}
-                    onLogFillup={(s) => setFillupTarget({ station: s, fuelType: activeFuel })}
-                  />
-                  </div>
+                {displayedStations.map((station, i) => (
+                  <Fragment key={station.station_id}>
+                    <div
+                      className={selectedStation?.station_id === station.station_id ? "card-selected" : ""}
+                      onClick={() => handleSelectStation(station, i + 1)}
+                    >
+                      <StationCard
+                        station={station}
+                        activeFuel={activeFuel}
+                        cheapestPrices={cheapestPrices}
+                        isFavourite={favourites.includes(station.station_id)}
+                        onToggleFavourite={toggleFavourite}
+                        onOpenChart={setChartStation}
+                        onSnapshot={handleSnapshot}
+                        showArea={sortBy === "city"}
+                        selectedCards={selectedCards}
+                        showCardDiscounts={showCardDiscounts}
+                        fillLitres={fillLitres}
+                        userCoords={userCoords}
+                        onLogFillup={(s) => {
+                          setFillupTarget({ station: s, fuelType: activeFuel });
+                          posthog.capture("station_log_started", { source: "station_card", station_id: s.station_id });
+                        }}
+                      />
+                    </div>
+                    {crowdsourceFor === station.station_id && (
+                      <div className="crowdsource-wrap">
+                        <CrowdsourcePrompt
+                          onConfirm={() => {
+                            setCrowdsourceFor(null);
+                            posthog.capture("crowdsource_prompt_confirm_clicked", { station_id: station.station_id });
+                          }}
+                          onUpdate={() => {
+                            setCrowdsourceFor(null);
+                            setFillupTarget({ station, fuelType: activeFuel });
+                            posthog.capture("crowdsource_prompt_update_clicked", { station_id: station.station_id });
+                          }}
+                          onDismiss={() => {
+                            setCrowdsourceFor(null);
+                            posthog.capture("crowdsource_prompt_dismissed", { station_id: station.station_id });
+                          }}
+                        />
+                      </div>
+                    )}
+                  </Fragment>
                 ))}
               </div>
             )}
 
             {viewMode === "compact" && (
               <div className="compact-list">
-                {sorted.map((station, i) => {
+                {displayedStations.map((station, i) => {
                   const fuelData = station[activeFuel];
                   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
                   const delta = station.price_delta?.[activeFuel];
                   const isFav = favourites.includes(station.station_id);
                   const isSelected = selectedStation?.station_id === station.station_id;
                   return (
-                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => handleSelectStation(station, i + 1)}>
-                      <button
-                        className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
-                        onClick={() => toggleFavourite(station.station_id)}
-                      >
-                        {isFav ? "★" : "☆"}
-                      </button>
-                      <div className="compact-info">
-                        <span className="compact-name">{station.name}</span>
-                        <a
-                          className="compact-addr"
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
-                          target="_blank"
-                          rel="noreferrer"
+                    <Fragment key={station.station_id}>
+                      <div className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => handleSelectStation(station, i + 1)}>
+                        <button
+                          className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
+                          onClick={() => toggleFavourite(station.station_id)}
                         >
-                          {station.address}, {station._area}
-                        </a>
-                      </div>
-                      <div className="compact-price">
-                        {VALID_PRICE(fuelData?.price) ? (
-                          <>
-                            <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
-                              {formatPrice(fuelData.price, station.unit_of_measure)}
-                            </span>
-                            {delta != null && (
-                              <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
-                                {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                          {isFav ? "★" : "☆"}
+                        </button>
+                        <div className="compact-info">
+                          <span className="compact-name">{station.name}</span>
+                          <a
+                            className="compact-addr"
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {station.address}, {station._area}
+                          </a>
+                        </div>
+                        <div className="compact-price">
+                          {VALID_PRICE(fuelData?.price) ? (
+                            <>
+                              <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
+                                {formatPrice(fuelData.price, station.unit_of_measure)}
                               </span>
-                            )}
-                          </>
-                        ) : <span className="tbl-empty">—</span>}
+                              {delta != null && (
+                                <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
+                                  {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                                </span>
+                              )}
+                            </>
+                          ) : <span className="tbl-empty">—</span>}
+                        </div>
+                        {VALID_PRICE(fuelData?.price) && (
+                          <button className="btn-snapshot btn-chart-sm" onClick={() => handleSnapshot(station, activeFuel)} title="Save current price to My Dashboard">📷 Save</button>
+                        )}
+                        <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
                       </div>
-                      {VALID_PRICE(fuelData?.price) && (
-                        <button className="btn-snapshot btn-chart-sm" onClick={() => handleSnapshot(station, activeFuel)} title="Save current price to My Dashboard">📷 Save</button>
+                      {crowdsourceFor === station.station_id && (
+                        <CrowdsourcePrompt
+                          onConfirm={() => {
+                            setCrowdsourceFor(null);
+                            posthog.capture("crowdsource_prompt_confirm_clicked", { station_id: station.station_id });
+                          }}
+                          onUpdate={() => {
+                            setCrowdsourceFor(null);
+                            setFillupTarget({ station, fuelType: activeFuel });
+                            posthog.capture("crowdsource_prompt_update_clicked", { station_id: station.station_id });
+                          }}
+                          onDismiss={() => {
+                            setCrowdsourceFor(null);
+                            posthog.capture("crowdsource_prompt_dismissed", { station_id: station.station_id });
+                          }}
+                        />
                       )}
-                      <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
-                    </div>
+                    </Fragment>
                   );
                 })}
               </div>
@@ -1227,7 +1377,7 @@ export default function App() {
 
             {viewMode === "table" && (
               <StationTable
-                stations={sorted}
+                stations={displayedStations}
                 cheapestPrices={cheapestPrices}
                 favourites={favourites}
                 onToggleFavourite={toggleFavourite}
@@ -1249,9 +1399,22 @@ export default function App() {
                 </div>
               )}
             </div>{/* end split-view */}
+
+            {/* Show more button — appears when list is truncated */}
+            {!showAllStations && sorted.length > 10 && (
+              <button
+                className="btn-show-more"
+                onClick={() => {
+                  setShowAllStations(true);
+                  posthog.capture("show_more_clicked", { total: sorted.length });
+                }}
+              >
+                Show {sorted.length - 10} more stations
+              </button>
+            )}
           </>
         )}
-        </>)}{/* end tab !== route && tab !== dashboard */}
+        </>)}{/* end tab === all */}
       </main>
 
       {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}

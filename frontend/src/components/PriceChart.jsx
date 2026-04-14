@@ -55,7 +55,7 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 export default function PriceChart({ stationId }) {
-  const [range, setRange]     = useState(24);
+  const [range, setRange]     = useState(168); // default 7-day view
   const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(true);
 

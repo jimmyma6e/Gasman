@@ -8,25 +8,26 @@ const FUEL_LABELS = {
 };
 
 export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose }) {
-  const stationPrice = station[fuelType]?.price ?? null;
+  // station may be null when logging manually from the Logs tab
+  const stationPrice = station?.[fuelType]?.price ?? null;
 
-  // Load saved vehicles from localStorage
   const vehicles = (() => {
     try { return JSON.parse(localStorage.getItem("gasman-vehicles") || "[]"); }
     catch { return []; }
   })();
   const defaultVehicle = vehicles[0] ?? null;
 
-  const [fuel,        setFuel]        = useState(fuelType);
-  const [priceCpl,    setPriceCpl]    = useState(stationPrice != null ? String(stationPrice) : "");
-  const [litres,      setLitres]      = useState("");
-  const [date,        setDate]        = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes,       setNotes]       = useState("");
-  const [vehicleId,   setVehicleId]   = useState(defaultVehicle?.id ?? "");
+  const [fuel,               setFuel]               = useState(fuelType);
+  const [priceCpl,           setPriceCpl]           = useState(stationPrice != null ? String(stationPrice) : "");
+  const [litres,             setLitres]             = useState("");
+  const [date,               setDate]               = useState(() => new Date().toISOString().slice(0, 10));
+  const [notes,              setNotes]              = useState("");
+  const [vehicleId,          setVehicleId]          = useState(defaultVehicle?.id ?? "");
+  const [manualStationName,  setManualStationName]  = useState("");
 
-  // Recalculate pre-filled price when fuel type changes
+  // Re-fill price when fuel type changes (only when a station is known)
   useEffect(() => {
-    const p = station[fuel]?.price;
+    const p = station?.[fuel]?.price;
     setPriceCpl(p != null ? String(p) : "");
   }, [fuel, station]);
 
@@ -36,22 +37,22 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
     ? (priceNum * litresNum / 100).toFixed(2)
     : null;
 
-  // Savings vs avg price at time of log
-  const savedCpl = avgPriceAtLog && !isNaN(priceNum) ? avgPriceAtLog - priceNum : null;
+  const savedCpl   = avgPriceAtLog && !isNaN(priceNum) ? avgPriceAtLog - priceNum : null;
   const totalSaved = savedCpl && !isNaN(litresNum) && litresNum > 0
     ? (savedCpl * litresNum / 100).toFixed(2)
     : null;
 
-  const priceEdited = stationPrice != null && parseFloat(priceCpl) !== stationPrice;
+  // Flag when user has edited the station's known price (triggers price contribution)
+  const priceEdited = station && stationPrice != null && !isNaN(priceNum) && priceNum !== stationPrice;
 
   function handleSave() {
     if (!priceCpl || isNaN(priceNum)) return;
     const selectedVehicle = vehicles.find((v) => v.id === vehicleId) ?? null;
     const entry = {
       id:                `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      station_id:        station.station_id,
-      station_name:      station.name,
-      station_address:   station.address,
+      station_id:        station?.station_id ?? null,
+      station_name:      station?.name ?? (manualStationName.trim() || "Manual entry"),
+      station_address:   station?.address ?? null,
       fuel_type:         fuel,
       price_cpl:         priceNum,
       price_was_edited:  priceEdited,
@@ -81,12 +82,30 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
         <div className="modal-header">
           <div>
             <h2 className="modal-title">⛽ Log Fill-up</h2>
-            <div className="modal-address">{station.name} · {station.address}</div>
+            {station
+              ? <div className="modal-address">{station.name} · {station.address}</div>
+              : <div className="modal-address">Manual entry</div>
+            }
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="fillup-form">
+          {/* Manual station name — only when no station pre-selected */}
+          {!station && (
+            <div className="fillup-field">
+              <label className="fillup-label">Station (optional)</label>
+              <input
+                className="fillup-input"
+                type="text"
+                placeholder="e.g. Shell on Broadway"
+                value={manualStationName}
+                onChange={(e) => setManualStationName(e.target.value)}
+                maxLength={80}
+              />
+            </div>
+          )}
+
           {/* Vehicle picker */}
           {vehicles.length > 0 && (
             <div className="fillup-field">
