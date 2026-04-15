@@ -33,7 +33,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-install:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Main ── */
-.main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.main { max-width: 1200px; margin: 0 auto; padding: 20px; min-width: 0; }
 .app-footer { max-width: 1200px; margin: 0 auto; padding: 16px 20px 24px;
   font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; opacity: 0.6; }
 
@@ -50,7 +50,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .tabs-row { margin-bottom: 16px; }
 .tabs { display: flex; border-bottom: 1px solid var(--border); }
 .tab-nav {
-  flex: 1; background: none; border: none; color: var(--text-dim);
+  flex: 1; min-width: 0; background: none; border: none; color: var(--text-dim);
   padding: 10px 8px; font-size: 0.9rem; cursor: pointer;
   border-bottom: 2px solid transparent; margin-bottom: -1px;
   transition: color 0.15s, border-color 0.15s;
@@ -65,14 +65,14 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Search + Area filter ── */
 .search-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.search-input { flex: 1; min-width: 180px; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 8px; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
+.search-input { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 8px; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
 .search-input:focus { border-color: var(--accent); }
 .search-input::placeholder { color: var(--text-dim); }
 .area-select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 0.88rem; cursor: pointer; outline: none; transition: border-color 0.15s; }
 .area-select:focus { border-color: var(--accent); }
 
 /* ── Filter sections (area + brand chips) ── */
-.filter-section { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-section { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; min-width: 0; }
 .filter-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 6px; white-space: nowrap; }
 .chip-row { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
 
@@ -120,10 +120,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-clear-filters:hover { border-color: var(--red); color: var(--red); }
 
 /* ── Fuel Type Tabs + Toolbar ── */
-.controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.controls-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.controls-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; min-width: 0; }
+.controls-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.controls-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .tab { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .tab:hover { border-color: var(--accent); color: var(--text); }
 .tab-active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
@@ -177,7 +177,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px; }
 
 /* ── Card ── */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .card-cheapest { border-color: var(--accent) !important; background: linear-gradient(135deg, var(--surface), #fff8f0); }
 .cheapest-tag { position: absolute; top: -1px; right: 12px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 0 0 6px 6px; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -470,85 +470,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .split-view { grid-template-columns: 1fr; }
   .split-map { position: static; height: 350px; order: -1; }
   .split-map .leaflet-container { height: 100% !important; }
-}
-
-@media (max-width: 600px) {
-  /* Header */
-  .header-inner { padding: 10px 14px; gap: 8px; }
-  .header-title h1 { font-size: 1.15rem; }
-  .header-icon { font-size: 1.6rem; }
-
-  /* Main — extra bottom padding so content clears the bottom nav */
-  .main { padding: 12px 14px 88px; }
-
-  /* Search */
-  .search-row { gap: 8px; }
-  .search-input { font-size: 0.85rem; padding: 8px 12px; }
-  .btn-clear-filters { padding: 8px 10px; font-size: 0.78rem; }
-
-  /* Filter chips — scrollable row, no wrap */
-  .filter-section { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: 6px; position: relative; }
-  .filter-section::-webkit-scrollbar { display: none; }
-  .filter-label { display: none; }
-  .chip-row { flex-wrap: nowrap; }
-  /* Scroll fade indicator */
-  .filter-section::after { content: ''; position: sticky; right: 0; flex-shrink: 0; width: 40px; background: linear-gradient(to right, transparent, var(--bg) 80%); pointer-events: none; align-self: stretch; margin-left: -40px; }
-  .brand-chip { font-size: 0.75rem; padding: 4px 10px; white-space: nowrap; }
-
-  /* Fuel tabs — horizontal scroll, controls top row stays flex */
-  .controls-top { gap: 6px; }
-  .fuel-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
-  .fuel-tabs::-webkit-scrollbar { display: none; }
-  .tab { padding: 6px 10px; font-size: 0.8rem; flex-shrink: 0; }
-  .btn-icon { width: 34px; height: 34px; font-size: 0.95rem; }
-
-  /* Controls bottom row */
-  .controls-bottom { gap: 6px; }
-  .sort-controls select { font-size: 0.82rem; padding: 6px 8px; }
-  .view-btn { width: 40px; height: 40px; font-size: 1.2rem; }
-
-  /* Dashboard stats — reduce font size on mobile */
-  .dash-saving-value { font-size: 1.1rem; }
-  .logs-stat-value { font-size: 1.2rem; }
-
-  /* Grid */
-  .grid { grid-template-columns: 1fr; gap: 10px; }
-
-  /* Card */
-  .card { padding: 12px; gap: 10px; }
-  .station-name { font-size: 0.92rem; }
-  .card-footer { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .btn-chart { width: 100%; text-align: center; padding: 7px; }
-
-  /* Compact */
-  .compact-row { padding: 8px 10px; gap: 8px; }
-  .compact-name { font-size: 0.85rem; }
-  .compact-badge { font-size: 0.92rem; }
-  .compact-row .btn-chart-sm { display: none; }
-  .compact-price { min-width: 70px; }
-
-  /* Table */
-  .tbl-area, .tbl-updated-col, .tbl-updated { display: none; }
-  .tbl-td, .tbl-th { padding: 8px 8px; font-size: 0.8rem; }
-
-  /* Modal — full screen on mobile */
-  .modal-overlay { padding: 0; align-items: flex-end; }
-  .modal { border-radius: 16px 16px 0 0; max-height: 92vh; padding: 20px 16px; }
-
-  /* Dropdowns — bottom sheet on mobile to avoid overflow-x clipping */
-  .area-dropdown,
-  .brand-dropdown {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    top: auto;
-    border-radius: 16px 16px 0 0;
-    max-height: 70vh;
-    min-width: unset;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
-    z-index: 10000;
-  }
 }
 
 /* ── Scan progress ── */
@@ -1062,13 +983,95 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
     font-size: 0.55rem; font-weight: 700; padding: 1px 4px; min-width: 14px;
     text-align: center; }
 
+  /* Header */
+  .header-inner { padding: 10px 14px; gap: 8px; }
+  .header-title h1 { font-size: 1.1rem; }
+  .header-sub { font-size: 0.72rem; }
+  .header-icon { font-size: 1.6rem; }
+  .refresh-time { display: none; }
+
+  /* Main — extra bottom padding so content clears the bottom nav */
+  .main { padding: 12px 14px 88px; }
+
+  /* Search */
+  .search-row { gap: 8px; }
+  .search-input { font-size: 0.85rem; padding: 8px 12px; }
+  .btn-clear-filters { padding: 8px 10px; font-size: 0.78rem; }
+
+  /* Filter chips — scrollable row, no wrap */
+  .filter-section { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: 6px; position: relative; }
+  .filter-section::-webkit-scrollbar { display: none; }
+  .filter-label { display: none; }
+  .chip-row { flex-wrap: nowrap; }
+  /* Scroll fade indicator */
+  .filter-section::after { content: ''; position: sticky; right: 0; flex-shrink: 0; width: 40px; background: linear-gradient(to right, transparent, var(--bg) 80%); pointer-events: none; align-self: stretch; margin-left: -40px; }
+  .brand-chip { font-size: 0.75rem; padding: 4px 10px; white-space: nowrap; min-height: 36px; }
+  .area-more-btn { min-height: 36px; padding: 7px 12px; }
+
+  /* Fuel tabs — horizontal scroll, controls top row stays flex */
+  .controls-top { gap: 6px; }
+  .fuel-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .fuel-tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 6px 10px; font-size: 0.8rem; flex-shrink: 0; }
+  .btn-icon { width: 34px; height: 34px; font-size: 0.95rem; }
+
+  /* Controls bottom row */
+  .controls-bottom { gap: 6px; }
+  .sort-controls select { font-size: 0.82rem; padding: 6px 8px; }
+  .view-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+
+  /* Dashboard stats — reduce font size on mobile */
+  .dash-saving-value { font-size: 1.1rem; }
+  .logs-stat-value { font-size: 1.2rem; }
+
+  /* Grid */
+  .grid { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Card */
+  .card { padding: 12px; gap: 10px; }
+  .station-name { font-size: 0.92rem; }
+  .card-footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .btn-chart { width: 100%; text-align: center; padding: 7px; }
+
+  /* Compact */
+  .compact-row { padding: 8px 10px; gap: 8px; min-height: 52px; }
+  .compact-name { font-size: 0.85rem; }
+  .compact-badge { font-size: 0.92rem; }
+  .compact-row .btn-chart-sm { display: none; }
+  .compact-price { min-width: 70px; }
+
+  /* Table */
+  .tbl-area, .tbl-updated-col, .tbl-updated { display: none; }
+  .tbl-td, .tbl-th { padding: 8px 8px; font-size: 0.8rem; }
+
+  /* Modal — full screen on mobile */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal { border-radius: 16px 16px 0 0; max-height: 92vh; padding: 20px 16px; }
+
+  /* Dropdowns — bottom sheet on mobile to avoid overflow-x clipping */
+  .area-dropdown,
+  .brand-dropdown {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    border-radius: 16px 16px 0 0;
+    max-height: 70vh;
+    min-width: unset;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+    z-index: 10000;
+  }
+
   /* Larger touch targets on key interactive rows */
-  .compact-row { min-height: 52px; }
-  .brand-chip, .area-more-btn { min-height: 36px; padding: 7px 12px; }
   .route-result-row { min-height: 64px; padding: 12px 10px; }
 
-  /* Route map below results on mobile */
-  .route-map-wrap { order: 2; }
+  /* Route tab */
+  .route-map-wrap { height: 260px; order: 2; }
+  .route-find-btn-big { font-size: 0.9rem; padding: 12px 16px; }
+  .route-result-name { font-size: 0.85rem; }
+  .route-result-price { font-size: 1rem; }
+  .route-summary { gap: 10px; font-size: 0.82rem; }
 }
 
 /* ── Dashboard savings row ──────────────────────────────────────────────────── */
@@ -1149,7 +1152,7 @@ html, body, #root { height: 100%; }
 /* clip instead of hidden: clips visually without creating a scroll container (keeps child scroll working) */
 html { overflow-x: clip; }
 .app { min-height: 100%; display: flex; flex-direction: column; max-width: 100vw; overflow-x: clip; }
-.main { flex: 1; }
+.main { flex: 1; min-width: 0; overflow-x: clip; }
 /* Smooth momentum scroll on iOS */
 .modal { -webkit-overflow-scrolling: touch; }
 /* Ensure safe areas on notched phones */
@@ -1218,16 +1221,6 @@ html { overflow-x: clip; }
   .log-entry-station { font-size: 0.83rem; }
 }
 
-/* ── Route tab mobile ────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .route-map-wrap { height: 260px; }
-  .route-find-btn-big { font-size: 0.9rem; padding: 12px 16px; }
-  .route-result-row { padding: 10px 10px; gap: 8px; }
-  .route-result-name { font-size: 0.85rem; }
-  .route-result-price { font-size: 1rem; }
-  .route-summary { gap: 10px; font-size: 0.82rem; }
-}
-
 /* ── Dashboard mobile ────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .dash-saving-value { font-size: 1.05rem; }
@@ -1238,9 +1231,3 @@ html { overflow-x: clip; }
   .snapshot-name { font-size: 0.88rem; }
 }
 
-/* ── Header mobile ───────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .header-title h1 { font-size: 1.1rem; }
-  .header-sub { font-size: 0.72rem; }
-  .refresh-time { display: none; }
-}
