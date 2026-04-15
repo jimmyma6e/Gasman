@@ -562,48 +562,49 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
       {/* ── Input form ── */}
       <div className="route-form">
 
-        {/* From */}
-        <div className="route-place-with-save">
-          <div className="route-place-label">From</div>
-          <div className="route-place-input-row">
-            <div className="route-place-wrap">
-              <PlaceInput value={fromPlace} onSelect={setFromPlace}
-                placeholder="e.g. Vancouver, BC"
-                savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+        {/* From + To — side by side */}
+        <div className="route-from-to-row">
+          <div className="route-place-with-save">
+            <div className="route-place-label">From</div>
+            <div className="route-place-input-row">
+              <div className="route-place-wrap">
+                <PlaceInput value={fromPlace} onSelect={setFromPlace}
+                  placeholder="e.g. Vancouver, BC"
+                  savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+              </div>
+              {fromPlace && (
+                <button className="btn-save-place" title="Save this location"
+                  onClick={() => setSavingFor(savingFor === "from" ? null : "from")}>💾</button>
+              )}
             </div>
-            {fromPlace && (
-              <button className="btn-save-place" title="Save this location"
-                onClick={() => setSavingFor(savingFor === "from" ? null : "from")}>💾</button>
+            {savingFor === "from" && (
+              <SavePlacePanel
+                onSave={(emoji, label) => handleSavePlace(fromPlace, emoji, label)}
+                onCancel={() => { setSavingFor(null); setSaveLabel(""); }}
+                saveLabel={saveLabel} setSaveLabel={setSaveLabel} />
             )}
           </div>
-          {savingFor === "from" && (
-            <SavePlacePanel
-              onSave={(emoji, label) => handleSavePlace(fromPlace, emoji, label)}
-              onCancel={() => { setSavingFor(null); setSaveLabel(""); }}
-              saveLabel={saveLabel} setSaveLabel={setSaveLabel} />
-          )}
-        </div>
 
-        {/* To */}
-        <div className="route-place-with-save">
-          <div className="route-place-label">To</div>
-          <div className="route-place-input-row">
-            <div className="route-place-wrap">
-              <PlaceInput value={toPlace} onSelect={setToPlace}
-                placeholder="e.g. Whistler, BC"
-                savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+          <div className="route-place-with-save">
+            <div className="route-place-label">To</div>
+            <div className="route-place-input-row">
+              <div className="route-place-wrap">
+                <PlaceInput value={toPlace} onSelect={setToPlace}
+                  placeholder="e.g. Whistler, BC"
+                  savedPlaces={savedPlaces} onDelete={handleDeletePlace} />
+              </div>
+              {toPlace && (
+                <button className="btn-save-place" title="Save this location"
+                  onClick={() => setSavingFor(savingFor === "to" ? null : "to")}>💾</button>
+              )}
             </div>
-            {toPlace && (
-              <button className="btn-save-place" title="Save this location"
-                onClick={() => setSavingFor(savingFor === "to" ? null : "to")}>💾</button>
+            {savingFor === "to" && (
+              <SavePlacePanel
+                onSave={(emoji, label) => handleSavePlace(toPlace, emoji, label)}
+                onCancel={() => { setSavingFor(null); setSaveLabel(""); }}
+                saveLabel={saveLabel} setSaveLabel={setSaveLabel} />
             )}
           </div>
-          {savingFor === "to" && (
-            <SavePlacePanel
-              onSave={(emoji, label) => handleSavePlace(toPlace, emoji, label)}
-              onCancel={() => { setSavingFor(null); setSaveLabel(""); }}
-              saveLabel={saveLabel} setSaveLabel={setSaveLabel} />
-          )}
         </div>
 
         {/* Fuel type + Mode — side by side */}
@@ -654,27 +655,26 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
               ))}
             </div>
           )}
-          <div className="route-consumption-input-wrap">
-            <input id="route-consumption" className="route-consumption-input"
-              type="number" min="1" max="40" step="0.5" value={consumption}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (!isNaN(v) && v > 0) {
-                  setConsumption(v);
-                  localStorage.setItem("gasman-consumption", String(v));
-                }
-              }} />
-            <span className="route-consumption-unit">L/100km</span>
-          </div>
-
-          {/* Fill litres */}
-          <div className="route-fill-row">
-            <span className="route-place-label" style={{ marginBottom: 0 }}>⛽ Fill at pump</span>
+          {/* Consumption + Fill at pump — same row */}
+          <div className="route-consumption-fill-row">
+            <div className="route-consumption-input-wrap">
+              <input id="route-consumption" className="route-consumption-input"
+                type="number" min="1" max="40" step="0.5" value={consumption}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v) && v > 0) {
+                    setConsumption(v);
+                    localStorage.setItem("gasman-consumption", String(v));
+                  }
+                }} />
+              <span className="route-consumption-unit">L/100km</span>
+            </div>
             <div className="route-fill-inputs">
+              <span className="route-consumption-unit">⛽</span>
               <input
                 type="number"
                 className="route-consumption-input"
-                placeholder="—"
+                placeholder="Fill L"
                 min={1} max={200} step={5}
                 value={fillLitres}
                 onChange={(e) => setFillLitres(e.target.value)}
@@ -683,7 +683,7 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
               {activeVehicle?.tank_litres && (
                 <button className="btn-fill-tank"
                   onClick={() => setFillLitres(String(activeVehicle.tank_litres))}>
-                  Full tank ({activeVehicle.tank_litres}L)
+                  Full
                 </button>
               )}
             </div>

@@ -1101,7 +1101,8 @@ export default function App() {
                 onClick={selectedCards.length > 0 ? () => setShowCardDiscounts((o) => !o) : () => setShowProfile(true)}
                 title={selectedCards.length > 0 ? (showCardDiscounts ? "Card prices ON" : "Card prices OFF") : "Add a credit card"}
               >
-                💳
+                <span className="btn-icon-emoji">💳</span>
+                <span className="btn-icon-label">Card</span>
               </button>
               {/* 📍 Near Me */}
               <button
@@ -1110,7 +1111,8 @@ export default function App() {
                 title={userCoords ? "Clear Near Me" : "Find stations near you"}
                 disabled={nearMeLoading}
               >
-                {nearMeLoading ? "⏳" : "📍"}
+                <span className="btn-icon-emoji">{nearMeLoading ? "⏳" : "📍"}</span>
+                <span className="btn-icon-label">{userCoords ? "Near ✓" : "Near Me"}</span>
               </button>
               {/* ⛽ Show fill cost */}
               <button
@@ -1121,7 +1123,8 @@ export default function App() {
                 }}
                 title={fillLitres ? `Show fill cost (${fillLitres}L)` : "Set fill litres in Profile"}
               >
-                ⛽
+                <span className="btn-icon-emoji">⛽</span>
+                <span className="btn-icon-label">Cost</span>
               </button>
             </div>
           </div>
