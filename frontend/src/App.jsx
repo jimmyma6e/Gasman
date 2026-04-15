@@ -914,7 +914,7 @@ export default function App() {
       </header>
 
       <main className="main">
-        <InsightsPanel activeFuel={activeFuel} trend={data?.trend} />
+        <InsightsPanel trend={data?.trend} />
 
         {/* Tabs */}
         <div className="tabs-row">

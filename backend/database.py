@@ -301,12 +301,33 @@ def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
             """, (fuel_type,))
             ytd_avg = cur.fetchone()[0]
 
-    today_avg = round(today_avg, 1) if today_avg else None
-    ytd_avg   = round(ytd_avg,   1) if ytd_avg   else None
+            cur.execute("""
+                SELECT AVG(price) FROM price_history
+                WHERE fuel_type = %s
+                  AND recorded_at >= NOW() - INTERVAL '7 days'
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
+            """, (fuel_type,))
+            seven_day_avg = cur.fetchone()[0]
+
+    today_avg     = round(today_avg,     1) if today_avg     else None
+    ytd_avg       = round(ytd_avg,       1) if ytd_avg       else None
+    seven_day_avg = round(seven_day_avg, 1) if seven_day_avg else None
+
     change_pct = None
     if today_avg and ytd_avg and ytd_avg > 0:
         change_pct = round((today_avg - ytd_avg) / ytd_avg * 100, 1)
-    return {"today_avg": today_avg, "ytd_avg": ytd_avg, "change_pct": change_pct}
+
+    seven_day_change_pct = None
+    if today_avg and seven_day_avg and seven_day_avg > 0:
+        seven_day_change_pct = round((today_avg - seven_day_avg) / seven_day_avg * 100, 1)
+
+    return {
+        "today_avg":            today_avg,
+        "ytd_avg":              ytd_avg,
+        "change_pct":           change_pct,
+        "seven_day_avg":        seven_day_avg,
+        "seven_day_change_pct": seven_day_change_pct,
+    }
 
 
 def get_latest_stations() -> list:

@@ -124,7 +124,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .controls-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .controls-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
-.tab { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tab { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
 .tab:hover { border-color: var(--accent); color: var(--text); }
 .tab-active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
 .tab-price { font-size: 0.72rem; opacity: 0.8; }
@@ -175,6 +175,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Grid ── */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px; }
+@media (min-width: 900px) { .grid { grid-template-columns: repeat(3, 1fr); } }
 
 /* ── Card ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -327,6 +328,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .insight-area-name  { color: var(--text-dim); }
 .insight-area-today { font-weight: 600; color: var(--text); }
 .insight-area-change { font-size: 0.7rem; font-weight: 600; }
+.insight-area-sep { color: var(--border); margin: 0 1px; font-size: 0.7rem; }
+.insight-area-premium { color: var(--text-dim); }
 
 /* ── Area filter dropdown ── */
 .area-more-wrap { position: relative; }
