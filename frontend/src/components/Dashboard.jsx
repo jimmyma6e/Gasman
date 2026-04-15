@@ -584,6 +584,9 @@ export function ProfileModal({ onClose }) {
     catch { return []; }
   });
   const [addingPlace, setAddingPlace] = useState(false);
+  const [fillLitres, setFillLitres] = useState(
+    () => localStorage.getItem("gasman-fill-litres") || ""
+  );
 
   function deletePlace(id) {
     const next = places.filter((p) => p.id !== id);
@@ -612,6 +615,25 @@ export function ProfileModal({ onClose }) {
         <VehicleManager />
 
         <CardManager />
+
+        <h3 className="profile-section-label">⛽ Default Fill Amount</h3>
+        <p className="profile-tip-text">Set your typical fill-up amount to see total cost on station cards (tap ⛽ in All Stations).</p>
+        <div className="profile-consumption-row">
+          <input
+            type="number"
+            className="route-consumption-input"
+            value={fillLitres}
+            onChange={(e) => {
+              setFillLitres(e.target.value);
+              localStorage.setItem("gasman-fill-litres", e.target.value);
+            }}
+            placeholder="0"
+            min="0"
+            max="200"
+            step="5"
+          />
+          <span className="profile-unit">litres</span>
+        </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 className="profile-section-label">📍 Saved Places</h3>

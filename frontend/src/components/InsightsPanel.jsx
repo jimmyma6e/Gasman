@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export default function InsightsPanel({ activeFuel }) {
+export default function InsightsPanel({ activeFuel, trend }) {
   const [regular, setRegular] = useState(null);
   const [active, setActive]   = useState(null);
   const [expanded, setExpanded] = useState(false);
@@ -20,17 +20,34 @@ export default function InsightsPanel({ activeFuel }) {
       .catch(() => {});
   }, [activeFuel]);
 
-  if (!regular) return null;
+  // Extract trend data (BC or first available)
+  const bc = trend?.find((t) => t.country === "CA") || trend?.[0];
+  const trendArrow = bc?.trend === 1 ? "↑" : bc?.trend === -1 ? "↓" : null;
+  const trendCls   = bc?.trend === 1 ? "pill-up" : bc?.trend === -1 ? "pill-down" : "";
+
+  // If no data at all, show just the trend banner if available
+  if (!regular) {
+    if (!bc) return null;
+    return (
+      <div className="insights-panel">
+        <div className="insights-header">
+          <span className={`insight-pill ${trendCls}`} style={{ fontWeight: 600 }}>
+            {trendArrow && `${trendArrow} `}{bc.today?.toFixed(1)}¢/L avg
+            {bc.todayLow ? ` · Low ${bc.todayLow.toFixed(1)}¢` : ""}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const { area_averages, ytd_vs_today } = regular;
   const areasWithData = (area_averages || []).filter((a) => a.avg_today != null);
-  if (areasWithData.length === 0) return null;
+  if (areasWithData.length === 0 && !bc) return null;
 
-  const todayAvg = ytd_vs_today?.today_avg;
-  const ytdAvg   = ytd_vs_today?.ytd_avg;
+  const todayAvg  = ytd_vs_today?.today_avg;
+  const ytdAvg    = ytd_vs_today?.ytd_avg;
   const changePct = ytd_vs_today?.change_pct;
 
-  // Active fuel label (for secondary pill, when not regular)
   const activeLabel = {
     midgrade_gas: "Mid", premium_gas: "Premium", diesel: "Diesel", e85: "E85",
   }[activeFuel];
@@ -39,9 +56,16 @@ export default function InsightsPanel({ activeFuel }) {
   return (
     <div className="insights-panel">
       <div className="insights-header">
-        <span className="insights-title">Regular Insights</span>
+        {/* Trend + today avg (from trend API — real-time) */}
+        {bc && (
+          <span className={`insight-pill ${trendCls}`} style={{ fontWeight: 600 }}>
+            {trendArrow && `${trendArrow} `}{bc.today?.toFixed(1)}¢/L
+            {bc.todayLow ? ` · Low ${bc.todayLow.toFixed(1)}` : ""}
+          </span>
+        )}
         <div className="insights-summary-pills">
-          {todayAvg && (
+          {/* Show today avg from insights only when trend doesn't already supply it */}
+          {todayAvg && !bc && (
             <span className="insight-pill">
               Today <strong>{todayAvg}¢/L</strong>
             </span>
@@ -62,13 +86,15 @@ export default function InsightsPanel({ activeFuel }) {
             </span>
           )}
         </div>
-        <button
-          className="insights-toggle"
-          onClick={() => setExpanded((e) => !e)}
-          title={expanded ? "Collapse" : "Show by area"}
-        >
-          {expanded ? "▴" : "▾"}
-        </button>
+        {areasWithData.length > 0 && (
+          <button
+            className="insights-toggle"
+            onClick={() => setExpanded((e) => !e)}
+            title={expanded ? "Collapse" : "Show by area"}
+          >
+            {expanded ? "▴" : "▾"}
+          </button>
+        )}
       </div>
 
       {expanded && (

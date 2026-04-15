@@ -258,7 +258,7 @@ function ChartModal({ station, onClose }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, userCoords, onLogFillup }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, showFillCost, userCoords, onLogFillup }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
@@ -327,7 +327,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
                       </div>
                     );
                   })()}
-                  {key === activeFuel && parseFloat(fillLitres) > 0 && (() => {
+                  {key === activeFuel && showFillCost && parseFloat(fillLitres) > 0 && (() => {
                     const litres = parseFloat(fillLitres);
                     const total = (price * litres / 100).toFixed(2);
                     const cardResult = showCardDiscounts
@@ -375,14 +375,15 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
 }
 
 // ---------- Station Summary Bar ----------
-function StationSummaryBar({ sorted, cheapestPrices, userCoords }) {
+function StationSummaryBar({ sorted, activeFuel, cheapestPrices, userCoords }) {
   if (!sorted?.length) return null;
 
-  const cheapReg = VALID_PRICE(cheapestPrices?.regular_gas)
-    ? sorted.find((s) => s.regular_gas?.price === cheapestPrices.regular_gas) : null;
-  const cheapPrem = VALID_PRICE(cheapestPrices?.premium_gas)
-    ? sorted.find((s) => s.premium_gas?.price === cheapestPrices.premium_gas) : null;
+  // Cheapest station for the active fuel type
+  const cheapStation = VALID_PRICE(cheapestPrices?.[activeFuel])
+    ? sorted.find((s) => s[activeFuel]?.price === cheapestPrices[activeFuel])
+    : null;
 
+  // Closest station (only when Near Me is active)
   let closest = null;
   if (userCoords) {
     let minDist = Infinity;
@@ -393,32 +394,26 @@ function StationSummaryBar({ sorted, cheapestPrices, userCoords }) {
     }
   }
 
-  if (!cheapReg && !cheapPrem && !closest) return null;
+  if (!cheapStation && !closest) return null;
+
+  const distLabel = (d) => d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
 
   return (
     <div className="station-summary-bar">
-      {cheapReg && (
-        <div className="summary-item">
-          <div className="summary-price">{cheapReg.regular_gas.price.toFixed(1)}¢</div>
-          <div className="summary-label">Cheapest Regular</div>
-          <div className="summary-name">{cheapReg.name}</div>
-        </div>
+      {cheapStation && (
+        <span className="summary-best">
+          ⛽ <strong>{cheapStation[activeFuel].price.toFixed(1)}¢</strong>
+          {" at "}
+          <span className="summary-sname">{cheapStation.name}</span>
+        </span>
       )}
-      {cheapPrem && (
-        <div className="summary-item">
-          <div className="summary-price">{cheapPrem.premium_gas.price.toFixed(1)}¢</div>
-          <div className="summary-label">Cheapest Premium</div>
-          <div className="summary-name">{cheapPrem.name}</div>
-        </div>
-      )}
+      {cheapStation && closest && <span className="summary-dot">·</span>}
       {closest && (
-        <div className="summary-item">
-          <div className="summary-price">
-            {closest.dist < 1 ? `${Math.round(closest.dist * 1000)}m` : `${closest.dist.toFixed(1)}km`}
-          </div>
-          <div className="summary-label">Closest Station</div>
-          <div className="summary-name">{closest.station.name}</div>
-        </div>
+        <span className="summary-closest">
+          📍 <strong>{distLabel(closest.dist)}</strong>
+          {" to "}
+          <span className="summary-sname">{closest.station.name}</span>
+        </span>
       )}
     </div>
   );
@@ -504,7 +499,15 @@ export default function App() {
   const [showCardDiscounts, setShowCardDiscounts] = useState(
     () => localStorage.getItem("gasman-show-card-discounts") === "1"
   );
-  const [fillLitres, setFillLitres] = useState("");
+  const [fillLitres, setFillLitres] = useState(
+    () => localStorage.getItem("gasman-fill-litres") || ""
+  );
+  const [showFillCost, setShowFillCost] = useState(
+    () => localStorage.getItem("gasman-show-fill-cost") === "1"
+  );
+  // PWA install prompt
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
 
   const [onboarded, setOnboarded] = useState(
     () => !!localStorage.getItem("gasman-onboarded")
@@ -671,13 +674,30 @@ export default function App() {
   useEffect(() => { localStorage.setItem("gasman-area-filter",  JSON.stringify([...areaFilter]));  }, [areaFilter]);
   useEffect(() => { localStorage.setItem("gasman-brand-filter", JSON.stringify([...brandFilter])); }, [brandFilter]);
   useEffect(() => { localStorage.setItem("gasman-show-card-discounts", showCardDiscounts ? "1" : "0"); }, [showCardDiscounts]);
-  // Sync selectedCards from localStorage when profile modal closes (cards may have changed)
+  useEffect(() => { localStorage.setItem("gasman-show-fill-cost", showFillCost ? "1" : "0"); }, [showFillCost]);
+  // Sync state from localStorage when profile modal closes (cards/fill litres may have changed)
   useEffect(() => {
     if (!showProfile) {
-      try { setSelectedCards(JSON.parse(localStorage.getItem("gasman-cards") || "[]")); }
-      catch { /* ignore */ }
+      try {
+        setSelectedCards(JSON.parse(localStorage.getItem("gasman-cards") || "[]"));
+        setFillLitres(localStorage.getItem("gasman-fill-litres") || "");
+      } catch { /* ignore */ }
     }
   }, [showProfile]);
+
+  // PWA install prompt
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") { setShowInstall(false); setInstallPrompt(null); }
+  };
 
   // GA4 — skip first render because index.html gtag snippet already fires the hit.
   const gaTabMounted = useRef(false);
@@ -856,18 +876,19 @@ export default function App() {
             </div>
           </div>
           <div className="header-actions">
-            {lastRefresh && <span className="refresh-time">Refreshed {timeAgo(lastRefresh.toISOString())}</span>}
+            {lastRefresh && <span className="refresh-time">{timeAgo(lastRefresh.toISOString())}</span>}
+            {showInstall && (
+              <button className="btn-install" onClick={handleInstall} title="Add to Home Screen">
+                📲 Install
+              </button>
+            )}
             <button className="btn-edit-profile" onClick={() => setShowProfile(true)} title="My Profile">⚙️</button>
-            <button className="btn-refresh" onClick={fetchData} disabled={loading}>
-              {loading ? "Loading..." : "Refresh"}
-            </button>
           </div>
         </div>
       </header>
 
       <main className="main">
-        {data?.trend && <TrendBanner trend={data.trend} />}
-        <InsightsPanel activeFuel={activeFuel} />
+        <InsightsPanel activeFuel={activeFuel} trend={data?.trend} />
 
         {/* Tabs */}
         <div className="tabs-row">
@@ -1012,41 +1033,18 @@ export default function App() {
           </div>
         </div>
 
-        {/* Brand filter — single-select quick chips + More dropdown */}
+        {/* Brand filter — multi-select quick chips + More dropdown */}
         {brands.length > 0 && (
           <div className="filter-section">
             <span className="filter-label">Brand</span>
             <div className="chip-row">
-              {/* All chip — clears brand filter */}
-              <button
-                className={`brand-chip ${brandFilter.size === 0 ? "brand-chip-active" : ""}`}
-                onClick={() => setBrandFilter(new Set())}
-              >
-                All
-              </button>
-
-              {/* Quick brand chips — single-select */}
+              {/* Quick brand chips — multi-select toggle */}
               {QUICK_BRANDS.filter((b) => brands.includes(b)).map((b) => (
                 <button key={b}
                   className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
-                  onClick={() => {
-                    if (brandFilter.has(b)) {
-                      setBrandFilter(new Set());
-                    } else {
-                      setBrandFilter(new Set([b]));
-                      setSortBy("price");
-                    }
-                  }}
+                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}
                 >
                   {b}
-                </button>
-              ))}
-
-              {/* Selected non-quick brands as dismissible chips */}
-              {[...brandFilter].filter((b) => !QUICK_BRANDS.includes(b)).map((b) => (
-                <button key={b} className="brand-chip brand-chip-active"
-                  onClick={() => setBrandFilter(new Set())}>
-                  {b} ×
                 </button>
               ))}
 
@@ -1067,11 +1065,7 @@ export default function App() {
                         b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
                         <label key={b} className="area-dropdown-item">
                           <input type="checkbox" checked={brandFilter.has(b)}
-                            onChange={() => {
-                              const next = brandFilter.has(b) ? new Set() : new Set([b]);
-                              setBrandFilter(next);
-                              if (next.size > 0) setSortBy("price");
-                            }} />
+                            onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
                           {b}
                         </label>
                       ))}
@@ -1083,60 +1077,56 @@ export default function App() {
           </div>
         )}
 
-        {/* Controls */}
+        {/* Controls — top row: fuel tabs + 3 icon buttons */}
         <div className="controls">
-          <div className="fuel-tabs">
-            {FUEL_TYPES.map(({ key, label }) => (
-              <button
-                key={key}
-                className={`tab ${activeFuel === key ? "tab-active" : ""}`}
-                onClick={() => setActiveFuel(key)}
-              >
-                {label}
-                {cheapestPrices[key] != null && (
-                  <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="controls-right">
-            <div className="fill-control">
-              <label className="fill-label" htmlFor="fill-input">⛽ Fill</label>
-              <input
-                id="fill-input"
-                type="number"
-                className="fill-input"
-                placeholder="—"
-                min={1}
-                max={200}
-                step={5}
-                value={fillLitres}
-                onChange={(e) => setFillLitres(e.target.value)}
-              />
-              <span className="fill-unit">L</span>
+          <div className="controls-top">
+            <div className="fuel-tabs">
+              {FUEL_TYPES.map(({ key, label }) => (
+                <button
+                  key={key}
+                  className={`tab ${activeFuel === key ? "tab-active" : ""}`}
+                  onClick={() => setActiveFuel(key)}
+                >
+                  {label}
+                  {cheapestPrices[key] != null && (
+                    <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
+                  )}
+                </button>
+              ))}
             </div>
-            {selectedCards.length > 0 ? (
+            <div className="toolbar-icons">
+              {/* 💳 Credit card prices */}
               <button
-                className={`btn-card-toggle ${showCardDiscounts ? "btn-card-toggle-on" : ""}`}
-                onClick={() => setShowCardDiscounts((o) => !o)}
-                title="Show discounted prices based on your credit cards">
-                💳 {showCardDiscounts ? "Card prices ON" : "Card prices"}
+                className={`btn-icon ${showCardDiscounts && selectedCards.length > 0 ? "btn-icon-active" : ""}`}
+                onClick={selectedCards.length > 0 ? () => setShowCardDiscounts((o) => !o) : () => setShowProfile(true)}
+                title={selectedCards.length > 0 ? (showCardDiscounts ? "Card prices ON" : "Card prices OFF") : "Add a credit card"}
+              >
+                💳
               </button>
-            ) : (
-              <button className="btn-card-toggle" onClick={() => setShowProfile(true)}
-                title="Add a credit card to see discounted prices">
-                💳 Add a card
+              {/* 📍 Near Me */}
+              <button
+                className={`btn-icon ${userCoords ? "btn-icon-active" : ""}`}
+                onClick={userCoords ? () => { setUserCoords(null); setSortBy("price"); } : getNearMe}
+                title={userCoords ? "Clear Near Me" : "Find stations near you"}
+                disabled={nearMeLoading}
+              >
+                {nearMeLoading ? "⏳" : "📍"}
               </button>
-            )}
-            <button
-              className={`btn-near-me ${userCoords ? "btn-near-me-active" : ""}`}
-              onClick={userCoords ? () => { setUserCoords(null); setSortBy("price"); } : getNearMe}
-              title={userCoords ? "Clear Near Me" : "Find stations near you"}
-              disabled={nearMeLoading}
-            >
-              {nearMeLoading ? "Locating…" : userCoords ? "📍 Near Me ✓" : "📍 Near Me"}
-            </button>
-            {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
+              {/* ⛽ Show fill cost */}
+              <button
+                className={`btn-icon ${showFillCost ? "btn-icon-active" : ""}`}
+                onClick={() => {
+                  if (!fillLitres) { setShowProfile(true); return; }
+                  setShowFillCost((o) => !o);
+                }}
+                title={fillLitres ? `Show fill cost (${fillLitres}L)` : "Set fill litres in Profile"}
+              >
+                ⛽
+              </button>
+            </div>
+          </div>
+          {/* Bottom row: map toggle, sort, view */}
+          <div className="controls-bottom">
             <button
               className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
               onClick={() => setShowMap((v) => !v)}
@@ -1145,12 +1135,12 @@ export default function App() {
             </button>
             {viewMode !== "table" && (
               <div className="sort-controls">
-                <label>Sort by</label>
+                <label>Sort</label>
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                   <option value="price">Price</option>
-                  <option value="updated">Latest Update</option>
+                  <option value="updated">Latest</option>
                   <option value="name">Name</option>
-                  <option value="city">City / Area</option>
+                  <option value="city">City</option>
                   {userCoords && <option value="distance">Distance</option>}
                 </select>
               </div>
@@ -1171,6 +1161,7 @@ export default function App() {
                 </button>
               ))}
             </div>
+            {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
           </div>
         </div>
 
@@ -1248,7 +1239,7 @@ export default function App() {
 
         {data && sorted.length > 0 && (
           <>
-            <StationSummaryBar sorted={sorted} cheapestPrices={cheapestPrices} userCoords={userCoords} />
+            <StationSummaryBar sorted={sorted} activeFuel={activeFuel} cheapestPrices={cheapestPrices} userCoords={userCoords} />
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
 
             <div className={showMap ? "split-view" : ""}>
@@ -1274,6 +1265,7 @@ export default function App() {
                         selectedCards={selectedCards}
                         showCardDiscounts={showCardDiscounts}
                         fillLitres={fillLitres}
+                        showFillCost={showFillCost}
                         userCoords={userCoords}
                         onLogFillup={(s) => {
                           setFillupTarget({ station: s, fuelType: activeFuel });

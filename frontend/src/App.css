@@ -23,10 +23,14 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .header-title h1 { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
 .header-sub { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
 .header-actions { display: flex; align-items: center; gap: 12px; }
-.refresh-time { font-size: 0.78rem; color: var(--text-dim); }
+.refresh-time { font-size: 0.75rem; color: var(--text-dim); }
+/* Keep .btn-refresh for the Browse Stations / Retry buttons used elsewhere */
 .btn-refresh { background: var(--accent); color: #000; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: opacity 0.15s; }
 .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-refresh:hover:not(:disabled) { opacity: 0.85; }
+/* PWA install button */
+.btn-install { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+.btn-install:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Main ── */
 .main { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -115,13 +119,22 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-clear-filters { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .btn-clear-filters:hover { border-color: var(--red); color: var(--red); }
 
-/* ── Fuel Type Tabs + Sort ── */
-.controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-.fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+/* ── Fuel Type Tabs + Toolbar ── */
+.controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.controls-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.controls-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
 .tab { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .tab:hover { border-color: var(--accent); color: var(--text); }
 .tab-active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
 .tab-price { font-size: 0.72rem; opacity: 0.8; }
+/* 3 icon buttons next to fuel tabs */
+.toolbar-icons { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.btn-icon { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); width: 36px; height: 36px; border-radius: 8px; font-size: 1.05rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+.btn-icon:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.btn-icon-active { background: rgba(245,158,11,0.15); border-color: var(--accent); color: var(--accent); }
+.btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Legacy controls-right kept for any remaining usages */
 .controls-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sort-controls { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim); }
 .sort-controls select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
@@ -454,16 +467,21 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .filter-section::after { content: ''; position: sticky; right: 0; flex-shrink: 0; width: 40px; background: linear-gradient(to right, transparent, var(--bg) 80%); pointer-events: none; align-self: stretch; margin-left: -40px; }
   .brand-chip { font-size: 0.75rem; padding: 4px 10px; white-space: nowrap; }
 
-  /* Fuel tabs — horizontal scroll */
-  .controls { flex-direction: column; align-items: stretch; gap: 8px; }
+  /* Fuel tabs — horizontal scroll, controls top row stays flex */
+  .controls-top { gap: 6px; }
   .fuel-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
   .fuel-tabs::-webkit-scrollbar { display: none; }
-  .tab { padding: 6px 12px; font-size: 0.8rem; flex-shrink: 0; }
+  .tab { padding: 6px 10px; font-size: 0.8rem; flex-shrink: 0; }
+  .btn-icon { width: 34px; height: 34px; font-size: 0.95rem; }
 
-  /* Controls right row */
-  .controls-right { justify-content: space-between; width: 100%; }
+  /* Controls bottom row */
+  .controls-bottom { gap: 6px; }
   .sort-controls select { font-size: 0.82rem; padding: 6px 8px; }
   .view-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+
+  /* Dashboard stats — reduce font size on mobile */
+  .dash-saving-value { font-size: 1.1rem; }
+  .logs-stat-value { font-size: 1.2rem; }
 
   /* Grid */
   .grid { grid-template-columns: 1fr; gap: 10px; }
@@ -1042,12 +1060,12 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .logs-tab { padding: 0; }
 .logs-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
 .logs-stat-card { background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px; }
+  border-radius: 12px; padding: 12px 14px; }
 .logs-stat-highlight { background: rgba(22,163,74,0.07); border-color: rgba(22,163,74,0.25); }
-.logs-stat-label { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
-.logs-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--text); line-height: 1; }
+.logs-stat-label { font-size: 0.7rem; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
+.logs-stat-value { font-size: 1.4rem; font-weight: 800; color: var(--text); line-height: 1; }
 .logs-stat-highlight .logs-stat-value { color: var(--green); }
-.logs-stat-sub { font-size: 0.68rem; color: var(--text-dim); margin-top: 4px; }
+.logs-stat-sub { font-size: 0.65rem; color: var(--text-dim); margin-top: 4px; }
 
 .logs-empty { text-align: center; padding: 48px 20px; }
 .logs-empty-icon { font-size: 3rem; margin-bottom: 12px; }
@@ -1095,8 +1113,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* Full-height app shell */
 html, body, #root { height: 100%; }
 /* Prevent horizontal layout expansion after interaction */
-html { overflow-x: hidden; }
-.app { min-height: 100%; display: flex; flex-direction: column; max-width: 100vw; overflow-x: hidden; }
+/* clip instead of hidden: clips visually without creating a scroll container (keeps child scroll working) */
+html { overflow-x: clip; }
+.app { min-height: 100%; display: flex; flex-direction: column; max-width: 100vw; overflow-x: clip; }
 .main { flex: 1; }
 /* Smooth momentum scroll on iOS */
 .modal { -webkit-overflow-scrolling: touch; }
@@ -1104,18 +1123,19 @@ html { overflow-x: hidden; }
 .header { padding-top: env(safe-area-inset-top, 0); }
 .app-footer { padding-bottom: calc(env(safe-area-inset-bottom, 0) + 16px); }
 
-/* ── Station summary bar (All Stations top quick stats) ─────────────────────── */
-.station-summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-.summary-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  padding: 10px 14px; cursor: default; transition: border-color 0.15s; overflow: hidden; }
-.summary-price { font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1; }
-.summary-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase;
-  letter-spacing: 0.05em; margin: 3px 0 2px; }
-.summary-name { font-size: 0.76rem; color: var(--text-dim); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 600px) {
-  .station-summary-bar { grid-template-columns: 1fr 1fr; }
-  .station-summary-bar .summary-item:last-child:nth-child(odd) { grid-column: span 2; }
+/* ── Station summary bar (All Stations top compact highlight) ────────────────── */
+.station-summary-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 14px; margin-bottom: 12px; font-size: 0.83rem; color: var(--text-dim); }
+.summary-best, .summary-closest { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.summary-best strong { color: var(--accent); font-size: 0.95rem; font-weight: 800; white-space: nowrap; }
+.summary-closest strong { color: var(--text); font-weight: 700; white-space: nowrap; }
+.summary-sname { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 160px; }
+.summary-dot { color: var(--border); flex-shrink: 0; }
+@media (max-width: 480px) {
+  .station-summary-bar { font-size: 0.78rem; padding: 7px 12px; }
+  .summary-sname { max-width: 100px; }
 }
 
 /* ── Show more button ────────────────────────────────────────────────────────── */
@@ -1154,3 +1174,40 @@ html { overflow-x: hidden; }
   border-radius: 10px; font-size: 0.88rem; font-weight: 700; cursor: pointer;
   transition: opacity 0.15s; -webkit-tap-highlight-color: transparent; }
 .btn-add-log:hover { opacity: 0.85; }
+
+/* ── Logs mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .logs-stats-grid { gap: 8px; }
+  .logs-stat-card { padding: 10px 12px; }
+  .logs-stat-value { font-size: 1.15rem; }
+  .logs-stat-label { font-size: 0.65rem; }
+  .log-entry { padding: 9px 11px; }
+  .log-entry-station { font-size: 0.83rem; }
+}
+
+/* ── Route tab mobile ────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .route-map-wrap { height: 260px; }
+  .route-find-btn-big { font-size: 0.9rem; padding: 12px 16px; }
+  .route-result-row { padding: 10px 10px; gap: 8px; }
+  .route-result-name { font-size: 0.85rem; }
+  .route-result-price { font-size: 1rem; }
+  .route-summary { gap: 10px; font-size: 0.82rem; }
+}
+
+/* ── Dashboard mobile ────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .dash-saving-value { font-size: 1.05rem; }
+  .dash-saving-label { font-size: 0.65rem; }
+  .dash-saving-sub { font-size: 0.62rem; }
+  .dashboard-section-title { font-size: 0.92rem; }
+  .fav-station-name { font-size: 0.88rem; }
+  .snapshot-name { font-size: 0.88rem; }
+}
+
+/* ── Header mobile ───────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .header-title h1 { font-size: 1.1rem; }
+  .header-sub { font-size: 0.72rem; }
+  .refresh-time { display: none; }
+}
