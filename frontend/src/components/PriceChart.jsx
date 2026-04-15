@@ -40,6 +40,15 @@ function formatBucketLabel(isoKey, hours) {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function timeAgoShort(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -54,7 +63,7 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-export default function PriceChart({ stationId }) {
+export default function PriceChart({ stationId, activeFuel }) {
   const [range, setRange]     = useState(168); // default 7-day view
   const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -97,10 +106,23 @@ export default function PriceChart({ stationId }) {
     }
   }
   const chartData = Object.values(bucketMap).sort((a, b) => a._ts - b._ts);
-  const prices = history.map((h) => h.price).filter((p) => p != null);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const change = history[history.length-1]?.price && history[0]?.price ? history[history.length-1].price - history[0].price : null;
+
+  // Stats for active fuel (or all prices if no activeFuel)
+  const fuelForStats = activeFuel ?? Object.keys(FUEL_CONFIG)[0];
+  const activePrices = history.filter((h) => h.fuel_type === fuelForStats && h.price != null).map((h) => h.price);
+  const minPrice = activePrices.length ? Math.min(...activePrices) : null;
+  const maxPrice = activePrices.length ? Math.max(...activePrices) : null;
+  const firstPrice = activePrices[0];
+  const lastPrice  = activePrices[activePrices.length - 1];
+  const change = (firstPrice != null && lastPrice != null) ? lastPrice - firstPrice : null;
+
+  // Last recorded timestamp across all history
+  const lastTs = history.reduce((best, h) => {
+    const t = new Date(h.recorded_at).getTime();
+    return t > best ? t : best;
+  }, 0);
+  const lastTsIso = lastTs ? new Date(lastTs).toISOString() : null;
+
   const unit = history[0]?.unit ?? "";
   const unitLabel = (unit.includes("litre") || unit.includes("liter")) ? "¢/L" : "$/gal";
   const rangeLabel = RANGES.find((r) => r.hours === range)?.label ?? "";
@@ -109,10 +131,10 @@ export default function PriceChart({ stationId }) {
     <div>
       {rangeBar}
       <div className="chart-stats-row">
-        <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} Low</span><span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span></div>
-        <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} High</span><span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span></div>
-        {change !== null && <div className="chart-stat"><span className="chart-stat-label">Change ({rangeLabel})</span><span className={`chart-stat-value ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>{change > 0 ? "+" : ""}{change.toFixed(1)}{unitLabel}</span></div>}
-        <div className="chart-stat"><span className="chart-stat-label">Data Points</span><span className="chart-stat-value">{chartData.length}</span></div>
+        {minPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} Low</span><span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span></div>}
+        {maxPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} High</span><span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span></div>}
+        {change !== null && <div className="chart-stat"><span className="chart-stat-label">Change</span><span className={`chart-stat-value ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>{change > 0 ? "+" : ""}{change.toFixed(1)}{unitLabel}</span></div>}
+        {lastTsIso && <div className="chart-stat"><span className="chart-stat-label">Last data</span><span className="chart-stat-value">{timeAgoShort(lastTsIso)}</span></div>}
       </div>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
@@ -121,10 +143,24 @@ export default function PriceChart({ stationId }) {
           <YAxis domain={["auto", "auto"]} tick={{ fill: "#94a3b8", fontSize: 11 }} width={48} tickFormatter={(v) => v.toFixed(1)} />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ paddingTop: 8, fontSize: 12, color: "#94a3b8" }} />
-          <ReferenceLine y={minPrice} stroke="#22c55e" strokeDasharray="4 4" strokeOpacity={0.5} />
-          {Object.entries(FUEL_CONFIG).map(([key, { label, color }]) => (
-            <Line key={key} type="monotone" dataKey={key} name={label} stroke={color} strokeWidth={2} dot={chartData.length < 10} activeDot={{ r: 4 }} connectNulls />
-          ))}
+          {minPrice != null && <ReferenceLine y={minPrice} stroke="#22c55e" strokeDasharray="4 4" strokeOpacity={0.5} />}
+          {Object.entries(FUEL_CONFIG).map(([key, { label, color }]) => {
+            const isActive = activeFuel ? key === activeFuel : true;
+            return (
+              <Line
+                key={key}
+                type="monotone"
+                dataKey={key}
+                name={label}
+                stroke={color}
+                strokeWidth={isActive ? 2.5 : 1.5}
+                strokeOpacity={isActive ? 1 : 0.35}
+                dot={false}
+                activeDot={{ r: 4 }}
+                connectNulls
+              />
+            );
+          })}
         </LineChart>
       </ResponsiveContainer>
     </div>

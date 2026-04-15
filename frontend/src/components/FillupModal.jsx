@@ -7,9 +7,10 @@ const FUEL_LABELS = {
   diesel:       "Diesel",
 };
 
-export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose }) {
+export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose, editEntry }) {
   // station may be null when logging manually from the Logs tab
   const stationPrice = station?.[fuelType]?.price ?? null;
+  const isEdit = !!editEntry;
 
   const vehicles = (() => {
     try { return JSON.parse(localStorage.getItem("gasman-vehicles") || "[]"); }
@@ -17,13 +18,13 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
   })();
   const defaultVehicle = vehicles[0] ?? null;
 
-  const [fuel,               setFuel]               = useState(fuelType);
-  const [priceCpl,           setPriceCpl]           = useState(stationPrice != null ? String(stationPrice) : "");
-  const [litres,             setLitres]             = useState("");
-  const [date,               setDate]               = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes,              setNotes]              = useState("");
-  const [vehicleId,          setVehicleId]          = useState(defaultVehicle?.id ?? "");
-  const [manualStationName,  setManualStationName]  = useState("");
+  const [fuel,               setFuel]               = useState(editEntry?.fuel_type ?? fuelType);
+  const [priceCpl,           setPriceCpl]           = useState(editEntry ? String(editEntry.price_cpl) : (stationPrice != null ? String(stationPrice) : ""));
+  const [litres,             setLitres]             = useState(editEntry?.litres != null ? String(editEntry.litres) : "");
+  const [date,               setDate]               = useState(editEntry?.date ?? new Date().toISOString().slice(0, 10));
+  const [notes,              setNotes]              = useState(editEntry?.notes ?? "");
+  const [vehicleId,          setVehicleId]          = useState(editEntry?.vehicle_id ?? defaultVehicle?.id ?? "");
+  const [manualStationName,  setManualStationName]  = useState(editEntry?.station_name ?? "");
 
   // Re-fill price when fuel type changes (only when a station is known)
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
     if (!priceCpl || isNaN(priceNum)) return;
     const selectedVehicle = vehicles.find((v) => v.id === vehicleId) ?? null;
     const entry = {
-      id:                `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id:                editEntry?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       station_id:        station?.station_id ?? null,
       station_name:      station?.name ?? (manualStationName.trim() || "Manual entry"),
       station_address:   station?.address ?? null,
@@ -81,10 +82,10 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
       <div className="modal fillup-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <h2 className="modal-title">⛽ Log Fill-up</h2>
+            <h2 className="modal-title">{isEdit ? "✏️ Edit Fill-up" : "⛽ Log Fill-up"}</h2>
             {station
-              ? <div className="modal-address">{station.name} · {station.address}</div>
-              : <div className="modal-address">Manual entry</div>
+              ? <div className="modal-address">{station.name}{station.address ? ` · ${station.address}` : ""}</div>
+              : <div className="modal-address">{isEdit ? (editEntry.station_name || "Manual entry") : "Manual entry"}</div>
             }
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -226,7 +227,7 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
 
           <div className="fillup-actions">
             <button className="btn-refresh" onClick={handleSave} disabled={!priceCpl || isNaN(priceNum)}>
-              Save Fill-up
+              {isEdit ? "Update Fill-up" : "Save Fill-up"}
             </button>
             <button className="btn-clear-filters" onClick={onClose}>Cancel</button>
           </div>

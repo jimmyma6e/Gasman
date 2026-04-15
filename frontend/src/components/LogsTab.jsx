@@ -16,7 +16,20 @@ function formatDate(iso) {
   return d.toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 }
 
-export default function LogsTab({ fillups, onDelete, onNavigate, onAddLog }) {
+const STAT_HINTS = {
+  monthSaved:  "Total money saved vs the provincial average price on fill-up days this month.",
+  monthSpent:  "Total cost of all fill-ups logged this month.",
+  totalSaved:  "Cumulative savings vs average price, all time.",
+  allTime:     "Total spending logged across all your fill-ups.",
+};
+
+function InfoTip({ text }) {
+  return (
+    <span className="logs-stat-info" title={text} aria-label={text}>ℹ️</span>
+  );
+}
+
+export default function LogsTab({ fillups, onDelete, onEdit, onNavigate, onAddLog }) {
   const month = thisMonth();
 
   // ── Stats ────────────────────────────────────────────────────────────────────
@@ -50,22 +63,34 @@ export default function LogsTab({ fillups, onDelete, onNavigate, onAddLog }) {
       {/* ── Stats cards ── */}
       <div className="logs-stats-grid">
         <div className="logs-stat-card logs-stat-highlight">
-          <div className="logs-stat-label">💸 Saved this month</div>
+          <div className="logs-stat-label">
+            💸 Saved this month
+            <InfoTip text={STAT_HINTS.monthSaved} />
+          </div>
           <div className="logs-stat-value">${monthSaved.toFixed(2)}</div>
           <div className="logs-stat-sub">vs average price</div>
         </div>
         <div className="logs-stat-card">
-          <div className="logs-stat-label">⛽ Spent this month</div>
+          <div className="logs-stat-label">
+            ⛽ Spent this month
+            <InfoTip text={STAT_HINTS.monthSpent} />
+          </div>
           <div className="logs-stat-value">${monthSpent.toFixed(2)}</div>
           <div className="logs-stat-sub">{monthLitres.toFixed(0)}L · {monthFillups.length} fill-up{monthFillups.length !== 1 ? "s" : ""}</div>
         </div>
         <div className="logs-stat-card">
-          <div className="logs-stat-label">💸 Total saved</div>
+          <div className="logs-stat-label">
+            💸 Total saved
+            <InfoTip text={STAT_HINTS.totalSaved} />
+          </div>
           <div className="logs-stat-value">${overallSaved.toFixed(2)}</div>
           <div className="logs-stat-sub">all time vs avg</div>
         </div>
         <div className="logs-stat-card">
-          <div className="logs-stat-label">📊 All time</div>
+          <div className="logs-stat-label">
+            📊 All time
+            <InfoTip text={STAT_HINTS.allTime} />
+          </div>
           <div className="logs-stat-value">${overallSpent.toFixed(2)}</div>
           <div className="logs-stat-sub">{overallLitres.toFixed(0)}L · {fillupCount} fill-up{fillupCount !== 1 ? "s" : ""}</div>
         </div>
@@ -125,7 +150,12 @@ export default function LogsTab({ fillups, onDelete, onNavigate, onAddLog }) {
                       )}
                       {f.notes && <div className="log-entry-notes">{f.notes}</div>}
                     </div>
-                    <button className="btn-delete-snapshot" onClick={() => onDelete(f.id)} title="Delete">×</button>
+                    <div className="log-entry-actions">
+                      {onEdit && (
+                        <button className="btn-edit-log" onClick={() => onEdit(f)} title="Edit">✏️</button>
+                      )}
+                      <button className="btn-delete-snapshot" onClick={() => onDelete(f.id)} title="Delete">×</button>
+                    </div>
                   </div>
                 ))}
               </div>

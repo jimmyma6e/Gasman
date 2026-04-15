@@ -215,43 +215,66 @@ function TrendBanner({ trend }) {
 }
 
 // ---------- Chart Modal ----------
-function ChartModal({ station, onClose }) {
+function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
+  // Initialize to activeFuel if that fuel has price data, else first available fuel
+  const firstAvailable = FUEL_TYPES.find(({ key }) => station[key]?.price != null)?.key ?? "regular_gas";
+  const initFuel = station[activeFuel]?.price != null ? activeFuel : firstAvailable;
+  const [selectedFuel, setSelectedFuel] = useState(initFuel);
+
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.name}, ${station.address}, ${station._area}, BC`)}`;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h2 className="modal-title">{station.name}</h2>
-            <a
-              className="modal-address"
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {station.address}, {station._area}
-            </a>
+            <p className="modal-address">{station.address}, {station._area}</p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
+
+        {/* Fuel price chips — tap to switch chart fuel */}
         <div className="modal-prices">
           {FUEL_TYPES.map(({ key, label }) => {
             const price = station[key]?.price;
-            return price != null ? (
-              <div key={key} className="modal-price-chip">
+            if (price == null) return null;
+            return (
+              <button
+                key={key}
+                className={`modal-price-chip ${selectedFuel === key ? "modal-price-chip-active" : ""}`}
+                onClick={() => setSelectedFuel(key)}
+              >
                 <span className="modal-price-label">{label}</span>
                 <span className="modal-price-value">{formatPrice(price, station.unit_of_measure)}</span>
-              </div>
-            ) : null;
+              </button>
+            );
           })}
         </div>
+
+        {/* Action buttons */}
+        <div className="modal-actions">
+          <a className="btn-modal-action" href={mapsUrl} target="_blank" rel="noreferrer">
+            🗺️ Directions
+          </a>
+          {station[selectedFuel]?.price != null && (
+            <button className="btn-modal-action" onClick={() => { onLogFillup(station, selectedFuel); onClose(); }}>
+              ⛽ Log Fill-up
+            </button>
+          )}
+          <button className="btn-modal-action" onClick={() => { onSnapshot(station, selectedFuel); onClose(); }}>
+            📷 Snapshot
+          </button>
+        </div>
+
         <h3 className="modal-chart-title">Price History</h3>
-        <PriceChart stationId={station.station_id} />
+        <PriceChart stationId={station.station_id} activeFuel={selectedFuel} />
       </div>
     </div>
   );
@@ -544,7 +567,10 @@ export default function App() {
 
   const handleSaveFillup = useCallback((entry) => {
     setFillups((prev) => {
-      const next = [entry, ...prev];
+      const exists = prev.some((f) => f.id === entry.id);
+      const next = exists
+        ? prev.map((f) => f.id === entry.id ? entry : f)
+        : [entry, ...prev];
       localStorage.setItem("gasman-fillups", JSON.stringify(next));
       return next;
     });
@@ -918,6 +944,14 @@ export default function App() {
           <LogsTab
             fillups={fillups}
             onDelete={handleDeleteFillup}
+            onEdit={(entry) => {
+              const pseudoStation = entry.station_id ? {
+                station_id: entry.station_id,
+                name: entry.station_name,
+                address: entry.station_address,
+              } : null;
+              setFillupTarget({ station: pseudoStation, fuelType: entry.fuel_type, editEntry: entry });
+            }}
             onNavigate={setTab}
             onAddLog={() => {
               setFillupTarget({ station: null, fuelType: activeFuel });
@@ -1412,7 +1446,15 @@ export default function App() {
         </>)}{/* end tab === all */}
       </main>
 
-      {chartStation && <ChartModal station={chartStation} onClose={() => setChartStation(null)} />}
+      {chartStation && (
+        <ChartModal
+          station={chartStation}
+          activeFuel={activeFuel}
+          onClose={() => setChartStation(null)}
+          onLogFillup={(s, fuelType) => { setFillupTarget({ station: s, fuelType }); setChartStation(null); }}
+          onSnapshot={(s, fuelType) => { handleSnapshot(s, fuelType); setChartStation(null); }}
+        />
+      )}
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {fillupTarget && (
         <FillupModal
@@ -1421,6 +1463,7 @@ export default function App() {
           avgPriceAtLog={avgPrices[fillupTarget.fuelType] ?? null}
           onSave={handleSaveFillup}
           onClose={() => setFillupTarget(null)}
+          editEntry={fillupTarget.editEntry ?? null}
         />
       )}
       {!onboarded && <Onboarding onDone={() => setOnboarded(true)} />}
