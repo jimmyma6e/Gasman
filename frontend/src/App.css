@@ -294,8 +294,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); margin-bottom: 12px;
   padding: 10px 14px; display: flex; align-items: center;
-  gap: 10px; flex-wrap: wrap; position: relative;
+  gap: 10px; flex-wrap: nowrap; overflow-x: auto; position: relative;
 }
+.insights-bar::-webkit-scrollbar { display: none; }
 .insights-stat { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
 .insights-stat-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .insights-stat-value { font-size: 0.9rem; font-weight: 700; color: var(--text); }

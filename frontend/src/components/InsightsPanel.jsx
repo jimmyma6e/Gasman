@@ -37,13 +37,24 @@ export default function InsightsPanel({ activeFuel, trend }) {
 
   return (
     <div className="insights-bar">
-      {/* Today's avg — colored by trend direction */}
+      {/* Today avg — colored by trend direction */}
       <div className="insights-stat">
-        <span className="insights-stat-label">Today (Regular)</span>
+        <span className="insights-stat-label">Regular</span>
         <span className={`insights-stat-value ${trendCls}`}>
           {trendArrow && <>{trendArrow} </>}{todayAvg?.toFixed(1)}¢/L
         </span>
       </div>
+
+      {/* Today low — from trend data */}
+      {bc?.todayLow != null && (
+        <>
+          <div className="insights-divider" />
+          <div className="insights-stat">
+            <span className="insights-stat-label">Low today</span>
+            <span className="insights-stat-value insights-val-down">{bc.todayLow.toFixed(1)}¢/L</span>
+          </div>
+        </>
+      )}
 
       {ytdAvg && (
         <>
