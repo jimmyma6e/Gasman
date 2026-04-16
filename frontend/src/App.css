@@ -1,5 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Prevent layout shift when scrollbar appears/disappears */
+html { scrollbar-gutter: stable; }
+
 :root {
   --bg: #f5f7fa;
   --surface: #ffffff;
@@ -233,6 +236,20 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-modal-action { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; transition: border-color 0.15s, background 0.15s; }
 .btn-modal-action:hover { border-color: var(--accent); background: rgba(245, 158, 11, 0.08); }
 .modal-chart-title { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+/* "Just visited?" CTA inside ChartModal */
+.modal-visited {
+  margin-top: 16px; padding: 10px 14px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.modal-visited-label { font-size: 0.82rem; color: var(--text-dim); }
+.modal-visited-btns { display: flex; gap: 6px; }
+.btn-visited-yes { background: rgba(22,163,74,0.1); border: 1px solid rgba(22,163,74,0.3);
+  color: var(--green); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.btn-visited-update { background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+.btn-visited-yes:hover { background: rgba(22,163,74,0.2); }
+.btn-visited-update:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Chart ── */
 .chart-range-row { display: flex; gap: 6px; margin-bottom: 16px; }
@@ -300,9 +317,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); margin-bottom: 12px;
   padding: 10px 14px; display: flex; align-items: center;
-  gap: 10px; flex-wrap: nowrap; overflow-x: auto; position: relative;
+  gap: 10px; flex-wrap: wrap; position: relative;
 }
-.insights-bar::-webkit-scrollbar { display: none; }
 .insights-stat { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
 .insights-stat-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .insights-stat-value { font-size: 0.9rem; font-weight: 700; color: var(--text); }
@@ -318,7 +334,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .insights-expand:hover { border-color: var(--accent); color: var(--accent); }
 /* Area breakdown — spans full width below the stat row */
 .insights-areas-row {
-  width: 100%; display: flex; gap: 6px; overflow-x: auto;
+  flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto;
   flex-wrap: nowrap; padding-top: 8px;
   border-top: 1px solid var(--border); margin-top: 2px;
 }
@@ -720,7 +736,11 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   font-weight: 600; }
 .route-mode-hint { font-size: 0.75rem; color: var(--text-dim); margin: -4px 0 4px;
   line-height: 1.4; }
+/* Inline mode hint shown next to active mode button */
+.route-mode-active-hint { font-size: 0.72rem; color: var(--text-dim); flex-shrink: 0; max-width: 200px; }
 
+/* Vehicle + Brand in same row on desktop */
+.route-vehicle-brand-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
 /* Vehicle section inside form */
 .route-vehicle-section { display: flex; flex-direction: column; gap: 8px; }
 .route-consumption-input-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -748,12 +768,17 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-brand-pref-hint { font-size: 0.75rem; color: var(--text-dim); display: block; margin-top: 6px; }
 .route-brand-pref-wrap .chip-row { padding: 0 14px 12px; }
 
-/* Big find button */
-.route-find-btn-big { width: 100%; padding: 14px 20px; border-radius: 10px;
+/* Big find button row — inline save route button */
+.route-find-row { display: flex; gap: 8px; align-items: stretch; }
+.route-find-btn-big { flex: 1; padding: 14px 20px; border-radius: 10px;
   background: var(--accent); color: #000; border: none; font-size: 1rem;
   font-weight: 700; cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.01em; }
 .route-find-btn-big:hover:not(:disabled) { opacity: 0.85; }
 .route-find-btn-big:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-save-route-inline { background: var(--surface2); border: 1px solid var(--accent); color: var(--accent);
+  padding: 10px 14px; border-radius: 10px; font-size: 0.84rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-save-route-inline:hover { background: rgba(245,158,11,0.12); }
 
 /* Results header */
 .route-results-header { display: flex; justify-content: space-between; align-items: baseline;
@@ -1075,6 +1100,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .route-result-name { font-size: 0.85rem; }
   .route-result-price { font-size: 1rem; }
   .route-summary { gap: 10px; font-size: 0.82rem; }
+  /* Vehicle + brand collapse to single column on mobile */
+  .route-vehicle-brand-row { grid-template-columns: 1fr; }
 }
 
 /* ── Dashboard savings row ──────────────────────────────────────────────────── */
@@ -1141,6 +1168,23 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .fillup-vehicle-active { border-color: var(--accent); background: rgba(249,115,22,0.08);
   color: var(--accent); font-weight: 600; }
 .fillup-saved { color: var(--green); font-weight: 600; font-size: 0.85rem; margin-top: 4px; }
+/* Favourites station picker inside FillupModal */
+.fillup-fav-list { display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }
+.fillup-fav-item { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 12px; font-size: 0.84rem; text-align: left;
+  cursor: pointer; transition: all 0.15s; color: var(--text); }
+.fillup-fav-item:hover { border-color: var(--accent); background: rgba(245,158,11,0.07); }
+.fillup-fav-item-active { border-color: var(--accent) !important; background: rgba(245,158,11,0.12) !important; color: var(--accent); font-weight: 600; }
+.fillup-fav-name { font-weight: 600; }
+.fillup-fav-addr { font-size: 0.74rem; color: var(--text-dim); margin-top: 1px; }
+/* Credit card chip row inside FillupModal */
+.fillup-card-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.fillup-card-chip { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 12px; font-size: 0.8rem; cursor: pointer;
+  transition: all 0.15s; color: var(--text-dim); }
+.fillup-card-chip:hover { border-color: var(--accent); color: var(--text); }
+.fillup-card-active { border-color: var(--accent); background: rgba(245,158,11,0.1);
+  color: var(--accent); font-weight: 600; }
 .fillup-hint-warn { color: var(--text-dim) !important; }
 
 /* ── App-like tweaks ─────────────────────────────────────────────────────────── */
@@ -1166,11 +1210,12 @@ html { overflow-x: clip; }
 .station-summary-bar { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; overflow-x: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   padding: 8px 14px; margin-bottom: 12px; font-size: 0.83rem; color: var(--text-dim); white-space: nowrap; }
-.summary-best, .summary-closest { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.summary-best strong { color: var(--accent); font-size: 0.95rem; font-weight: 800; white-space: nowrap; }
-.summary-closest strong { color: var(--text); font-weight: 700; white-space: nowrap; }
-.summary-sname { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden;
-  text-overflow: ellipsis; max-width: 160px; }
+.summary-best, .summary-closest { flex-shrink: 0; white-space: nowrap; }
+.summary-best strong { color: var(--accent); font-size: 0.95rem; font-weight: 800; }
+.summary-closest strong { color: var(--text); font-weight: 700; }
+.summary-top-pick { background: rgba(245,158,11,0.15); color: var(--accent); font-size: 0.72rem;
+  font-weight: 700; padding: 1px 6px; border-radius: 10px; letter-spacing: 0.02em; }
+.summary-sname { color: var(--text); font-weight: 600; }
 .summary-dot { color: var(--border); flex-shrink: 0; }
 @media (max-width: 480px) {
   .station-summary-bar { font-size: 0.78rem; padding: 7px 12px; }

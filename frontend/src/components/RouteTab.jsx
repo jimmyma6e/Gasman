@@ -338,7 +338,7 @@ const POPULAR_BRANDS_RT = [
 
 const STATION_COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
 
-export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts: showCardDiscountsProp, fillLitres: fillLitresProp, onOpenProfile, onLogFillup }) {
+export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, onSaveRoute, selectedCards, showCardDiscounts: showCardDiscountsProp, fillLitres: fillLitresProp, onOpenProfile, onLogFillup, onOpenChart }) {
   const [fromPlace, setFromPlace]           = useState(null);
   const [toPlace, setToPlace]               = useState(null);
   const [fuelType, setFuelType]             = useState("regular_gas");
@@ -507,9 +507,8 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
   }, []);
 
   function handleSelectStation(s) {
-    const wasSelected = selectedStation?.station_id === s.station_id;
-    setSelectedStation(wasSelected ? null : s);
-    if (wasSelected) return; // deselect — don't re-fire
+    setSelectedStation(s);
+    if (onOpenChart) onOpenChart(s); // Open detail modal (same as All Stations tab)
     const rank = results ? results.indexOf(s) + 1 : null;
     const price = s[fuelType]?.price ?? null;
     posthog.capture("station_view", {
@@ -622,7 +621,12 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
             </div>
           </div>
           <div className="route-option-group">
-            <label className="route-place-label">Mode</label>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <label className="route-place-label">Mode</label>
+              <span className="route-mode-active-hint">
+                {ROUTE_MODES.find((m) => m.id === routeMode)?.hint}
+              </span>
+            </div>
             <div className="route-mode-btns">
               {ROUTE_MODES.map((m) => (
                 <button key={m.id}
@@ -635,11 +639,9 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
             </div>
           </div>
         </div>
-        {/* Mode hint */}
-        <p className="route-mode-hint">
-          {ROUTE_MODES.find((m) => m.id === routeMode)?.hint}
-        </p>
 
+        {/* Vehicle + Brand preference — side-by-side on desktop */}
+        <div className="route-vehicle-brand-row">
         {/* Vehicle picker */}
         <div className="route-vehicle-section">
           <label className="route-place-label">Your vehicle</label>
@@ -704,9 +706,9 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
               </>
             ) : (
               <>
-                <span className="route-add-card-hint">Have a gas rewards card?</span>
+                <span className="route-add-card-hint">Use Credit Card to get rewards?</span>
                 <button className="btn-route-add-card" onClick={onOpenProfile}>
-                  + Add card for discounts
+                  + Add your card
                 </button>
               </>
             )}
@@ -746,17 +748,25 @@ export default function RouteTab({ stations, activeRouteLoad, onClearRouteLoad, 
             )}
           </div>
         )}
+        </div>{/* end route-vehicle-brand-row */}
 
-        {/* Find button */}
+        {/* Find button row — with inline Save Route button when route already found */}
         {stations.length === 0 && (
           <p className="route-no-data-note">
             ⚠️ No station data loaded yet — prices may still be fetching. Try refreshing the app first.
           </p>
         )}
-        <button className="route-find-btn-big" onClick={handleFind}
-          disabled={!fromPlace || !toPlace || loading}>
-          {loading ? "Finding…" : "🔍 Find Stations Along Route"}
-        </button>
+        <div className="route-find-row">
+          <button className="route-find-btn-big" onClick={handleFind}
+            disabled={!fromPlace || !toPlace || loading}>
+            {loading ? "Finding…" : "🔍 Find Stations Along Route"}
+          </button>
+          {results !== null && results.length > 0 && !savingRoute && (
+            <button className="btn-save-route-inline" onClick={() => setSavingRoute(true)}>
+              ★ Save
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="error-box">{error}</div>}

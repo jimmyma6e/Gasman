@@ -220,6 +220,7 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
   const firstAvailable = FUEL_TYPES.find(({ key }) => station[key]?.price != null)?.key ?? "regular_gas";
   const initFuel = station[activeFuel]?.price != null ? activeFuel : firstAvailable;
   const [selectedFuel, setSelectedFuel] = useState(initFuel);
+  const [visitedDone, setVisitedDone] = useState(false);
 
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -275,6 +276,19 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
 
         <h3 className="modal-chart-title">Price History</h3>
         <PriceChart stationId={station.station_id} activeFuel={selectedFuel} />
+
+        {/* Just visited? — price accuracy prompt shown after chart */}
+        {!visitedDone && (
+          <div className="modal-visited">
+            <span className="modal-visited-label">📍 Just filled up here? Is the price still correct?</span>
+            <div className="modal-visited-btns">
+              <button className="btn-visited-yes" onClick={() => setVisitedDone(true)}>✓ Yes</button>
+              <button className="btn-visited-update" onClick={() => { onLogFillup(station, selectedFuel); onClose(); }}>
+                ✏️ Update
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -291,7 +305,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
 
   return (
     <div className={`card ${isCheapest ? "card-cheapest" : ""}`}>
-      {isCheapest && <div className="cheapest-tag">Cheapest</div>}
+      {isCheapest && <div className="cheapest-tag">★ Top Pick</div>}
 
       <div className="card-top">
         <div className="card-header">
@@ -425,17 +439,16 @@ function StationSummaryBar({ sorted, activeFuel, cheapestPrices, userCoords }) {
     <div className="station-summary-bar">
       {cheapStation && (
         <span className="summary-best">
-          ⛽ <strong>{cheapStation[activeFuel].price.toFixed(1)}¢</strong>
-          {" at "}
-          <span className="summary-sname">{cheapStation.name}</span>
+          <span className="summary-top-pick">★ Best</span>
+          {" "}<strong>{cheapStation[activeFuel].price.toFixed(1)}¢</strong>
+          {" at "}<span className="summary-sname">{cheapStation.name}</span>
         </span>
       )}
       {cheapStation && closest && <span className="summary-dot">·</span>}
       {closest && (
         <span className="summary-closest">
           📍 <strong>{distLabel(closest.dist)}</strong>
-          {" to "}
-          <span className="summary-sname">{closest.station.name}</span>
+          {" to "}<span className="summary-sname">{closest.station.name}</span>
         </span>
       )}
     </div>
@@ -562,8 +575,6 @@ export default function App() {
   const [fillupTarget, setFillupTarget] = useState(null); // { station, fuelType }
 
   const [showAllStations, setShowAllStations] = useState(false);
-  const [crowdsourceFor, setCrowdsourceFor]   = useState(null); // station_id or null
-  const crowdsourceShown = useRef(new Set());
 
   const handleSaveFillup = useCallback((entry) => {
     setFillups((prev) => {
@@ -760,17 +771,7 @@ export default function App() {
 
   function handleSelectStation(station, rank) {
     setSelectedStation(station);
-    // Show crowdsource prompt once per station per session
-    if (station && !crowdsourceShown.current.has(station.station_id)) {
-      crowdsourceShown.current.add(station.station_id);
-      setCrowdsourceFor(station.station_id);
-      posthog.capture("crowdsource_prompt_shown", {
-        station_id:   station.station_id,
-        station_name: station.name,
-      });
-    } else {
-      setCrowdsourceFor(null);
-    }
+    setChartStation(station); // Open detail modal directly — user can report price from there
     if (!station || lastViewedStation.current === station.station_id) return;
     lastViewedStation.current = station.station_id;
     const price = station[activeFuel]?.price ?? null;
@@ -791,10 +792,9 @@ export default function App() {
     }
   }
 
-  // Reset "show more" and crowdsource prompt when tab or filters change
+  // Reset "show more" when tab or filters change
   useEffect(() => {
     setShowAllStations(false);
-    setCrowdsourceFor(null);
   }, [tab, areaFilter, brandFilter, search]);
 
   // Close area dropdown on outside click
@@ -970,7 +970,8 @@ export default function App() {
             showCardDiscounts={showCardDiscounts}
             fillLitres={fillLitres}
             onOpenProfile={() => setShowProfile(true)}
-            onLogFillup={(s, ft) => setFillupTarget({ station: s, fuelType: ft })} />
+            onLogFillup={(s, ft) => setFillupTarget({ station: s, fuelType: ft })}
+            onOpenChart={(s) => setChartStation(s)} />
         )}
 
         {/* Dashboard Tab */}
@@ -1285,51 +1286,31 @@ export default function App() {
             {viewMode === "card" && (
               <div className="grid">
                 {displayedStations.map((station, i) => (
-                  <Fragment key={station.station_id}>
-                    <div
-                      className={selectedStation?.station_id === station.station_id ? "card-selected" : ""}
-                      onClick={() => handleSelectStation(station, i + 1)}
-                    >
-                      <StationCard
-                        station={station}
-                        activeFuel={activeFuel}
-                        cheapestPrices={cheapestPrices}
-                        isFavourite={favourites.includes(station.station_id)}
-                        onToggleFavourite={toggleFavourite}
-                        onOpenChart={setChartStation}
-                        onSnapshot={handleSnapshot}
-                        showArea={sortBy === "city"}
-                        selectedCards={selectedCards}
-                        showCardDiscounts={showCardDiscounts}
-                        fillLitres={fillLitres}
-                        showFillCost={showFillCost}
-                        userCoords={userCoords}
-                        onLogFillup={(s) => {
-                          setFillupTarget({ station: s, fuelType: activeFuel });
-                          posthog.capture("station_log_started", { source: "station_card", station_id: s.station_id });
-                        }}
-                      />
-                    </div>
-                    {crowdsourceFor === station.station_id && (
-                      <div className="crowdsource-wrap">
-                        <CrowdsourcePrompt
-                          onConfirm={() => {
-                            setCrowdsourceFor(null);
-                            posthog.capture("crowdsource_prompt_confirm_clicked", { station_id: station.station_id });
-                          }}
-                          onUpdate={() => {
-                            setCrowdsourceFor(null);
-                            setFillupTarget({ station, fuelType: activeFuel });
-                            posthog.capture("crowdsource_prompt_update_clicked", { station_id: station.station_id });
-                          }}
-                          onDismiss={() => {
-                            setCrowdsourceFor(null);
-                            posthog.capture("crowdsource_prompt_dismissed", { station_id: station.station_id });
-                          }}
-                        />
-                      </div>
-                    )}
-                  </Fragment>
+                  <div
+                    key={station.station_id}
+                    className={selectedStation?.station_id === station.station_id ? "card-selected" : ""}
+                    onClick={() => handleSelectStation(station, i + 1)}
+                  >
+                    <StationCard
+                      station={station}
+                      activeFuel={activeFuel}
+                      cheapestPrices={cheapestPrices}
+                      isFavourite={favourites.includes(station.station_id)}
+                      onToggleFavourite={toggleFavourite}
+                      onOpenChart={setChartStation}
+                      onSnapshot={handleSnapshot}
+                      showArea={sortBy === "city"}
+                      selectedCards={selectedCards}
+                      showCardDiscounts={showCardDiscounts}
+                      fillLitres={fillLitres}
+                      showFillCost={showFillCost}
+                      userCoords={userCoords}
+                      onLogFillup={(s) => {
+                        setFillupTarget({ station: s, fuelType: activeFuel });
+                        posthog.capture("station_log_started", { source: "station_card", station_id: s.station_id });
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -1343,62 +1324,44 @@ export default function App() {
                   const isFav = favourites.includes(station.station_id);
                   const isSelected = selectedStation?.station_id === station.station_id;
                   return (
-                    <Fragment key={station.station_id}>
-                      <div className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => handleSelectStation(station, i + 1)}>
-                        <button
-                          className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
-                          onClick={() => toggleFavourite(station.station_id)}
+                    <div key={station.station_id} className={`compact-row ${isCheapest ? "compact-cheapest" : ""} ${isSelected ? "compact-selected" : ""}`} onClick={() => handleSelectStation(station, i + 1)}>
+                      <button
+                        className={`btn-fav btn-fav-sm ${isFav ? "btn-fav-active" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); toggleFavourite(station.station_id); }}
+                      >
+                        {isFav ? "★" : "☆"}
+                      </button>
+                      <div className="compact-info">
+                        <span className="compact-name">{station.name}</span>
+                        <a
+                          className="compact-addr"
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {isFav ? "★" : "☆"}
-                        </button>
-                        <div className="compact-info">
-                          <span className="compact-name">{station.name}</span>
-                          <a
-                            className="compact-addr"
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.address}, ${station._area}, BC`)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {station.address}, {station._area}
-                          </a>
-                        </div>
-                        <div className="compact-price">
-                          {VALID_PRICE(fuelData?.price) ? (
-                            <>
-                              <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
-                                {formatPrice(fuelData.price, station.unit_of_measure)}
-                              </span>
-                              {delta != null && (
-                                <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
-                                  {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
-                                </span>
-                              )}
-                            </>
-                          ) : <span className="tbl-empty">—</span>}
-                        </div>
-                        {VALID_PRICE(fuelData?.price) && (
-                          <button className="btn-snapshot btn-chart-sm" onClick={() => handleSnapshot(station, activeFuel)} title="Save current price to My Dashboard">📷 Save</button>
-                        )}
-                        <button className="btn-chart btn-chart-sm" onClick={() => setChartStation(station)} title="Price history">📈</button>
+                          {station.address}, {station._area}
+                        </a>
                       </div>
-                      {crowdsourceFor === station.station_id && (
-                        <CrowdsourcePrompt
-                          onConfirm={() => {
-                            setCrowdsourceFor(null);
-                            posthog.capture("crowdsource_prompt_confirm_clicked", { station_id: station.station_id });
-                          }}
-                          onUpdate={() => {
-                            setCrowdsourceFor(null);
-                            setFillupTarget({ station, fuelType: activeFuel });
-                            posthog.capture("crowdsource_prompt_update_clicked", { station_id: station.station_id });
-                          }}
-                          onDismiss={() => {
-                            setCrowdsourceFor(null);
-                            posthog.capture("crowdsource_prompt_dismissed", { station_id: station.station_id });
-                          }}
-                        />
+                      <div className="compact-price">
+                        {VALID_PRICE(fuelData?.price) ? (
+                          <>
+                            <span className={`compact-badge ${isCheapest ? "badge-cheapest" : ""}`}>
+                              {formatPrice(fuelData.price, station.unit_of_measure)}
+                            </span>
+                            {delta != null && (
+                              <span className={`price-delta ${delta > 0 ? "delta-up" : "delta-down"}`}>
+                                {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
+                              </span>
+                            )}
+                          </>
+                        ) : <span className="tbl-empty">—</span>}
+                      </div>
+                      {VALID_PRICE(fuelData?.price) && (
+                        <button className="btn-snapshot btn-chart-sm" onClick={(e) => { e.stopPropagation(); handleSnapshot(station, activeFuel); }} title="Save current price to My Dashboard">📷 Save</button>
                       )}
-                    </Fragment>
+                      <button className="btn-chart btn-chart-sm" onClick={(e) => { e.stopPropagation(); setChartStation(station); }} title="Price history">📈</button>
+                    </div>
                   );
                 })}
               </div>
@@ -1464,6 +1427,7 @@ export default function App() {
           onSave={handleSaveFillup}
           onClose={() => setFillupTarget(null)}
           editEntry={fillupTarget.editEntry ?? null}
+          favouriteStations={stationsWithArea.filter((s) => favourites.includes(s.station_id))}
         />
       )}
       {!onboarded && <Onboarding onDone={() => setOnboarded(true)} />}

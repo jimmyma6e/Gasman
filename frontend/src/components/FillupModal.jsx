@@ -7,7 +7,7 @@ const FUEL_LABELS = {
   diesel:       "Diesel",
 };
 
-export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose, editEntry }) {
+export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose, editEntry, favouriteStations }) {
   // station may be null when logging manually from the Logs tab
   const stationPrice = station?.[fuelType]?.price ?? null;
   const isEdit = !!editEntry;
@@ -18,6 +18,12 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
   })();
   const defaultVehicle = vehicles[0] ?? null;
 
+  // Saved credit cards from profile
+  const savedCards = (() => {
+    try { return JSON.parse(localStorage.getItem("gasman-cards") || "[]"); }
+    catch { return []; }
+  })();
+
   const [fuel,               setFuel]               = useState(editEntry?.fuel_type ?? fuelType);
   const [priceCpl,           setPriceCpl]           = useState(editEntry ? String(editEntry.price_cpl) : (stationPrice != null ? String(stationPrice) : ""));
   const [litres,             setLitres]             = useState(editEntry?.litres != null ? String(editEntry.litres) : "");
@@ -25,12 +31,18 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
   const [notes,              setNotes]              = useState(editEntry?.notes ?? "");
   const [vehicleId,          setVehicleId]          = useState(editEntry?.vehicle_id ?? defaultVehicle?.id ?? "");
   const [manualStationName,  setManualStationName]  = useState(editEntry?.station_name ?? "");
+  const [selectedCardId,     setSelectedCardId]     = useState(editEntry?.credit_card_id ?? "");
+  // Selected favourite station (when no station prop provided)
+  const [pickedFav,          setPickedFav]          = useState(null);
+
+  // Resolve the effective station: prop-provided station takes priority, then picked favourite
+  const effectiveStation = station ?? pickedFav ?? null;
 
   // Re-fill price when fuel type changes (only when a station is known)
   useEffect(() => {
-    const p = station?.[fuel]?.price;
-    setPriceCpl(p != null ? String(p) : "");
-  }, [fuel, station]);
+    const p = effectiveStation?.[fuel]?.price;
+    if (p != null) setPriceCpl(String(p));
+  }, [fuel, effectiveStation?.station_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const priceNum  = parseFloat(priceCpl);
   const litresNum = parseFloat(litres);
@@ -44,16 +56,19 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
     : null;
 
   // Flag when user has edited the station's known price (triggers price contribution)
-  const priceEdited = station && stationPrice != null && !isNaN(priceNum) && priceNum !== stationPrice;
+  const knownPrice = effectiveStation?.[fuel]?.price ?? null;
+  const priceEdited = effectiveStation && knownPrice != null && !isNaN(priceNum) && priceNum !== knownPrice;
+
+  const selectedCard = savedCards.find((c) => c.id === selectedCardId) ?? null;
 
   function handleSave() {
     if (!priceCpl || isNaN(priceNum)) return;
     const selectedVehicle = vehicles.find((v) => v.id === vehicleId) ?? null;
     const entry = {
       id:                editEntry?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      station_id:        station?.station_id ?? null,
-      station_name:      station?.name ?? (manualStationName.trim() || "Manual entry"),
-      station_address:   station?.address ?? null,
+      station_id:        effectiveStation?.station_id ?? null,
+      station_name:      effectiveStation?.name ?? (manualStationName.trim() || "Manual entry"),
+      station_address:   effectiveStation?.address ?? null,
       fuel_type:         fuel,
       price_cpl:         priceNum,
       price_was_edited:  priceEdited,
@@ -64,6 +79,8 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
       total_saved:       totalSaved ? parseFloat(totalSaved) : null,
       vehicle_id:        selectedVehicle?.id ?? null,
       vehicle_name:      selectedVehicle ? `${selectedVehicle.icon || "🚗"} ${selectedVehicle.name}` : null,
+      credit_card_id:    selectedCard?.id ?? null,
+      credit_card_name:  selectedCard ? `${selectedCard.bank}` : null,
       date,
       notes:             notes.trim() || null,
       logged_at:         new Date().toISOString(),
@@ -83,8 +100,8 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
         <div className="modal-header">
           <div>
             <h2 className="modal-title">{isEdit ? "✏️ Edit Fill-up" : "⛽ Log Fill-up"}</h2>
-            {station
-              ? <div className="modal-address">{station.name}{station.address ? ` · ${station.address}` : ""}</div>
+            {effectiveStation
+              ? <div className="modal-address">{effectiveStation.name}{effectiveStation.address ? ` · ${effectiveStation.address}` : ""}</div>
               : <div className="modal-address">{isEdit ? (editEntry.station_name || "Manual entry") : "Manual entry"}</div>
             }
           </div>
@@ -92,18 +109,40 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
         </div>
 
         <div className="fillup-form">
-          {/* Manual station name — only when no station pre-selected */}
+          {/* Station picker — only when no station pre-selected */}
           {!station && (
             <div className="fillup-field">
               <label className="fillup-label">Station (optional)</label>
-              <input
-                className="fillup-input"
-                type="text"
-                placeholder="e.g. Shell on Broadway"
-                value={manualStationName}
-                onChange={(e) => setManualStationName(e.target.value)}
-                maxLength={80}
-              />
+              {/* Favourites list */}
+              {favouriteStations?.length > 0 && (
+                <div className="fillup-fav-list">
+                  {favouriteStations.map((s) => (
+                    <button
+                      key={s.station_id}
+                      type="button"
+                      className={`fillup-fav-item ${pickedFav?.station_id === s.station_id ? "fillup-fav-item-active" : ""}`}
+                      onClick={() => {
+                        setPickedFav(pickedFav?.station_id === s.station_id ? null : s);
+                        setManualStationName("");
+                      }}
+                    >
+                      <div className="fillup-fav-name">★ {s.name}</div>
+                      {s.address && <div className="fillup-fav-addr">{s.address}</div>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Manual text input — only when no fav picked */}
+              {!pickedFav && (
+                <input
+                  className="fillup-input"
+                  type="text"
+                  placeholder={favouriteStations?.length > 0 ? "Or type a station name…" : "e.g. Shell on Broadway"}
+                  value={manualStationName}
+                  onChange={(e) => setManualStationName(e.target.value)}
+                  maxLength={80}
+                />
+              )}
             </div>
           )}
 
@@ -129,6 +168,25 @@ export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, 
                 >
                   Other
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Credit card used */}
+          {savedCards.length > 0 && (
+            <div className="fillup-field">
+              <label className="fillup-label">💳 Credit card used (optional)</label>
+              <div className="fillup-card-row">
+                {savedCards.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`fillup-card-chip ${selectedCardId === c.id ? "fillup-card-active" : ""}`}
+                    onClick={() => setSelectedCardId(selectedCardId === c.id ? "" : c.id)}
+                  >
+                    {c.bank}
+                  </button>
+                ))}
               </div>
             </div>
           )}
