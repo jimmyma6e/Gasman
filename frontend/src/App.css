@@ -1,8 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Prevent layout shift when scrollbar appears/disappears */
-html { scrollbar-gutter: stable; }
-
 :root {
   --bg: #f5f7fa;
   --surface: #ffffff;
@@ -20,7 +17,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Header ── */
 .header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
-.header-inner { max-width: 1200px; margin: 0 auto; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.header-inner { max-width: 1400px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .header-title { display: flex; align-items: center; gap: 12px; }
 .header-icon { font-size: 2rem; }
 .header-title h1 { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
@@ -36,8 +33,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-install:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Main ── */
-.main { max-width: 1200px; margin: 0 auto; padding: 20px; min-width: 0; }
-.app-footer { max-width: 1200px; margin: 0 auto; padding: 16px 20px 24px;
+.main { max-width: 1400px; margin: 0 auto; padding: 20px 24px; min-width: 0; }
+.app-footer { max-width: 1400px; margin: 0 auto; padding: 16px 24px 24px;
   font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; opacity: 0.6; }
 
 /* ── Trend Banner ── */
@@ -1239,7 +1236,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* Full-height app shell */
 html, body, #root { height: 100%; }
 /* Keep horizontal overflow clipped at the html level only (prevents rogue child overflow on mobile) */
-html { overflow-x: hidden; }
+html { overflow-x: hidden; overflow-y: scroll; }
 .app { min-height: 100%; display: flex; flex-direction: column; }
 .main { flex: 1; min-width: 0; }
 /* Smooth momentum scroll on iOS */
