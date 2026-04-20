@@ -995,7 +995,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .all-stations-sidebar::-webkit-scrollbar { width: 4px; }
 .all-stations-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.all-stations-content { flex: 1; min-width: 0; }
+.all-stations-content { flex: 1; min-width: 0; overflow: hidden; }
 
 /* Fuel tabs go vertical inside the sidebar */
 .all-stations-sidebar .fuel-tabs { flex-direction: column; gap: 4px; }
@@ -1092,8 +1092,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .dash-saving-value { font-size: 1.1rem; }
   .logs-stat-value { font-size: 1.2rem; }
 
-  /* Grid */
-  .grid { grid-template-columns: 1fr; gap: 10px; }
+  /* Grid — 1 col on narrow phones, 2 cols when width allows */
+  .grid { grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 10px; }
 
   /* Card */
   .card { padding: 12px; gap: 10px; }
