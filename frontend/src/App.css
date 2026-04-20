@@ -176,9 +176,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 .station-count { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px; }
 
-/* ── Grid ── */
+/* ── Grid — auto-reflows at any width ── */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px; }
-@media (min-width: 900px) { .grid { grid-template-columns: repeat(3, 1fr); } }
 
 /* ── Card ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -985,6 +984,50 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   cursor: pointer; white-space: nowrap; margin-top: 6px; transition: opacity 0.15s; }
 .btn-route-fillup:hover { opacity: 0.85; }
 
+/* ── Desktop Two-Column Layout (All Stations sidebar) ───────────────────────── */
+.all-stations-layout { display: flex; gap: 20px; align-items: flex-start; }
+
+.all-stations-sidebar {
+  width: 260px; flex-shrink: 0;
+  position: sticky; top: 74px;
+  max-height: calc(100vh - 90px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0;
+  /* Scrollbar styling */
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.all-stations-sidebar::-webkit-scrollbar { width: 4px; }
+.all-stations-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.all-stations-content { flex: 1; min-width: 0; }
+
+/* Fuel tabs go vertical inside the sidebar */
+.all-stations-sidebar .fuel-tabs { flex-direction: column; gap: 4px; }
+.all-stations-sidebar .tab {
+  flex: none; flex-direction: row; justify-content: space-between;
+  padding: 8px 12px; text-align: left;
+}
+.all-stations-sidebar .tab-price { margin-left: auto; font-size: 0.8rem; }
+
+/* Icon buttons spread horizontally across the sidebar */
+.all-stations-sidebar .controls-top { flex-direction: column; gap: 8px; }
+.all-stations-sidebar .toolbar-icons { gap: 6px; flex-wrap: wrap; }
+.all-stations-sidebar .btn-icon { flex: 1; min-width: 0; }
+
+/* Collapse sidebar vertically on tablet / narrow desktop */
+@media (max-width: 900px) {
+  .all-stations-layout { flex-direction: column; }
+  .all-stations-sidebar {
+    width: 100%; position: static;
+    max-height: none; overflow-y: visible;
+  }
+  /* Restore horizontal fuel tabs on mobile/tablet */
+  .all-stations-sidebar .fuel-tabs { flex-direction: row; gap: 6px; }
+  .all-stations-sidebar .tab { flex: 1; flex-direction: column; justify-content: center; padding: 8px 14px; }
+  .all-stations-sidebar .tab-price { margin-left: 0; }
+  .all-stations-sidebar .controls-top { flex-direction: row; }
+  .all-stations-sidebar .btn-icon { flex: none; min-width: 44px; }
+}
+
 /* ── Bottom navigation ───────────────────────────────────────────────────────── */
 .bottom-nav { display: none; }
 
@@ -1195,11 +1238,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 }
 /* Full-height app shell */
 html, body, #root { height: 100%; }
-/* Prevent horizontal layout expansion after interaction */
-/* clip instead of hidden: clips visually without creating a scroll container (keeps child scroll working) */
-html { overflow-x: clip; }
-.app { min-height: 100%; display: flex; flex-direction: column; max-width: 100vw; overflow-x: clip; }
-.main { flex: 1; min-width: 0; overflow-x: clip; }
+/* Keep horizontal overflow clipped at the html level only (prevents rogue child overflow on mobile) */
+html { overflow-x: hidden; }
+.app { min-height: 100%; display: flex; flex-direction: column; }
+.main { flex: 1; min-width: 0; }
 /* Smooth momentum scroll on iOS */
 .modal { -webkit-overflow-scrolling: touch; }
 /* Ensure safe areas on notched phones */

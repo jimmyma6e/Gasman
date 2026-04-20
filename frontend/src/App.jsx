@@ -993,216 +993,188 @@ export default function App() {
           />
         )}
 
-        {/* Station list — All Stations tab only */}
-        {tab === "all" && (<>
-        <div className="search-row">
-          <input
-            className="search-input"
-            type="search"
-            placeholder="Search stations or address…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {hasFilters && (
-            <button className="btn-clear-filters" onClick={() => { setAreaFilter(new Set()); setBrandFilter(new Set()); setSearch(""); }}>
-              Clear filters
-            </button>
-          )}
-        </div>
+        {/* Station list — All Stations tab: sidebar + content layout */}
+        {tab === "all" && (
+        <div className="all-stations-layout">
 
-        {/* Area filter — popular chips + "More areas" dropdown */}
-        <div className="filter-section">
-          <span className="filter-label">Area</span>
-          <div className="chip-row">
-            {POPULAR_AREAS.map((name) => (
-              <button
-                key={name}
-                className={`brand-chip ${areaFilter.has(name) ? "brand-chip-active" : ""}`}
-                onClick={() => setAreaFilter(toggleSet(areaFilter, name))}
-              >
-                {name}
+        {/* ── Sidebar: search, filters, controls ── */}
+        <div className="all-stations-sidebar">
+          <div className="search-row">
+            <input
+              className="search-input"
+              type="search"
+              placeholder="Search stations or address…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {hasFilters && (
+              <button className="btn-clear-filters" onClick={() => { setAreaFilter(new Set()); setBrandFilter(new Set()); setSearch(""); }}>
+                Clear
               </button>
-            ))}
-            {/* Region dropdown */}
-            <div className="area-more-wrap" ref={dropdownRef}>
-              <button
-                className={`area-more-btn ${[...areaFilter].some((n) => !POPULAR_AREAS.includes(n)) ? "brand-chip-active" : ""}`}
-                onClick={() => { setAreaDropdownOpen((o) => !o); setAreaSearch(""); }}
-              >
-                All regions {areaDropdownOpen ? "▴" : "▾"}
-              </button>
-              {areaDropdownOpen && (
-                <div className="area-dropdown">
-                  <input
-                    className="area-search-input"
-                    type="text"
-                    placeholder="Search area..."
-                    value={areaSearch}
-                    onChange={(e) => setAreaSearch(e.target.value)}
-                    autoFocus
-                  />
-                  {Object.entries(BC_REGIONS).map(([region, cities]) => {
-                    const filtered = cities.filter((c) =>
-                      c.toLowerCase().includes(areaSearch.toLowerCase())
-                    );
-                    if (filtered.length === 0) return null;
-                    return (
-                      <div key={region} className="area-region-group">
-                        <div className="area-region-header">{region}</div>
-                        {filtered.map((name) => (
-                          <label key={name} className="area-dropdown-item">
-                            <input
-                              type="checkbox"
-                              checked={areaFilter.has(name)}
-                              onChange={() => setAreaFilter(toggleSet(areaFilter, name))}
-                            />
-                            {name}
+            )}
+          </div>
+
+          {/* Area filter */}
+          <div className="filter-section">
+            <span className="filter-label">Area</span>
+            <div className="chip-row">
+              {POPULAR_AREAS.map((name) => (
+                <button key={name}
+                  className={`brand-chip ${areaFilter.has(name) ? "brand-chip-active" : ""}`}
+                  onClick={() => setAreaFilter(toggleSet(areaFilter, name))}
+                >{name}</button>
+              ))}
+              <div className="area-more-wrap" ref={dropdownRef}>
+                <button
+                  className={`area-more-btn ${[...areaFilter].some((n) => !POPULAR_AREAS.includes(n)) ? "brand-chip-active" : ""}`}
+                  onClick={() => { setAreaDropdownOpen((o) => !o); setAreaSearch(""); }}
+                >
+                  All regions {areaDropdownOpen ? "▴" : "▾"}
+                </button>
+                {areaDropdownOpen && (
+                  <div className="area-dropdown">
+                    <input className="area-search-input" type="text" placeholder="Search area..."
+                      value={areaSearch} onChange={(e) => setAreaSearch(e.target.value)} autoFocus />
+                    {Object.entries(BC_REGIONS).map(([region, cities]) => {
+                      const filtered = cities.filter((c) => c.toLowerCase().includes(areaSearch.toLowerCase()));
+                      if (!filtered.length) return null;
+                      return (
+                        <div key={region} className="area-region-group">
+                          <div className="area-region-header">{region}</div>
+                          {filtered.map((name) => (
+                            <label key={name} className="area-dropdown-item">
+                              <input type="checkbox" checked={areaFilter.has(name)}
+                                onChange={() => setAreaFilter(toggleSet(areaFilter, name))} />
+                              {name}
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Brand filter */}
+          {brands.length > 0 && (
+            <div className="filter-section">
+              <span className="filter-label">Brand</span>
+              <div className="chip-row">
+                {QUICK_BRANDS.filter((b) => brands.includes(b)).map((b) => (
+                  <button key={b}
+                    className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
+                    onClick={() => setBrandFilter(toggleSet(brandFilter, b))}
+                  >{b}</button>
+                ))}
+                {brands.filter((b) => !QUICK_BRANDS.includes(b)).length > 0 && (
+                  <div className="area-more-wrap" ref={brandDropdownRef}>
+                    <button
+                      className={`area-more-btn ${[...brandFilter].some((b) => !QUICK_BRANDS.includes(b)) ? "brand-chip-active" : ""}`}
+                      onClick={() => { setBrandDropdownOpen((o) => !o); setBrandSearch(""); }}
+                    >
+                      More {brandDropdownOpen ? "▴" : "▾"}
+                    </button>
+                    {brandDropdownOpen && (
+                      <div className="area-dropdown brand-dropdown">
+                        <input className="area-search-input" type="text" placeholder="Search brand…"
+                          value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} autoFocus />
+                        {brands.filter((b) => !QUICK_BRANDS.includes(b) && b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
+                          <label key={b} className="area-dropdown-item">
+                            <input type="checkbox" checked={brandFilter.has(b)}
+                              onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
+                            {b}
                           </label>
                         ))}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Brand filter — multi-select quick chips + More dropdown */}
-        {brands.length > 0 && (
-          <div className="filter-section">
-            <span className="filter-label">Brand</span>
-            <div className="chip-row">
-              {/* Quick brand chips — multi-select toggle */}
-              {QUICK_BRANDS.filter((b) => brands.includes(b)).map((b) => (
-                <button key={b}
-                  className={`brand-chip ${brandFilter.has(b) ? "brand-chip-active" : ""}`}
-                  onClick={() => setBrandFilter(toggleSet(brandFilter, b))}
-                >
-                  {b}
-                </button>
-              ))}
-
-              {/* "More" dropdown for brands not in QUICK_BRANDS */}
-              {brands.filter((b) => !QUICK_BRANDS.includes(b)).length > 0 && (
-                <div className="area-more-wrap" ref={brandDropdownRef}>
-                  <button
-                    className={`area-more-btn ${[...brandFilter].some((b) => !QUICK_BRANDS.includes(b)) ? "brand-chip-active" : ""}`}
-                    onClick={() => { setBrandDropdownOpen((o) => !o); setBrandSearch(""); }}
-                  >
-                    More {brandDropdownOpen ? "▴" : "▾"}
-                  </button>
-                  {brandDropdownOpen && (
-                    <div className="area-dropdown brand-dropdown">
-                      <input className="area-search-input" type="text" placeholder="Search brand…"
-                        value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} autoFocus />
-                      {brands.filter((b) => !QUICK_BRANDS.includes(b) &&
-                        b.toLowerCase().includes(brandSearch.toLowerCase())).map((b) => (
-                        <label key={b} className="area-dropdown-item">
-                          <input type="checkbox" checked={brandFilter.has(b)}
-                            onChange={() => setBrandFilter(toggleSet(brandFilter, b))} />
-                          {b}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Controls — top row: fuel tabs + 3 icon buttons */}
-        <div className="controls">
-          <div className="controls-top">
-            <div className="fuel-tabs">
-              {FUEL_TYPES.map(({ key, label }) => (
-                <button
-                  key={key}
-                  className={`tab ${activeFuel === key ? "tab-active" : ""}`}
-                  onClick={() => setActiveFuel(key)}
-                >
-                  {label}
-                  {cheapestPrices[key] != null && (
-                    <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="toolbar-icons">
-              {/* 💳 Credit card prices */}
-              <button
-                className={`btn-icon ${showCardDiscounts && selectedCards.length > 0 ? "btn-icon-active" : ""}`}
-                onClick={selectedCards.length > 0 ? () => setShowCardDiscounts((o) => !o) : () => setShowProfile(true)}
-                title={selectedCards.length > 0 ? (showCardDiscounts ? "Card prices ON" : "Card prices OFF") : "Add a credit card"}
-              >
-                <span className="btn-icon-emoji">💳</span>
-                <span className="btn-icon-label">Card</span>
-              </button>
-              {/* 📍 Near Me */}
-              <button
-                className={`btn-icon ${userCoords ? "btn-icon-active" : ""}`}
-                onClick={userCoords ? () => { setUserCoords(null); setSortBy("price"); } : getNearMe}
-                title={userCoords ? "Clear Near Me" : "Find stations near you"}
-                disabled={nearMeLoading}
-              >
-                <span className="btn-icon-emoji">{nearMeLoading ? "⏳" : "📍"}</span>
-                <span className="btn-icon-label">{userCoords ? "Near ✓" : "Near Me"}</span>
-              </button>
-              {/* ⛽ Show fill cost */}
-              <button
-                className={`btn-icon ${showFillCost ? "btn-icon-active" : ""}`}
-                onClick={() => {
-                  if (!fillLitres) { setShowProfile(true); return; }
-                  setShowFillCost((o) => !o);
-                }}
-                title={fillLitres ? `Show fill cost (${fillLitres}L)` : "Set fill litres in Profile"}
-              >
-                <span className="btn-icon-emoji">⛽</span>
-                <span className="btn-icon-label">Cost</span>
-              </button>
-            </div>
-          </div>
-          {/* Bottom row: map toggle, sort, view */}
-          <div className="controls-bottom">
-            <button
-              className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
-              onClick={() => setShowMap((v) => !v)}
-            >
-              🗺 Map
-            </button>
-            {viewMode !== "table" && (
-              <div className="sort-controls">
-                <label>Sort</label>
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                  <option value="price">Price</option>
-                  <option value="updated">Latest</option>
-                  <option value="name">Name</option>
-                  <option value="city">City</option>
-                  {userCoords && <option value="distance">Distance</option>}
-                </select>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-            <div className="view-toggle">
-              {[
-                { id: "card",    icon: "⊞", title: "Card view"    },
-                { id: "compact", icon: "☰", title: "Compact view" },
-                { id: "table",   icon: "⊟", title: "Table view"   },
-              ].map(({ id, icon, title }) => (
-                <button
-                  key={id}
-                  className={`view-btn ${viewMode === id ? "view-btn-active" : ""}`}
-                  onClick={() => setViewMode(id)}
-                  title={title}
-                >
-                  {icon}
-                </button>
-              ))}
             </div>
-            {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
-          </div>
-        </div>
+          )}
 
+          {/* Controls: fuel tabs + icon buttons + sort + view */}
+          <div className="controls">
+            <div className="controls-top">
+              <div className="fuel-tabs">
+                {FUEL_TYPES.map(({ key, label }) => (
+                  <button key={key}
+                    className={`tab ${activeFuel === key ? "tab-active" : ""}`}
+                    onClick={() => setActiveFuel(key)}
+                  >
+                    {label}
+                    {cheapestPrices[key] != null && (
+                      <span className="tab-price">{formatPrice(cheapestPrices[key], allStations[0]?.unit_of_measure)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="toolbar-icons">
+                <button
+                  className={`btn-icon ${showCardDiscounts && selectedCards.length > 0 ? "btn-icon-active" : ""}`}
+                  onClick={selectedCards.length > 0 ? () => setShowCardDiscounts((o) => !o) : () => setShowProfile(true)}
+                  title={selectedCards.length > 0 ? (showCardDiscounts ? "Card prices ON" : "Card prices OFF") : "Add a credit card"}
+                >
+                  <span className="btn-icon-emoji">💳</span>
+                  <span className="btn-icon-label">Card</span>
+                </button>
+                <button
+                  className={`btn-icon ${userCoords ? "btn-icon-active" : ""}`}
+                  onClick={userCoords ? () => { setUserCoords(null); setSortBy("price"); } : getNearMe}
+                  title={userCoords ? "Clear Near Me" : "Find stations near you"}
+                  disabled={nearMeLoading}
+                >
+                  <span className="btn-icon-emoji">{nearMeLoading ? "⏳" : "📍"}</span>
+                  <span className="btn-icon-label">{userCoords ? "Near ✓" : "Near Me"}</span>
+                </button>
+                <button
+                  className={`btn-icon ${showFillCost ? "btn-icon-active" : ""}`}
+                  onClick={() => { if (!fillLitres) { setShowProfile(true); return; } setShowFillCost((o) => !o); }}
+                  title={fillLitres ? `Show fill cost (${fillLitres}L)` : "Set fill litres in Profile"}
+                >
+                  <span className="btn-icon-emoji">⛽</span>
+                  <span className="btn-icon-label">Cost</span>
+                </button>
+              </div>
+            </div>
+            <div className="controls-bottom">
+              <button className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
+                onClick={() => setShowMap((v) => !v)}>
+                🗺 Map
+              </button>
+              {viewMode !== "table" && (
+                <div className="sort-controls">
+                  <label>Sort</label>
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                    <option value="price">Price</option>
+                    <option value="updated">Latest</option>
+                    <option value="name">Name</option>
+                    <option value="city">City</option>
+                    {userCoords && <option value="distance">Distance</option>}
+                  </select>
+                </div>
+              )}
+              <div className="view-toggle">
+                {[
+                  { id: "card",    icon: "⊞", title: "Card view"    },
+                  { id: "compact", icon: "☰", title: "Compact view" },
+                  { id: "table",   icon: "⊟", title: "Table view"   },
+                ].map(({ id, icon, title }) => (
+                  <button key={id}
+                    className={`view-btn ${viewMode === id ? "view-btn-active" : ""}`}
+                    onClick={() => setViewMode(id)} title={title}
+                  >{icon}</button>
+                ))}
+              </div>
+              {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
+            </div>
+          </div>
+        </div>{/* end sidebar */}
+
+        {/* ── Content: loading states + station results ── */}
+        <div className="all-stations-content">
         {error && (
           <div className="error-box">Failed to load: {error}.{" "}<button onClick={fetchData}>Retry</button></div>
         )}
@@ -1214,15 +1186,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Scan progress banner — only shown during discovery (refresh runs silently) */}
+        {/* Scan progress banner — only shown during discovery */}
         {scanStatus?.mode === "discovery" && (scanStatus?.running || scanning) && (
           <div className="scan-banner">
             <div className="spinner spinner-sm" />
             <div className="scan-banner-text">
               <span>
-                <strong>
-                  {scanStatus?.mode === "discovery" ? "Discovering" : "Refreshing"} stations
-                </strong>
+                <strong>{scanStatus?.mode === "discovery" ? "Discovering" : "Refreshing"} stations</strong>
                 {scanStatus?.stations_found > 0 && ` · ${scanStatus.stations_found} found`}
               </span>
               {scanStatus?.zones_done > 0 && scanStatus?.zones_total > 0 && (
@@ -1234,10 +1204,8 @@ export default function App() {
             </div>
             {scanStatus?.zones_done > 0 && scanStatus?.zones_total > 0 && (
               <div className="scan-progress-bar scan-banner-bar">
-                <div
-                  className="scan-progress-fill"
-                  style={{ width: `${Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}%` }}
-                />
+                <div className="scan-progress-fill"
+                  style={{ width: `${Math.round(scanStatus.zones_done / scanStatus.zones_total * 100)}%` }} />
               </div>
             )}
           </div>
@@ -1392,21 +1360,18 @@ export default function App() {
               )}
             </div>{/* end split-view */}
 
-            {/* Show more button — appears when list is truncated */}
+            {/* Show more button */}
             {!showAllStations && sorted.length > 10 && (
-              <button
-                className="btn-show-more"
-                onClick={() => {
-                  setShowAllStations(true);
-                  posthog.capture("show_more_clicked", { total: sorted.length });
-                }}
+              <button className="btn-show-more"
+                onClick={() => { setShowAllStations(true); posthog.capture("show_more_clicked", { total: sorted.length }); }}
               >
                 Show {sorted.length - 10} more stations
               </button>
             )}
           </>
         )}
-        </>)}{/* end tab === all */}
+        </div>{/* end all-stations-content */}
+        </div>)}{/* end all-stations-layout / tab === all */}
       </main>
 
       {chartStation && (
