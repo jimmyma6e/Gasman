@@ -174,7 +174,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .station-count { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px; }
 
 /* ── Grid — auto-reflows at any width ── */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; }
 
 /* ── Card ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; transition: border-color 0.15s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -1093,7 +1093,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .logs-stat-value { font-size: 1.2rem; }
 
   /* Grid — 1 col on narrow phones, 2 cols when width allows */
-  .grid { grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 10px; }
+  .grid { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 10px; }
 
   /* Card */
   .card { padding: 12px; gap: 10px; }
