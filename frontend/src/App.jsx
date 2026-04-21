@@ -1111,6 +1111,8 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="controls-bottom">
               <div className="toolbar-icons">
                 <button
                   className={`btn-icon ${showCardDiscounts && selectedCards.length > 0 ? "btn-icon-active" : ""}`}
@@ -1138,8 +1140,6 @@ export default function App() {
                   <span className="btn-icon-label">Cost</span>
                 </button>
               </div>
-            </div>
-            <div className="controls-bottom">
               <button className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
                 onClick={() => setShowMap((v) => !v)}>
                 🗺 Map

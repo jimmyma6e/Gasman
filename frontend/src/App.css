@@ -1005,19 +1005,20 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 }
 .all-stations-sidebar .tab-price { margin-left: auto; font-size: 0.8rem; }
 
-/* Icon buttons spread horizontally across the sidebar */
+/* Sidebar desktop: fuel tabs go vertical, controls-bottom wraps */
 .all-stations-sidebar .controls-top { flex-direction: column; gap: 8px; }
-.all-stations-sidebar .toolbar-icons { gap: 6px; flex-wrap: wrap; }
+.all-stations-sidebar .controls-bottom { flex-wrap: wrap; gap: 6px; }
+.all-stations-sidebar .toolbar-icons { gap: 4px; flex-wrap: wrap; }
 .all-stations-sidebar .btn-icon { flex: 1; min-width: 0; }
 
-/* Collapse sidebar vertically on tablet / narrow desktop */
-@media (max-width: 900px) {
+/* Collapse sidebar to stacked layout on tablet / medium desktop */
+@media (max-width: 1024px) {
   .all-stations-layout { flex-direction: column; }
   .all-stations-sidebar {
     width: 100%; position: static;
     max-height: none; overflow-y: visible;
   }
-  /* Restore horizontal fuel tabs on mobile/tablet */
+  /* Restore horizontal fuel tabs on stacked layout */
   .all-stations-sidebar .fuel-tabs { flex-direction: row; gap: 6px; }
   .all-stations-sidebar .tab { flex: 1; flex-direction: column; justify-content: center; padding: 8px 14px; }
   .all-stations-sidebar .tab-price { margin-left: 0; }
