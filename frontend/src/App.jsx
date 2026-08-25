@@ -549,23 +549,42 @@ export default function App() {
     () => !!localStorage.getItem("gasman-onboarded")
   );
 
-  // Near Me
-  const [userCoords, setUserCoords] = useState(null);
+  // Near Me — cache coords in localStorage so we don't re-prompt for
+  // location permission on every visit/reload within the TTL window.
+  const COORDS_CACHE_KEY = "gasman-user-coords";
+  const COORDS_TTL_MS = 15 * 60 * 1000; // 15 min
+
+  const [userCoords, setUserCoords] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(COORDS_CACHE_KEY) || "null");
+      if (cached && Date.now() - cached.ts < COORDS_TTL_MS) {
+        return { lat: cached.lat, lng: cached.lng };
+      }
+    } catch { /* ignore malformed cache */ }
+    return null;
+  });
   const [nearMeLoading, setNearMeLoading] = useState(false);
   const [nearMeError, setNearMeError] = useState(null);
+
+  const persistCoords = useCallback((coords) => {
+    setUserCoords(coords);
+    try {
+      localStorage.setItem(COORDS_CACHE_KEY, JSON.stringify({ ...coords, ts: Date.now() }));
+    } catch { /* storage unavailable — ignore */ }
+  }, []);
 
   const getNearMe = useCallback(() => {
     if (!navigator.geolocation) { setNearMeError("not-supported"); return; }
     setNearMeLoading(true); setNearMeError(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        persistCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setSortBy("distance");
         setNearMeLoading(false);
       },
       () => { setNearMeError("denied"); setNearMeLoading(false); }
     );
-  }, []);
+  }, [persistCoords]);
 
   // Fill-up log
   const [fillups, setFillups] = useState(() => {
@@ -757,14 +776,14 @@ export default function App() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            persistCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
             setSortBy("distance");
           },
           () => {} // silent — manual Near Me button still available
         );
       }
     }
-  }, [tab, userCoords]);
+  }, [tab, userCoords, persistCoords]);
 
   // Track last station_view to avoid duplicate fires when clicking the same card twice
   const lastViewedStation = useRef(null);
@@ -1124,7 +1143,7 @@ export default function App() {
                 </button>
                 <button
                   className={`btn-icon ${userCoords ? "btn-icon-active" : ""}`}
-                  onClick={userCoords ? () => { setUserCoords(null); setSortBy("price"); } : getNearMe}
+                  onClick={userCoords ? () => { setUserCoords(null); localStorage.removeItem(COORDS_CACHE_KEY); setSortBy("price"); } : getNearMe}
                   title={userCoords ? "Clear Near Me" : "Find stations near you"}
                   disabled={nearMeLoading}
                 >

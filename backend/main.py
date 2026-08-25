@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -126,6 +126,18 @@ async def get_stations():
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "scanning":   scan_status["running"],
     }
+
+
+@app.get("/api/station/{station_id}")
+async def get_station(station_id: str):
+    stations, _ = gb.get_cache_snapshot()
+    station = next((s for s in stations if s["station_id"] == station_id), None)
+    if station is None:
+        raise HTTPException(status_code=404, detail="station not found")
+    delta = database.get_price_deltas().get(station_id)
+    if delta:
+        station = {**station, "price_delta": delta}
+    return station
 
 
 @app.get("/api/history/{station_id}")
