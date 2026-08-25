@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gasman
+      POSTGRES_USER: gasman
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gasman}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gasman"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: gasman:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8001}:8000"
+    environment:
+      DATABASE_URL: postgresql://gasman:${POSTGRES_PASSWORD:-gasman}@db/gasman
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
