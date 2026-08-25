@@ -41,8 +41,7 @@ $SSH "
   $NAS_DOCKER load < $NAS_DIR/gasman-image.tar.gz
   rm $NAS_DIR/gasman-image.tar.gz
   cd $NAS_DIR
-  $NAS_DOCKER compose down --remove-orphans
-  $NAS_DOCKER compose up -d
+  $NAS_DOCKER compose up -d --force-recreate --remove-orphans
   $NAS_DOCKER compose ps
 "
 
