@@ -29,14 +29,17 @@ scp -i "$NAS_KEY" -o StrictHostKeyChecking=no \
     /tmp/gasman-image.tar.gz "$NAS_USER@$NAS_HOST:$NAS_DIR/gasman-image.tar.gz"
 
 echo "==> Loading image and restarting on NAS..."
-$SSH "
+# QNAP's non-interactive SSH shell doesn't source the profile that puts
+# Container Station's docker CLI on PATH — run via a login shell (bash -lc)
+# so it picks up the same PATH as an interactive SSH session.
+$SSH "bash -lc '
   docker load < $NAS_DIR/gasman-image.tar.gz
   rm $NAS_DIR/gasman-image.tar.gz
   cd $NAS_DIR
   docker compose down --remove-orphans
   docker compose up -d
   docker compose ps
-"
+'"
 
 rm /tmp/gasman-image.tar.gz
 echo "==> Done. GASMAN running — accessible via cloudflared as http://gasman:8000"
