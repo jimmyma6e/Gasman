@@ -526,3 +526,8 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
 def get_cache_snapshot() -> tuple[list[dict], list[dict]]:
     """Return whatever is currently cached (may be empty list). Never blocks."""
     return _cache.get("stations") or [], _cache.get("trends") or []
+
+
+def get_station_by_id(station_id: str) -> dict | None:
+    stations, _ = get_cache_snapshot()
+    return next((s for s in stations if s["station_id"] == station_id), None)

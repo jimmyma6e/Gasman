@@ -293,6 +293,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .tbl-price { white-space: nowrap; font-weight: 600; }
 .tbl-cheapest { color: var(--accent); }
 .tbl-price-inner { display: flex; align-items: center; gap: 4px; }
+.tbl-octane { font-size: 0.7rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .tbl-empty { color: var(--text-dim); }
 .tbl-updated { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
 

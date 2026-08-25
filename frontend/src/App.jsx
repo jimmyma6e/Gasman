@@ -10,6 +10,7 @@ import FillupModal from "./components/FillupModal";
 import LogsTab from "./components/LogsTab";
 import BottomNav from "./components/BottomNav";
 import { bestCardSavings } from "./creditCards.js";
+import { octaneLabel } from "./octane.js";
 import { pageview } from "./analytics.js";
 import posthog from "posthog-js";
 
@@ -243,7 +244,7 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
 
         {/* Fuel price chips — tap to switch chart fuel */}
         <div className="modal-prices">
-          {FUEL_TYPES.map(({ key, label }) => {
+          {FUEL_TYPES.map(({ key }) => {
             const price = station[key]?.price;
             if (price == null) return null;
             return (
@@ -252,7 +253,7 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
                 className={`modal-price-chip ${selectedFuel === key ? "modal-price-chip-active" : ""}`}
                 onClick={() => setSelectedFuel(key)}
               >
-                <span className="modal-price-label">{label}</span>
+                <span className="modal-price-label">{octaneLabel(key, station._brand || station.name)}</span>
                 <span className="modal-price-value">{formatPrice(price, station.unit_of_measure)}</span>
               </button>
             );
@@ -334,12 +335,12 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
       </div>
 
       <div className="fuel-grid">
-        {FUEL_TYPES.map(({ key, label }) => {
+        {FUEL_TYPES.map(({ key }) => {
           const price = station[key]?.price;
           const delta = deltas[key];
           return (
             <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
-              <span className="fuel-label">{label}</span>
+              <span className="fuel-label">{octaneLabel(key, station._brand || station.name)}</span>
               {VALID_PRICE(price) ? (
                 <>
                   <div className="fuel-price-row">

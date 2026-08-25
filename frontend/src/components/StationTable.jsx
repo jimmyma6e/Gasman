@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { octaneLabel } from "../octane.js";
 
 const FUEL_TYPES = [
   { key: "regular_gas",  label: "Regular (87)" },
   { key: "midgrade_gas", label: "Mid (89)"     },
-  { key: "premium_gas",  label: "Premium (91)" },
+  { key: "premium_gas",  label: "Premium"      }, // octane varies by brand — shown per-cell
   { key: "diesel",       label: "Diesel"       },
 ];
 
@@ -92,9 +93,16 @@ export default function StationTable({ stations, cheapestPrices, favourites, onT
                 {FUEL_TYPES.map(({ key }) => {
                   const price = s[key]?.price;
                   const isCheap = price != null && price > 0 && price === cheapestPrices[key];
+                  const octane = key === "premium_gas" ? octaneLabel(key, s._brand || s.name) : null;
                   return (
                     <td key={key} className={`tbl-td tbl-price ${isCheap ? "tbl-cheapest" : ""}`}>
-                      {price != null && price > 0 ? <span className="tbl-price-inner">{formatPrice(price, s.unit_of_measure)}<DeltaBadge delta={deltas[key]} /></span> : <span className="tbl-empty">—</span>}
+                      {price != null && price > 0 ? (
+                        <span className="tbl-price-inner">
+                          {octane && <span className="tbl-octane">{octane}</span>}
+                          {formatPrice(price, s.unit_of_measure)}
+                          <DeltaBadge delta={deltas[key]} />
+                        </span>
+                      ) : <span className="tbl-empty">—</span>}
                     </td>
                   );
                 })}

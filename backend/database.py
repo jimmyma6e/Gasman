@@ -121,6 +121,16 @@ def init_db():
                 GROUP BY station_id, name, address, latitude, longitude
                 ON CONFLICT (station_id) DO NOTHING
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS api_keys (
+                    key_hash      TEXT PRIMARY KEY,
+                    label         TEXT NOT NULL,
+                    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    revoked       BOOLEAN NOT NULL DEFAULT FALSE,
+                    request_count BIGINT NOT NULL DEFAULT 0,
+                    last_used_at  TIMESTAMPTZ
+                )
+            """)
 
 
 def upsert_stations(stations: list) -> None:
@@ -393,6 +403,45 @@ def purge_old_prices(days: int = 30) -> int:
                 DELETE FROM price_history
                 WHERE recorded_at < NOW() - make_interval(days => %s)
             """, (days,))
+            return cur.rowcount
+
+
+def insert_api_key(key_hash: str, label: str) -> None:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO api_keys (key_hash, label) VALUES (%s, %s)",
+                (key_hash, label),
+            )
+
+
+def verify_and_touch_api_key(key_hash: str) -> bool:
+    """Return True and bump usage stats if key_hash is a valid, non-revoked key."""
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE api_keys
+                SET request_count = request_count + 1, last_used_at = NOW()
+                WHERE key_hash = %s AND revoked = FALSE
+                RETURNING key_hash
+            """, (key_hash,))
+            return cur.fetchone() is not None
+
+
+def list_api_keys() -> list:
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT key_hash, label, created_at, revoked, request_count, last_used_at
+                FROM api_keys ORDER BY created_at DESC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def revoke_api_key(label: str) -> int:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE api_keys SET revoked = TRUE WHERE label = %s", (label,))
             return cur.rowcount
 
 

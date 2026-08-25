@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 
 import database
 import gasbuddy_client as gb
+from public_api import v1_app
 
 # Ensure our application loggers emit at INFO regardless of what
 # uvicorn does to the root logger.  force=True removes any existing
@@ -130,8 +131,7 @@ async def get_stations():
 
 @app.get("/api/station/{station_id}")
 async def get_station(station_id: str):
-    stations, _ = gb.get_cache_snapshot()
-    station = next((s for s in stations if s["station_id"] == station_id), None)
+    station = gb.get_station_by_id(station_id)
     if station is None:
         raise HTTPException(status_code=404, detail="station not found")
     delta = database.get_price_deltas().get(station_id)
@@ -207,6 +207,10 @@ async def trigger_discovery():
     asyncio.create_task(discovery_job())
     return {"status": "discovery job started"}
 
+
+# Public, API-key-authenticated v1 API — isolated sub-app with its own
+# OpenAPI schema and Swagger docs at /api/v1/docs.
+app.mount("/api/v1", v1_app)
 
 # Serve the built React SPA — must be mounted AFTER all /api routes
 if STATIC_DIR.is_dir():
