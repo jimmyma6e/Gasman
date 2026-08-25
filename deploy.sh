@@ -19,19 +19,19 @@ docker build $NO_CACHE -t "$IMAGE" .
 echo "==> Saving image..."
 docker save "$IMAGE" | gzip > /tmp/gasman-image.tar.gz
 
-echo "==> Copying image to NAS..."
-scp -i "$NAS_KEY" -o StrictHostKeyChecking=no \
-    /tmp/gasman-image.tar.gz "$NAS_USER@$NAS_HOST:/tmp/gasman-image.tar.gz"
-
 echo "==> Copying compose file to NAS..."
 $SSH "mkdir -p $NAS_DIR"
 scp -i "$NAS_KEY" -o StrictHostKeyChecking=no \
     docker-compose.yml "$NAS_USER@$NAS_HOST:$NAS_DIR/docker-compose.yml"
 
+echo "==> Copying image to NAS (persistent share, not /tmp)..."
+scp -i "$NAS_KEY" -o StrictHostKeyChecking=no \
+    /tmp/gasman-image.tar.gz "$NAS_USER@$NAS_HOST:$NAS_DIR/gasman-image.tar.gz"
+
 echo "==> Loading image and restarting on NAS..."
 $SSH "
-  docker load < /tmp/gasman-image.tar.gz
-  rm /tmp/gasman-image.tar.gz
+  docker load < $NAS_DIR/gasman-image.tar.gz
+  rm $NAS_DIR/gasman-image.tar.gz
   cd $NAS_DIR
   docker compose down --remove-orphans
   docker compose up -d
@@ -39,4 +39,4 @@ $SSH "
 "
 
 rm /tmp/gasman-image.tar.gz
-echo "==> Done. GASMAN running at http://$NAS_HOST:8001"
+echo "==> Done. GASMAN running — accessible via cloudflared as http://gasman:8000"
