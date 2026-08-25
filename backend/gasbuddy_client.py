@@ -71,6 +71,47 @@ ANCHOR_COORDS = [
     (49.1890, -122.8490),  # Surrey centre
 ]
 
+# Named city centres for classifying a station's city from its lat/lng —
+# GasBuddy's own "city" field isn't requested/reliable, so this is derived.
+CITY_CENTROIDS = [
+    ("Vancouver", 49.2827, -123.1207),
+    ("Burnaby",   49.2488, -122.9805),
+    ("Richmond",  49.1666, -123.1336),
+    ("Delta",     49.0847, -123.0588),
+    ("Surrey",    49.1890, -122.8490),
+]
+
+
+def nearest_city(lat, lng) -> str:
+    if lat is None or lng is None:
+        return "Other"
+    best, best_d = "Other", float("inf")
+    for name, clat, clng in CITY_CENTROIDS:
+        d = math.hypot(lat - clat, lng - clng)
+        if d < best_d:
+            best_d, best = d, name
+    return best
+
+
+# Normalize raw GasBuddy brand names to canonical versions — mirrors
+# frontend/src/App.jsx's BRAND_ALIASES so city/brand filtering agrees
+# with what the UI shows.
+BRAND_ALIASES = {
+    "CENTEX": "Centex", "Centex Gas": "Centex",
+    "CO-OP": "Co-op", "CO-OP Cardlock": "Co-op", "Co-op Cardlock": "Co-op", "Co-Op": "Co-op",
+    "Yellow Stores": "Yellow",
+    "Husky Go!": "Husky", "HUSKY": "Husky",
+    "ESSO": "Esso",
+    "SHELL": "Shell",
+    "CHEVRON": "Chevron",
+    "Petro-Can": "Petro-Canada",
+}
+
+
+def normalize_brand(name: str) -> str:
+    return BRAND_ALIASES.get(name, name) if name else name
+
+
 CACHE_TTL = timedelta(hours=4)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}
