@@ -43,60 +43,8 @@ def _build_search_coords() -> list:
                 lng += lng_step
             lat += lat_step
 
-    # Metro Vancouver — 2.5 km grid (~500 points, still fully comprehensive)
-    grid(49.00, 49.42, -123.35, -122.45, 2.5)
-
-    # Fraser Valley — 5 km grid (~130 points)
-    grid(49.00, 49.45, -122.45, -121.00, 5.0)
-
-    # Sea to Sky corridor — targeted
-    coords += [
-        (49.4400, -123.2800),  # Gibsons
-        (49.7016, -123.1558),  # Squamish
-        (50.1163, -122.9574),  # Whistler
-    ]
-
-    # Vancouver Island — 10 km grid
-    grid(48.30, 49.00, -124.50, -123.25, 10.0)
-    coords += [
-        (49.1659, -123.9401),  # Nanaimo
-        (49.3000, -124.3100),  # Parksville / Qualicum
-        (49.6870, -124.9901),  # Courtenay / Comox
-        (50.0163, -125.2445),  # Campbell River
-    ]
-
-    # Okanagan — 5 km grid (~80 points)
-    grid(49.00, 50.40, -119.80, -119.10, 5.0)
-    coords += [
-        (49.1783, -119.5919),  # Oliver / Osoyoos
-    ]
-
-    # Thompson / Kamloops — targeted
-    coords += [
-        (50.6745, -120.3273),  # Kamloops
-        (50.7500, -120.3800),  # Kamloops North
-        (50.9250, -118.7717),  # Salmon Arm
-    ]
-
-    # Kootenays — targeted
-    coords += [
-        (49.4926, -117.2948),  # Nelson
-        (49.0956, -117.7097),  # Trail / Castlegar
-        (49.5198, -115.7697),  # Cranbrook
-        (49.5100, -114.9700),  # Fernie
-    ]
-
-    # Northern BC — targeted
-    coords += [
-        (53.9166, -122.7497),  # Prince George
-        (54.0133, -124.2484),  # Vanderhoof / Burns Lake
-        (54.7700, -127.1800),  # Smithers
-        (54.5168, -128.5975),  # Terrace
-        (54.3150, -130.3208),  # Prince Rupert
-        (56.2518, -120.8476),  # Fort St. John
-        (55.7596, -120.2388),  # Dawson Creek
-        (58.8050, -122.6978),  # Fort Nelson
-    ]
+    # Vancouver, Burnaby, Richmond, Delta, Surrey — 2.5 km grid (~100 zones)
+    grid(49.02, 49.32, -123.27, -122.68, 2.5)
 
     # Deduplicate (grid edges can overlap)
     seen = set()
@@ -116,32 +64,11 @@ print(f"[config] {len(SEARCH_COORDS)} search zones loaded.")
 # areas have any known stations (ensures Sea-to-Sky, Island, Interior, North
 # always get checked on every 30-min cycle — not just after discovery).
 ANCHOR_COORDS = [
-    # Sea to Sky
-    (49.4400, -123.2800),  # Gibsons
-    (49.7016, -123.1558),  # Squamish
-    (50.1163, -122.9574),  # Whistler
-    # Vancouver Island
-    (49.1659, -123.9401),  # Nanaimo
-    (49.3000, -124.3100),  # Parksville / Qualicum
-    (49.6870, -124.9901),  # Courtenay / Comox
-    (50.0163, -125.2445),  # Campbell River
-    # Okanagan
-    (49.1783, -119.5919),  # Oliver / Osoyoos
-    (49.4870, -119.3960),  # Penticton
-    (49.8880, -119.4960),  # Kelowna
-    (50.2670, -119.2720),  # Vernon
-    # Thompson / Kamloops
-    (50.6745, -120.3273),  # Kamloops
-    (50.9250, -118.7717),  # Salmon Arm
-    # Kootenays
-    (49.4926, -117.2948),  # Nelson
-    (49.5198, -115.7697),  # Cranbrook
-    # Northern BC
-    (53.9166, -122.7497),  # Prince George
-    (54.5168, -128.5975),  # Terrace
-    (56.2518, -120.8476),  # Fort St. John
-    (55.7596, -120.2388),  # Dawson Creek
-    (58.8050, -122.6978),  # Fort Nelson
+    (49.2827, -123.1207),  # Vancouver downtown
+    (49.2488, -122.9805),  # Burnaby centre
+    (49.1666, -123.1336),  # Richmond centre
+    (49.0847, -123.0588),  # Delta / Ladner
+    (49.1890, -122.8490),  # Surrey centre
 ]
 
 CACHE_TTL = timedelta(hours=4)
