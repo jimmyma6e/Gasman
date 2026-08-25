@@ -11,10 +11,18 @@ NAS_DIR="/share/Container/gasman"
 IMAGE="gasman:latest"
 NO_CACHE="${1:-}"
 
+# QNAP's Container Station docker binary isn't on the default non-interactive
+# SSH PATH, and wrapping remote commands in a login shell (bash -lc) to fix
+# that trips QNAP's console-menu handler ("Inappropriate ioctl for device").
+# Call docker by its absolute path instead.
+NAS_DOCKER="/share/CACHEDEV1_DATA/.qpkg/container-station/usr/bin/.libs/docker"
+
 SSH="ssh -i $NAS_KEY -o StrictHostKeyChecking=no $NAS_USER@$NAS_HOST"
 
-echo "==> Building Docker image locally..."
-docker build $NO_CACHE -t "$IMAGE" .
+echo "==> Building Docker image locally (linux/amd64 for QNAP)..."
+# Apple Silicon Macs build arm64 by default; the QNAP is amd64. Without
+# --platform the container crashes on the NAS with "exec format error".
+docker build --platform linux/amd64 $NO_CACHE -t "$IMAGE" .
 
 echo "==> Saving image..."
 docker save "$IMAGE" | gzip > /tmp/gasman-image.tar.gz
@@ -29,17 +37,14 @@ scp -i "$NAS_KEY" -o StrictHostKeyChecking=no \
     /tmp/gasman-image.tar.gz "$NAS_USER@$NAS_HOST:$NAS_DIR/gasman-image.tar.gz"
 
 echo "==> Loading image and restarting on NAS..."
-# QNAP's non-interactive SSH shell doesn't source the profile that puts
-# Container Station's docker CLI on PATH — run via a login shell (bash -lc)
-# so it picks up the same PATH as an interactive SSH session.
-$SSH "bash -lc '
-  docker load < $NAS_DIR/gasman-image.tar.gz
+$SSH "
+  $NAS_DOCKER load < $NAS_DIR/gasman-image.tar.gz
   rm $NAS_DIR/gasman-image.tar.gz
   cd $NAS_DIR
-  docker compose down --remove-orphans
-  docker compose up -d
-  docker compose ps
-'"
+  $NAS_DOCKER compose down --remove-orphans
+  $NAS_DOCKER compose up -d
+  $NAS_DOCKER compose ps
+"
 
 rm /tmp/gasman-image.tar.gz
 echo "==> Done. GASMAN running — accessible via cloudflared as http://gasman:8000"
