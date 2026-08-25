@@ -89,7 +89,11 @@ async def list_stations(
             "latitude":   s.get("latitude"),
             "longitude":  s.get("longitude"),
         })
-    return result
+    return {
+        "count":    len(result),
+        "filters":  {"city": city, "brand": brand},
+        "stations": result,
+    }
 
 
 @v1_app.get("/stations/{station_id}", tags=["stations"], summary="Get current prices for a station")
