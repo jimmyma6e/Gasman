@@ -24,11 +24,12 @@ services:
         condition: service_healthy
     networks:
       - default
-      - tunnel-net
+      - tunnel
 
 volumes:
   db_data:
 
 networks:
-  tunnel-net:
+  tunnel:
     external: true
+    name: household-budget_default
