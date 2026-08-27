@@ -7,8 +7,11 @@ Run inside the backend container (needs DATABASE_URL set):
     python backfill_cities.py           # only stations missing a city
     python backfill_cities.py --all     # re-geocode every station
 
-Respects Nominatim's ~1 req/sec usage policy — this will take a while
-for a few hundred/thousand stations (roughly 1 station/second).
+Paced well under Nominatim's ~1 req/sec usage policy, with automatic
+retry-with-backoff on 429s (geocoding.py) — the public instance rate-limits
+more aggressively than its stated policy in practice, so a run can take
+noticeably longer than station_count * SLEEP_BETWEEN_REQUESTS if it hits
+a lot of retries.
 """
 
 import asyncio
@@ -17,7 +20,7 @@ import sys
 import database
 from geocoding import reverse_geocode_city
 
-SLEEP_BETWEEN_REQUESTS = 1.1  # seconds — stay under Nominatim's rate limit
+SLEEP_BETWEEN_REQUESTS = 2.0  # seconds — Nominatim's public instance rate-limits below its stated 1 req/sec
 
 
 async def run(all_stations: bool) -> None:
@@ -33,7 +36,8 @@ async def run(all_stations: bool) -> None:
         print("Nothing to geocode.")
         return
 
-    print(f"Geocoding {total} station(s) — ~{total * SLEEP_BETWEEN_REQUESTS / 60:.1f} min at 1 req/sec …")
+    print(f"Geocoding {total} station(s) — at least ~{total * SLEEP_BETWEEN_REQUESTS / 60:.1f} min "
+          f"(more if rate-limited) …")
     done, found = 0, 0
     for s in stations:
         city = await reverse_geocode_city(s.get("latitude"), s.get("longitude"))

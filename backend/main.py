@@ -28,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
-GEOCODE_SLEEP_S = 1.1  # stay under Nominatim's ~1 req/sec usage policy
+GEOCODE_SLEEP_S = 2.0  # Nominatim's public instance rate-limits below its stated 1 req/sec
 
 
 async def geocode_new_stations() -> None:
