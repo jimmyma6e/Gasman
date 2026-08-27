@@ -28,6 +28,12 @@ from playwright.async_api import async_playwright
 logger = logging.getLogger(__name__)
 
 
+# (lat_min, lat_max, lng_min, lng_max) rectangle covering the 5 scanned
+# cities. Used both to build the scan grid and to decide whether a station
+# falls inside our coverage area at all (for city classification).
+SCAN_BOUNDS = (49.02, 49.32, -123.27, -122.68)
+
+
 def _build_search_coords() -> list:
     coords = []
 
@@ -44,7 +50,7 @@ def _build_search_coords() -> list:
             lat += lat_step
 
     # Vancouver, Burnaby, Richmond, Delta, Surrey — 2.5 km grid (~100 zones)
-    grid(49.02, 49.32, -123.27, -122.68, 2.5)
+    grid(*SCAN_BOUNDS, 2.5)
 
     # Deduplicate (grid edges can overlap)
     seen = set()
@@ -84,6 +90,12 @@ CITY_CENTROIDS = [
 
 def nearest_city(lat, lng) -> str:
     if lat is None or lng is None:
+        return "Other"
+    lat_min, lat_max, lng_min, lng_max = SCAN_BOUNDS
+    if not (lat_min <= lat <= lat_max and lng_min <= lng <= lng_max):
+        # Outside our 5-city scan area entirely (e.g. Vancouver Island,
+        # Fraser Valley, leftover rows from before the scan was narrowed) —
+        # don't force-fit it to whichever of the 5 centroids is least far.
         return "Other"
     best, best_d = "Other", float("inf")
     for name, clat, clng in CITY_CENTROIDS:
