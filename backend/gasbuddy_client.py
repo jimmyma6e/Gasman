@@ -77,33 +77,6 @@ ANCHOR_COORDS = [
     (49.1890, -122.8490),  # Surrey centre
 ]
 
-# Named city centres for classifying a station's city from its lat/lng —
-# GasBuddy's own "city" field isn't requested/reliable, so this is derived.
-CITY_CENTROIDS = [
-    ("Vancouver", 49.2827, -123.1207),
-    ("Burnaby",   49.2488, -122.9805),
-    ("Richmond",  49.1666, -123.1336),
-    ("Delta",     49.0847, -123.0588),
-    ("Surrey",    49.1890, -122.8490),
-]
-
-
-def nearest_city(lat, lng) -> str:
-    if lat is None or lng is None:
-        return "Other"
-    lat_min, lat_max, lng_min, lng_max = SCAN_BOUNDS
-    if not (lat_min <= lat <= lat_max and lng_min <= lng <= lng_max):
-        # Outside our 5-city scan area entirely (e.g. Vancouver Island,
-        # Fraser Valley, leftover rows from before the scan was narrowed) —
-        # don't force-fit it to whichever of the 5 centroids is least far.
-        return "Other"
-    best, best_d = "Other", float("inf")
-    for name, clat, clng in CITY_CENTROIDS:
-        d = math.hypot(lat - clat, lng - clng)
-        if d < best_d:
-            best_d, best = d, name
-    return best
-
 
 # Normalize raw GasBuddy brand names to canonical versions — mirrors
 # frontend/src/App.jsx's BRAND_ALIASES so city/brand filtering agrees
@@ -489,7 +462,8 @@ async def _fetch_via_playwright(
                     if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
                         snapshot = list(stations_map.values())
                         existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
-                        existing.update({s["station_id"]: s for s in snapshot})
+                        for s in snapshot:
+                            existing[s["station_id"]] = _merge_station(existing.get(s["station_id"]), s)
                         merged = list(existing.values())
                         _cache["stations"]   = merged
                         _cache["trends"]     = trends or []
@@ -567,7 +541,8 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
         # A refresh scan covers fewer zones than discovery so we must not discard
         # stations that weren't in the refresh radius.
         existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
-        existing.update({s["station_id"]: s for s in stations})
+        for s in stations:
+            existing[s["station_id"]] = _merge_station(existing.get(s["station_id"]), s)
         merged = list(existing.values())
         if merged:
             _cache["stations"]   = merged
@@ -584,3 +559,13 @@ def get_cache_snapshot() -> tuple[list[dict], list[dict]]:
 def get_station_by_id(station_id: str) -> dict | None:
     stations, _ = get_cache_snapshot()
     return next((s for s in stations if s["station_id"] == station_id), None)
+
+
+def _merge_station(old: dict | None, new: dict) -> dict:
+    """Merge a freshly-scanned station into the cache, preserving fields the
+    live GraphQL response never carries (e.g. the reverse-geocoded city) so
+    a price refresh doesn't wipe out data we backfilled separately.
+    """
+    if old and old.get("city") and not new.get("city"):
+        return {**new, "city": old["city"]}
+    return new

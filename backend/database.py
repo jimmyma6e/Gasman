@@ -160,6 +160,26 @@ def upsert_stations(stations: list) -> None:
             """, rows)
 
 
+def get_stations_missing_city() -> list:
+    """Stations that haven't been reverse-geocoded yet."""
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT station_id, latitude, longitude FROM stations
+                WHERE city IS NULL OR city = ''
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def update_station_city(station_id: str, city: str) -> None:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE stations SET city = %s WHERE station_id = %s",
+                (city, station_id),
+            )
+
+
 def get_known_stations() -> list:
     """Return all stations from the registry (lat/lng for clustering)."""
     with _conn() as conn:

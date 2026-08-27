@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 
 import database
 import gasbuddy_client as gb
+from geocoding import reverse_geocode_city
 from public_api import v1_app
 
 # Ensure our application loggers emit at INFO regardless of what
@@ -27,6 +28,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
+GEOCODE_SLEEP_S = 1.1  # stay under Nominatim's ~1 req/sec usage policy
+
+
+async def geocode_new_stations() -> None:
+    """Reverse-geocode any station that doesn't have a city yet.
+
+    Runs after every scan, but only ever does work for stations discovered
+    for the first time — everything else already has a city cached in the
+    DB from an earlier run or the initial backfill_cities.py pass.
+    """
+    missing = database.get_stations_missing_city()
+    if not missing:
+        return
+    logger.info("geocode_new_stations: resolving city for %d new station(s) …", len(missing))
+    for s in missing:
+        city = await reverse_geocode_city(s.get("latitude"), s.get("longitude"))
+        if city:
+            database.update_station_city(s["station_id"], city)
+        await asyncio.sleep(GEOCODE_SLEEP_S)
+
 
 async def discovery_job() -> None:
     """Full grid scan — discovers new stations across BC. Runs daily."""
@@ -40,6 +61,7 @@ async def discovery_job() -> None:
         stations, _ = await gb.discover_stations(on_flush=on_flush)
         database.upsert_stations(stations)
         database.insert_prices(stations)   # single write at end of scan
+        await geocode_new_stations()
         logger.info("discovery_job: done — %d stations", len(stations))
     except Exception:
         logger.exception("discovery_job failed")
@@ -61,6 +83,7 @@ async def price_refresh_job() -> None:
 
         stations, _ = await gb.refresh_prices(known, on_flush=on_flush)
         database.insert_prices(stations)   # single write at end of scan
+        await geocode_new_stations()
         logger.info("price_refresh_job: done — %d stations updated", len(stations))
     except Exception:
         logger.exception("price_refresh_job failed")

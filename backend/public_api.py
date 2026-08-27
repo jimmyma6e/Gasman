@@ -67,14 +67,14 @@ v1_app.add_middleware(
     summary="List stations, optionally filtered by city and/or brand",
 )
 async def list_stations(
-    city: Optional[str]  = Query(default=None, description="e.g. Vancouver, Burnaby, Richmond, Delta, Surrey"),
+    city: Optional[str]  = Query(default=None, description="Reverse-geocoded municipality, e.g. Richmond, Vancouver, Burnaby, Delta, Surrey"),
     brand: Optional[str] = Query(default=None, description="e.g. Shell, Esso, Chevron, Petro-Canada"),
     _: str = Depends(require_api_key),
 ):
     stations, _trend = gb.get_cache_snapshot()
     result = []
     for s in stations:
-        station_city  = gb.nearest_city(s.get("latitude"), s.get("longitude"))
+        station_city  = s.get("city") or "Other"
         station_brand = gb.normalize_brand(s["name"])
         if city and station_city.lower() != city.lower():
             continue
