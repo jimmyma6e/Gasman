@@ -55,10 +55,21 @@ def _station_city(s: dict) -> str:
     return s.get("city") or "Other"
 
 
+def _split_csv(value: Optional[str]) -> Optional[list]:
+    """Parse a comma-separated filter value, e.g. "Richmond,Vancouver" ->
+    ["richmond", "vancouver"]. None/empty means "no filter" (match anything).
+    """
+    if not value:
+        return None
+    return [v.strip().lower() for v in value.split(",") if v.strip()]
+
+
 def _matches_filters(s: dict, city: Optional[str], brand: Optional[str]) -> bool:
-    if city and _station_city(s).lower() != city.lower():
+    cities = _split_csv(city)
+    brands = _split_csv(brand)
+    if cities and _station_city(s).lower() not in cities:
         return False
-    if brand and gb.normalize_brand(s["name"]).lower() != brand.lower():
+    if brands and gb.normalize_brand(s["name"]).lower() not in brands:
         return False
     return True
 
@@ -91,8 +102,8 @@ v1_app.add_middleware(
     summary="List stations, optionally filtered by city and/or brand",
 )
 async def list_stations(
-    city: Optional[str]  = Query(default=None, description="Reverse-geocoded municipality, e.g. Richmond, Vancouver, Burnaby, Delta, Surrey"),
-    brand: Optional[str] = Query(default=None, description="e.g. Shell, Esso, Chevron, Petro-Canada"),
+    city: Optional[str]  = Query(default=None, description="Reverse-geocoded municipality, e.g. Richmond, Vancouver, Burnaby, Delta, Surrey. Comma-separated for multiple, e.g. Richmond,Vancouver"),
+    brand: Optional[str] = Query(default=None, description="e.g. Shell, Esso, Chevron, Petro-Canada. Comma-separated for multiple, e.g. Shell,Esso"),
     _: str = Depends(require_api_key),
 ):
     stations, _trend = gb.get_cache_snapshot()
