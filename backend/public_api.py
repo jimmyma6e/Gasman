@@ -8,6 +8,7 @@ routes the frontend uses. Mint keys with backend/manage_api_keys.py.
 import hashlib
 import time
 from collections import defaultdict, deque
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -86,6 +87,29 @@ def _matches_filters(s: dict, city: Optional[str], brand: Optional[str]) -> bool
 def _validate_fuel_type(fuel_type: str) -> None:
     if fuel_type not in FUEL_TYPES:
         raise HTTPException(status_code=400, detail=f"fuel_type must be one of {', '.join(FUEL_TYPES)}")
+
+
+def time_ago(iso_str: Optional[str]) -> Optional[str]:
+    """Human-readable relative time, e.g. "2h ago" — same buckets as the
+    frontend's own timeAgo() in StationTable.jsx, for consistency.
+    """
+    if not iso_str:
+        return None
+    try:
+        ts = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    minutes = int((datetime.now(timezone.utc) - ts).total_seconds() // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}h ago"
+    return f"{hours // 24}d ago"
 
 
 v1_app = FastAPI(
@@ -174,6 +198,7 @@ async def cheapest_station(
         "fuel_type":    fuel_type,
         "price":        price,
         "last_updated": last_updated,
+        "last_updated_ago": time_ago(last_updated),
     }
 
 
@@ -204,6 +229,7 @@ async def average_price(
         "filters": {"station_id": station_id, "city": city, "brand": brand, "fuel_type": fuel_type, "days": days},
         "station_count": len(station_ids),
         **result,
+        "latest_recorded_ago": time_ago(result.get("latest_recorded_at")),
     }
 
 
@@ -212,9 +238,18 @@ async def get_station(station_id: str, _: str = Depends(require_api_key)):
     station = gb.get_station_by_id(station_id)
     if station is None:
         raise HTTPException(status_code=404, detail="station not found")
+
+    # Copy (and copy each fuel's sub-dict) before mutating — `station` is a
+    # reference into the live in-memory cache, not our own object.
+    station = dict(station)
+    for fuel in FUEL_TYPES:
+        fuel_data = station.get(fuel)
+        if fuel_data:
+            station[fuel] = {**fuel_data, "last_updated_ago": time_ago(fuel_data.get("last_updated"))}
+
     delta = database.get_price_deltas().get(station_id)
     if delta:
-        station = {**station, "price_delta": delta}
+        station["price_delta"] = delta
     return station
 
 
