@@ -26,6 +26,15 @@ REFRESH_COOLDOWN_S = 300  # 5 minutes per station
 
 FUEL_TYPES = ("regular_gas", "midgrade_gas", "premium_gas", "diesel", "e85")
 
+# Same sane-price bounds used elsewhere (frontend's VALID_PRICE, database.py's
+# area averages) — excludes 0/placeholder/garbage scrapes, cents per litre.
+MIN_VALID_PRICE = 80
+MAX_VALID_PRICE = 350
+
+
+def _valid_price(price) -> bool:
+    return price is not None and MIN_VALID_PRICE <= price <= MAX_VALID_PRICE
+
 _request_log: dict[str, deque] = defaultdict(deque)
 _last_manual_refresh: dict[str, float] = {}
 
@@ -143,26 +152,28 @@ async def cheapest_station(
     for s in stations:
         if not _matches_filters(s, city, brand):
             continue
-        price = (s.get(fuel_type) or {}).get("price")
-        if price is None:
+        fuel_data = s.get(fuel_type) or {}
+        price = fuel_data.get("price")
+        if not _valid_price(price):
             continue
         if best is None or price < best[0]:
-            best = (price, s)
+            best = (price, s, fuel_data.get("last_updated"))
 
     if best is None:
         raise HTTPException(status_code=404, detail="No station matched those filters with a price for that fuel type.")
 
-    price, s = best
+    price, s, last_updated = best
     return {
-        "station_id": s["station_id"],
-        "name":       s["name"],
-        "brand":      gb.normalize_brand(s["name"]),
-        "address":    s.get("address"),
-        "city":       _station_city(s),
-        "latitude":   s.get("latitude"),
-        "longitude":  s.get("longitude"),
-        "fuel_type":  fuel_type,
-        "price":      price,
+        "station_id":   s["station_id"],
+        "name":         s["name"],
+        "brand":        gb.normalize_brand(s["name"]),
+        "address":      s.get("address"),
+        "city":         _station_city(s),
+        "latitude":     s.get("latitude"),
+        "longitude":    s.get("longitude"),
+        "fuel_type":    fuel_type,
+        "price":        price,
+        "last_updated": last_updated,
     }
 
 
