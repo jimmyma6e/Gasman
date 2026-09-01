@@ -461,17 +461,12 @@ async def _fetch_via_playwright(
                     # Progressive flush every FLUSH_EVERY zones
                     if (j + 1) % FLUSH_EVERY == 0 or (j + 1) == total:
                         snapshot = list(stations_map.values())
-                        existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
-                        for s in snapshot:
-                            existing[s["station_id"]] = _merge_station(existing.get(s["station_id"]), s)
-                        merged = list(existing.values())
-                        _cache["stations"]   = merged
-                        _cache["trends"]     = trends or []
-                        _cache["fetched_at"] = datetime.now(timezone.utc)
+                        merge_into_cache(snapshot)
+                        _cache["trends"] = trends or []
                         if on_flush:
                             on_flush(snapshot)
                         logger.info("[%s] flush — %d scanned / %d total in cache",
-                                    mode, len(snapshot), len(merged))
+                                    mode, len(snapshot), len(_cache["stations"]))
 
                 await browser.close()
                 i = batch_end
@@ -540,15 +535,10 @@ async def refresh_prices(known_stations: list[dict], on_flush=None) -> tuple[lis
         # Merge refreshed stations into the existing cache rather than replacing.
         # A refresh scan covers fewer zones than discovery so we must not discard
         # stations that weren't in the refresh radius.
-        existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
-        for s in stations:
-            existing[s["station_id"]] = _merge_station(existing.get(s["station_id"]), s)
-        merged = list(existing.values())
-        if merged:
-            _cache["stations"]   = merged
-            _cache["trends"]     = trends or _cache.get("trends") or []
-            _cache["fetched_at"] = datetime.now(timezone.utc)
-        return merged, _cache.get("trends") or []
+        if stations:
+            merge_into_cache(stations)
+            _cache["trends"] = trends or _cache.get("trends") or []
+        return _cache.get("stations") or [], _cache.get("trends") or []
 
 
 def get_cache_snapshot() -> tuple[list[dict], list[dict]]:
@@ -569,3 +559,51 @@ def _merge_station(old: dict | None, new: dict) -> dict:
     if old and old.get("city") and not new.get("city"):
         return {**new, "city": old["city"]}
     return new
+
+
+def merge_into_cache(stations: list[dict]) -> None:
+    """Merge freshly-scanned stations into the in-memory cache in place,
+    preserving fields (like geocoded city) the live scan never carries.
+    """
+    existing = {s["station_id"]: s for s in (_cache.get("stations") or [])}
+    for s in stations:
+        existing[s["station_id"]] = _merge_station(existing.get(s["station_id"]), s)
+    _cache["stations"]   = list(existing.values())
+    _cache["fetched_at"] = datetime.now(timezone.utc)
+
+
+def is_scan_running() -> bool:
+    return _scan_lock.locked()
+
+
+async def refresh_single_station(lat: float, lng: float) -> list[dict]:
+    """One-off GraphQL query for a single lat/lng point — used for a manual
+    per-station refresh triggered from the API. Launches its own short-lived
+    browser session, so it's much heavier than reading the cache; callers
+    should rate-limit/cooldown per station and avoid calling this while a
+    scheduled scan is running (see is_scan_running()).
+
+    Returns whatever GasBuddy hands back for that area (usually includes the
+    requested station plus a few nearby ones, since it's a radius search).
+    """
+    async with async_playwright() as pw:
+        browser, page, gbcsrf_token = await _start_browser_session(pw)
+        try:
+            result = await page.evaluate(
+                _JS_FETCH, {
+                    "query": _GQL,
+                    "operationName": "locationBySearchTerm",
+                    "lat": lat, "lng": lng,
+                    "gbcsrf": gbcsrf_token,
+                }
+            )
+        finally:
+            await browser.close()
+
+    if not isinstance(result, dict) or "error" in result:
+        logger.warning("refresh_single_station(%s, %s) failed: %s", lat, lng, result)
+        return []
+
+    loc          = (result.get("data") or {}).get("locationBySearchTerm") or {}
+    raw_stations = (loc.get("stations") or {}).get("results") or []
+    return [p for s in raw_stations if (p := _parse_station(s)).get("station_id")]

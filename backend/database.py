@@ -465,6 +465,28 @@ def revoke_api_key(label: str) -> int:
             return cur.rowcount
 
 
+def get_average_price(station_ids: list, fuel_type: str, days: int) -> dict:
+    """Average price for one fuel type across the given stations over the
+    last `days` days. Same sane-price bounds used elsewhere (80-350) to
+    exclude bad/placeholder scrapes.
+    """
+    if not station_ids:
+        return {"avg_price": None, "sample_count": 0}
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT AVG(price), COUNT(*) FROM price_history
+                WHERE station_id = ANY(%s) AND fuel_type = %s
+                  AND recorded_at >= NOW() - make_interval(days => %s)
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
+            """, (station_ids, fuel_type, days))
+            avg_price, count = cur.fetchone()
+    return {
+        "avg_price":     round(avg_price, 1) if avg_price is not None else None,
+        "sample_count":  count,
+    }
+
+
 def get_station_history(station_id: str, hours: int = 24) -> list:
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
