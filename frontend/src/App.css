@@ -338,19 +338,26 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .compact-selected { border-color: var(--accent) !important; background: #fff8f0; }
 .compact-row { cursor: pointer; }
 
-/* ── Insights Bar (merged trend + insights — clean stat strip) ── */
+/* ── Insights Bar (per-grade averages, city drill-down, history chart) ── */
 .insights-bar {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); margin-bottom: 12px;
-  padding: 10px 14px; display: flex; align-items: center;
-  gap: 10px; flex-wrap: wrap; position: relative;
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 0;
+  position: relative;
 }
-.insights-stat { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.insights-tiles-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; }
+.insights-tile {
+  background: none; border: 1px solid transparent; border-radius: 8px;
+  padding: 3px 8px; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 1px; flex-shrink: 0;
+  transition: all 0.15s;
+}
+.insights-tile:hover { border-color: var(--border); }
+.insights-tile-active { border-color: var(--accent); background: rgba(245,158,11,0.08); }
 .insights-stat-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .insights-stat-value { font-size: 0.9rem; font-weight: 700; color: var(--text); }
 .insights-val-up   { color: var(--red); }
 .insights-val-down { color: var(--green); }
-.insights-divider  { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
 .insights-expand {
   position: relative;
   background: none; border: 1px solid var(--border); color: var(--text-dim);
@@ -359,20 +366,25 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   flex-shrink: 0; margin-left: auto;
 }
 .insights-expand:hover { border-color: var(--accent); color: var(--accent); }
-/* Area breakdown — spans full width below the stat row */
+/* Area breakdown — spans full width below the tile row */
 .insights-areas-row {
-  flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto;
+  display: flex; gap: 6px; overflow-x: auto;
   flex-wrap: nowrap; padding-top: 8px;
-  border-top: 1px solid var(--border); margin-top: 2px;
+  border-top: 1px solid var(--border); margin-top: 8px;
 }
 .insights-areas-row::-webkit-scrollbar { height: 3px; }
 .insights-areas-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .insight-area-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 0.76rem; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+.insight-area-pill-clickable { cursor: pointer; transition: border-color 0.15s; }
+.insight-area-pill-clickable:hover { border-color: var(--accent); }
 .insight-area-name  { color: var(--text-dim); }
 .insight-area-today { font-weight: 600; color: var(--text); }
 .insight-area-change { font-size: 0.7rem; font-weight: 600; }
-.insight-area-sep { color: var(--border); margin: 0 1px; font-size: 0.7rem; }
-.insight-area-premium { color: var(--text-dim); }
+/* City drill-down chart */
+.insights-drilldown { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+.insights-drilldown-header { display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; margin-bottom: 8px; }
+.insights-drilldown-close { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; padding: 2px 6px; }
+.insights-drilldown-close:hover { color: var(--accent); }
 
 /* ── Area filter dropdown ── */
 .area-more-wrap { position: relative; }

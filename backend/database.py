@@ -312,6 +312,25 @@ def get_area_averages(fuel_type: str = "regular_gas") -> dict:
     return {"today": today_rows, "ytd": ytd_rows}
 
 
+def get_area_price_series(fuel_type: str, days: int) -> list:
+    """Per-station daily averages over the last `days` days, with lat/lng so
+    the caller can bucket by area (nearest-centroid classification lives in
+    main.py, same as get_area_averages's today/ytd split above).
+    """
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT latitude, longitude, DATE(recorded_at) AS day, AVG(price) AS avg_price
+                FROM price_history
+                WHERE fuel_type = %s
+                  AND recorded_at >= NOW() - make_interval(days => %s)
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
+                GROUP BY station_id, latitude, longitude, DATE(recorded_at)
+                ORDER BY day ASC
+            """, (fuel_type, days))
+            return [dict(r) for r in cur.fetchall()]
+
+
 def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
     with _conn() as conn:
         with conn.cursor() as cur:

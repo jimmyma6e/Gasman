@@ -196,7 +196,7 @@ async def get_insights(fuel_type: str = "regular_gas"):
             ytd_by_area.setdefault(area, []).append(row["avg_price"])
 
     area_averages = []
-    for name, _, _ in database.AREA_CENTROIDS:
+    for name, clat, clng in database.AREA_CENTROIDS:
         today_prices = today_by_area.get(name, [])
         if not today_prices:
             continue
@@ -209,9 +209,36 @@ async def get_insights(fuel_type: str = "regular_gas"):
             "avg_today": avg_today,
             "avg_ytd":   avg_ytd,
             "change":    change,
+            # Centroid, so a client can sort areas by distance from the user
+            # without duplicating AREA_CENTROIDS on the frontend.
+            "latitude":  clat,
+            "longitude": clng,
         })
 
     return {"area_averages": area_averages, "ytd_vs_today": ytd_vs_today}
+
+
+@app.get("/api/insights/history")
+async def get_insights_history(area: str, fuel_type: str = "regular_gas", days: int = 30):
+    """Daily average price for one named area (see AREA_CENTROIDS/_nearest_area),
+    for the Home city widget's drill-down chart.
+    """
+    rows = database.get_area_price_series(fuel_type, days)
+
+    by_day: dict = {}
+    for row in rows:
+        if row["latitude"] is None or row["longitude"] is None:
+            continue
+        if _nearest_area(row["latitude"], row["longitude"]) != area:
+            continue
+        day = row["day"].isoformat()
+        by_day.setdefault(day, []).append(row["avg_price"])
+
+    series = [
+        {"date": day, "avg_price": round(sum(prices) / len(prices), 1)}
+        for day, prices in sorted(by_day.items())
+    ]
+    return {"area": area, "fuel_type": fuel_type, "days": days, "series": series}
 
 
 @app.get("/api/health")
