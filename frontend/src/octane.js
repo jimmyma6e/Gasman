@@ -7,7 +7,14 @@ export const PREMIUM_OCTANE_BY_BRAND = {
 };
 export const DEFAULT_OCTANE = { regular_gas: 87, midgrade_gas: 89, premium_gas: 91 };
 
+// Diesel and E85 aren't rated by octane, so they get a text label instead
+// of a number — previously fell through to "" here, rendering an empty tile.
+const NON_OCTANE_LABELS = { diesel: "Diesel", e85: "E85" };
+
 export function octaneLabel(fuelKey, brand) {
+  if (fuelKey in NON_OCTANE_LABELS) {
+    return NON_OCTANE_LABELS[fuelKey];
+  }
   if (fuelKey === "premium_gas") {
     return String(PREMIUM_OCTANE_BY_BRAND[brand] ?? DEFAULT_OCTANE.premium_gas);
   }

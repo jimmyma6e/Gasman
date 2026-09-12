@@ -11,6 +11,10 @@
   --text: #1e293b;
   --text-dim: #64748b;
   --radius: 12px;
+  /* Desktop header's rendered height (padding 16px + content) — sidebar
+     and map sticky offsets below derive from this so they can't drift
+     out of sync with each other again. */
+  --header-h: 76px;
 }
 
 body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; }
@@ -34,6 +38,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Main ── */
 .main { padding: 20px; min-width: 0; }
+/* Nothing constrained line length or control width on wide monitors —
+   route inputs, buttons and grids stretched to the full viewport. */
+.main > * { max-width: 1600px; margin-inline: auto; }
 .app-footer { padding: 16px 20px 24px;
   font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; opacity: 0.6; }
 
@@ -297,12 +304,26 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .tbl-empty { color: var(--text-dim); }
 .tbl-updated { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
 
-/* ── Split view (list + map panel) ── */
-.split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+/* ── Split view (list + map panel) ──
+   Reads .all-stations-content's own width via a container query rather
+   than the viewport — the content column can be much narrower than the
+   viewport (desktop sidebar, or the stacked mobile/tablet layout), so a
+   viewport media query here picks the wrong breakpoint for the space
+   actually available. Mobile-first: stacked/static map by default. */
+.split-view { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
 .split-list { min-width: 0; }
-.split-map { position: sticky; top: 76px; height: calc(100vh - 96px); isolation: isolate; }
+.split-map { position: static; height: 350px; order: -1; }
 .split-map > div { height: 100%; }
 .split-map .leaflet-container { height: 100% !important; border-radius: var(--radius); }
+
+@container (min-width: 820px) {
+  .split-view { grid-template-columns: 1fr 1fr; }
+  .split-map {
+    position: sticky; top: var(--header-h);
+    height: calc(100vh - var(--header-h) - 20px);
+    order: 0; isolation: isolate;
+  }
+}
 
 /* Selected states */
 .card-selected { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(249,115,22,0.2); }
@@ -323,6 +344,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .insights-val-down { color: var(--green); }
 .insights-divider  { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
 .insights-expand {
+  position: relative;
   background: none; border: 1px solid var(--border); color: var(--text-dim);
   border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 0.78rem;
   transition: all 0.15s; display: flex; align-items: center; justify-content: center;
@@ -360,7 +382,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Route Tab ── */
 .route-tab { display: flex; flex-direction: column; gap: 16px; }
 
-.route-form { display: flex; flex-direction: column; gap: 10px; }
+.route-form { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
 /* From + To side by side */
 .route-from-to-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 @media (max-width: 480px) { .route-from-to-row { grid-template-columns: 1fr; } }
@@ -482,11 +504,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .route-empty-prompt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 60px 20px; color: var(--text-dim); text-align: center; }
 .route-empty-prompt strong { color: var(--text); }
 
-@media (max-width: 900px) {
-  .split-view { grid-template-columns: 1fr; }
-  .split-map { position: static; height: 350px; order: -1; }
-  .split-map .leaflet-container { height: 100% !important; }
-}
 
 /* ── Scan progress ── */
 .scan-progress-bar { width: 100%; max-width: 320px; height: 6px; background: var(--surface2);
@@ -511,13 +528,13 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .fav-station-name { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fav-station-meta { font-size: 0.75rem; color: var(--text-dim); margin-top: 3px; }
 .fav-cheapest-badge { font-size: 0.7rem; padding: 2px 7px; border-radius: 6px; }
-.fav-station-prices { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.fav-station-prices { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .fav-price-chip { display: flex; flex-direction: column; align-items: center; background: var(--surface2);
   border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; min-width: 52px; }
 .fav-price-chip.fav-price-active { border-color: var(--accent); background: rgba(var(--accent-rgb, 234 179 8), 0.08); }
 .fav-price-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
 .fav-price-value { font-size: 0.9rem; font-weight: 700; }
-.btn-unfav { background: none; border: none; color: var(--accent); font-size: 1.1rem;
+.btn-unfav { position: relative; background: none; border: none; color: var(--accent); font-size: 1.1rem;
   cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: opacity 0.15s; flex-shrink: 0; line-height: 1; }
 .btn-unfav:hover { opacity: 0.6; }
 
@@ -583,17 +600,26 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .dashboard-profile-row { display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 16px; }
 .dashboard-welcome { font-size: 0.85rem; color: var(--text-dim); }
-.btn-edit-profile { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+.btn-edit-profile { position: relative; background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
   padding: 6px 12px; border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; }
 .btn-edit-profile:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Dashboard section header (title + nav button) ── */
 .dashboard-section-header { display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 12px; }
-.btn-section-nav { background: none; border: 1px solid var(--border); color: var(--text-dim);
+.btn-section-nav { position: relative; background: none; border: 1px solid var(--border); color: var(--text-dim);
   font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s;
   white-space: nowrap; flex-shrink: 0; }
 .btn-section-nav:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Below WCAG's 24x24 minimum (iOS/Material want 44x44) but visually
+   correct at their current size — grow the invisible tap area instead
+   of the control itself. */
+.insights-expand::after, .btn-unfav::after,
+.btn-section-nav::after, .btn-edit-profile::after {
+  content: ""; position: absolute; inset: 50% auto auto 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
 
 /* ── Profile modal ── */
 .profile-modal { max-width: 480px; }
@@ -987,8 +1013,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 .all-stations-sidebar {
   width: 260px; flex-shrink: 0;
-  position: sticky; top: 74px;
-  max-height: calc(100vh - 90px); overflow-y: auto;
+  position: sticky; top: var(--header-h);
+  max-height: calc(100vh - var(--header-h) - 16px); overflow-y: auto;
   display: flex; flex-direction: column; gap: 0;
   /* Scrollbar styling */
   scrollbar-width: thin; scrollbar-color: var(--border) transparent;
@@ -996,7 +1022,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .all-stations-sidebar::-webkit-scrollbar { width: 4px; }
 .all-stations-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.all-stations-content { flex: 1; min-width: 0; overflow: hidden; }
+.all-stations-content { flex: 1; min-width: 0; max-width: 100%; overflow: hidden; container-type: inline-size; }
 
 /* Fuel tabs go vertical inside the sidebar */
 .all-stations-sidebar .fuel-tabs { flex-direction: column; gap: 4px; }
@@ -1014,7 +1040,11 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* Collapse sidebar to stacked layout on tablet / medium desktop */
 @media (max-width: 1024px) {
-  .all-stations-layout { flex-direction: column; }
+  /* align-items: flex-start (set on the row layout, to stop the sidebar
+     stretching to the list's height) means shrink-to-fit width once the
+     axis flips to column — must reset it or .all-stations-content sizes
+     to its own max-content width instead of the container's. */
+  .all-stations-layout { flex-direction: column; align-items: stretch; }
   .all-stations-sidebar {
     width: 100%; position: static;
     max-height: none; overflow-y: visible;
@@ -1065,8 +1095,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
   /* Search */
   .search-row { gap: 8px; }
-  .search-input { font-size: 0.85rem; padding: 8px 12px; }
-  .btn-clear-filters { padding: 8px 10px; font-size: 0.78rem; }
+  .search-input { font-size: 0.85rem; padding: 8px 12px; min-height: 44px; }
+  .btn-clear-filters { padding: 8px 10px; font-size: 0.78rem; min-height: 44px; }
 
   /* Filter chips — scrollable row, no wrap */
   .filter-section { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: 6px; position: relative; }
@@ -1075,7 +1105,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .chip-row { flex-wrap: nowrap; }
   /* Scroll fade indicator */
   .filter-section::after { content: ''; position: sticky; right: 0; flex-shrink: 0; width: 40px; background: linear-gradient(to right, transparent, var(--bg) 80%); pointer-events: none; align-self: stretch; margin-left: -40px; }
-  .brand-chip { font-size: 0.75rem; padding: 4px 10px; white-space: nowrap; min-height: 36px; }
+  .brand-chip { font-size: 0.75rem; padding: 4px 10px; white-space: nowrap; min-height: 40px; }
   .area-more-btn { min-height: 36px; padding: 7px 12px; }
 
   /* Fuel tabs — horizontal scroll, controls top row stays flex */
@@ -1083,7 +1113,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .fuel-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
   .fuel-tabs::-webkit-scrollbar { display: none; }
   .tab { padding: 6px 10px; font-size: 0.8rem; flex-shrink: 0; }
-  .btn-icon { width: 34px; height: 34px; font-size: 0.95rem; }
+  .btn-icon { width: 44px; height: 44px; font-size: 0.95rem; }
 
   /* Controls bottom row */
   .controls-bottom { gap: 6px; }
@@ -1146,6 +1176,15 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .route-vehicle-brand-row { grid-template-columns: 1fr; }
 }
 
+/* header-title has an intrinsic min width (icon + "GASMAN" + subtitle) that
+   never shrinks, so header-inner's flex-wrap fires below ~340px and the
+   header grows to two rows. Drop the subtitle instead of wrapping. */
+@media (max-width: 400px) {
+  .header-inner { flex-wrap: nowrap; }
+  .header-title { min-width: 0; }
+  .header-sub { display: none; }
+}
+
 /* ── Dashboard savings row ──────────────────────────────────────────────────── */
 .dash-savings-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
 .dash-saving-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
@@ -1163,6 +1202,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Logs Tab ───────────────────────────────────────────────────────────────── */
 .logs-tab { padding: 0; }
 .logs-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+@media (min-width: 1200px) {
+  .logs-stats-grid { grid-template-columns: repeat(4, 1fr); }
+}
 .logs-stat-card { background: var(--surface2); border: 1px solid var(--border);
   border-radius: 12px; padding: 12px 14px; }
 .logs-stat-highlight { background: rgba(22,163,74,0.07); border-color: rgba(22,163,74,0.25); }
@@ -1261,6 +1303,9 @@ html { overflow-x: hidden; overflow-y: scroll; }
 @media (max-width: 480px) {
   .station-summary-bar { font-size: 0.78rem; padding: 7px 12px; }
   .summary-sname { max-width: 100px; }
+}
+@media (max-width: 400px) {
+  .station-summary-bar { flex-wrap: wrap; white-space: normal; overflow-x: visible; }
 }
 
 /* ── Show more button ────────────────────────────────────────────────────────── */
