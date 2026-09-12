@@ -223,6 +223,7 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
   const initFuel = station[activeFuel]?.price != null ? activeFuel : firstAvailable;
   const [selectedFuel, setSelectedFuel] = useState(initFuel);
   const [visitedDone, setVisitedDone] = useState(false);
+  const [areaAvgToday, setAreaAvgToday] = useState(null);
 
   useBodyScrollLock();
 
@@ -231,6 +232,38 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
+
+  // Area average for the Fair/Good/Great badge — baseline is the area, not
+  // this station's own history, so a station that's always expensive
+  // relative to its neighbours never reads as "fair" just because it
+  // matches its own trend.
+  useEffect(() => {
+    let cancelled = false;
+    setAreaAvgToday(null);
+    fetch(`/api/insights?fuel_type=${selectedFuel}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const match = (data.area_averages || []).find((a) => a.area === station._area);
+        setAreaAvgToday(match?.avg_today ?? null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedFuel, station._area]);
+
+  const fairness = (() => {
+    const price = station[selectedFuel]?.price;
+    if (!VALID_PRICE(price) || !areaAvgToday) return null;
+    const pct = ((price - areaAvgToday) / areaAvgToday) * 100;
+    let label = pct <= -5 ? "Great" : pct <= -1 ? "Good" : pct <= 1 ? "Fair" : pct <= 5 ? "Above average" : "High";
+    // A stale price could easily be wrong by now — don't call it a great
+    // deal on data that's over 2 days old.
+    const lastUpdated = station[selectedFuel]?.last_updated;
+    const staleHours = lastUpdated ? (Date.now() - new Date(lastUpdated).getTime()) / 3600000 : Infinity;
+    if (staleHours > 48 && (label === "Great" || label === "Good")) label = "Fair";
+    const emoji = { Great: "🟢", Good: "🟢", Fair: "⚪", "Above average": "🟠", High: "🔴" }[label];
+    return { label, emoji, pct };
+  })();
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.name}, ${station.address}, ${station._area}, BC`)}`;
 
@@ -258,6 +291,11 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
               >
                 <span className="modal-price-label">{octaneLabel(key, station._brand || station.name)}</span>
                 <span className="modal-price-value">{formatPrice(price, station.unit_of_measure)}</span>
+                {selectedFuel === key && fairness && (
+                  <span className={`modal-fairness-badge fairness-${fairness.label.replace(/\s+/g, "-").toLowerCase()}`}>
+                    {fairness.emoji} {fairness.label}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -483,7 +521,7 @@ export default function App() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
   const [tab, setTab]           = useState("dashboard");
-  const [sortBy, setSortBy]     = useState(() => localStorage.getItem("gasman-sort-by") || "price");
+  const [sortBy, setSortBy]     = useState(() => localStorage.getItem("gasman-sort-by") || "updated");
   const [activeFuel, setActiveFuel] = useState(() => localStorage.getItem("gasman-active-fuel") || "regular_gas");
   const [lastRefresh, setLastRefresh] = useState(null);
   const [chartStation, setChartStation] = useState(null);

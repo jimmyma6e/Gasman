@@ -236,6 +236,11 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .modal-price-chip-active { border-color: var(--accent) !important; background: rgba(245, 158, 11, 0.08); }
 .modal-price-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .modal-price-value { font-size: 1rem; font-weight: 700; color: var(--accent); }
+.modal-fairness-badge { font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 8px; align-self: flex-start; }
+.fairness-great, .fairness-good { background: rgba(34,197,94,0.15); color: var(--green); }
+.fairness-fair { background: rgba(148,163,184,0.15); color: var(--text-dim); }
+.fairness-above-average { background: rgba(249,115,22,0.15); color: #f97316; }
+.fairness-high { background: rgba(220,38,38,0.15); color: var(--red); }
 .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .btn-modal-action { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; transition: border-color 0.15s, background 0.15s; }
 .btn-modal-action:hover { border-color: var(--accent); background: rgba(245, 158, 11, 0.08); }
@@ -267,6 +272,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .chart-stat-value { font-size: 1rem; font-weight: 700; }
 .chart-stat-value.green { color: var(--green); }
 .chart-stat-value.red   { color: var(--red); }
+.chart-vsavg-row .chart-stat { padding: 8px 12px; }
+.chart-vsavg-row .chart-stat-label { opacity: 0.8; }
 .chart-tooltip { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .chart-tooltip-time { color: var(--text-dim); margin-bottom: 6px; font-size: 0.78rem; }
 

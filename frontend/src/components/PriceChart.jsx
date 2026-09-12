@@ -63,19 +63,24 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
+const MAX_RANGE_HOURS = 720; // 30 days — the widest window any stat needs
+
 export default function PriceChart({ stationId, activeFuel }) {
-  const [range, setRange]     = useState(168); // default 7-day view
+  const [range, setRange]     = useState(168); // default 7-day view (only affects what's *displayed*)
   const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Always fetch the full 30-day window once per station, regardless of the
+  // selected range tab — the "vs 24h/7d/30d avg" row (#3.4) needs all three
+  // windows simultaneously, independent of which one the chart is showing.
   useEffect(() => {
     setLoading(true);
     setHistory(null);
-    fetch(`/api/history/${stationId}?hours=${range}`)
+    fetch(`/api/history/${stationId}?hours=${MAX_RANGE_HOURS}`)
       .then((r) => r.json())
       .then((data) => { setHistory(data.history); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [stationId, range]);
+  }, [stationId]);
 
   const rangeBar = (
     <div className="chart-range-row">
@@ -89,13 +94,56 @@ export default function PriceChart({ stationId, activeFuel }) {
 
   if (loading) return <div>{rangeBar}<div className="chart-state"><div className="spinner" /><p>Loading price history...</p></div></div>;
 
-  if (!history?.length) return (
+  // Defense-in-depth floor matching the backend's own bounds (database.py's
+  // get_station_history) — a $0/garbage scrape shouldn't distort the chart
+  // or its stats even if it ever slips past the server-side filter.
+  const MIN_VALID_PRICE = 80;
+  const validHistory = (history ?? []).filter((h) => h.price != null && h.price >= MIN_VALID_PRICE);
+
+  if (!validHistory.length) return (
     <div>{rangeBar}<div className="chart-state"><p style={{ fontSize: "2rem" }}>📊</p><p><strong>No history yet for this range</strong></p><p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Price data is collected every 30 minutes.<br />Check back soon!</p></div></div>
   );
 
+  const fuelForStats = activeFuel ?? Object.keys(FUEL_CONFIG)[0];
+  const fuelHistory = validHistory.filter((h) => h.fuel_type === fuelForStats);
+
+  // "Last data" and "current price" reflect this fuel's most recent point
+  // across the full 30-day fetch — independent of the selected range tab,
+  // so switching to 24h doesn't hide a Diesel price that hasn't moved in days.
+  const lastPoint = fuelHistory.reduce((best, h) => {
+    const t = new Date(h.recorded_at).getTime();
+    return (!best || t > best._t) ? { _t: t, price: h.price } : best;
+  }, null);
+  const lastTsIso = lastPoint ? new Date(lastPoint._t).toISOString() : null;
+  const currentPrice = lastPoint ? lastPoint.price : null;
+
+  // vs-avg row (#3.4) — also independent of the range tab, always comparing
+  // the current price against each fixed window's own average.
+  const now = Date.now();
+  function avgOverWindow(hours) {
+    const cutoff = now - hours * 3600 * 1000;
+    const prices = fuelHistory.filter((h) => new Date(h.recorded_at).getTime() >= cutoff).map((h) => h.price);
+    return prices.length ? prices.reduce((s, p) => s + p, 0) / prices.length : null;
+  }
+  function pctVsAvg(avg) {
+    return (currentPrice != null && avg) ? ((currentPrice - avg) / avg) * 100 : null;
+  }
+  const vsAvg = [
+    { label: "24h", pct: pctVsAvg(avgOverWindow(24)) },
+    { label: "7d",  pct: pctVsAvg(avgOverWindow(168)) },
+    { label: "30d", pct: pctVsAvg(avgOverWindow(720)) },
+  ];
+
+  // Everything below (chart + Low/High/Change) is scoped to the selected range tab.
+  const rangeCutoff = now - range * 3600 * 1000;
+  const rangeHistory = validHistory.filter((h) => new Date(h.recorded_at).getTime() >= rangeCutoff);
+  const rangeFuelPrices = fuelHistory
+    .filter((h) => new Date(h.recorded_at).getTime() >= rangeCutoff)
+    .map((h) => h.price);
+
   const bucketMap = {};
   const bucketCount = {};
-  for (const h of history) {
+  for (const h of rangeHistory) {
     const key = bucketKey(new Date(h.recorded_at), range);
     if (!bucketMap[key]) { bucketMap[key] = { _ts: new Date(key).getTime(), time: formatBucketLabel(key, range) }; bucketCount[key] = {}; }
     if (h.price != null) { bucketMap[key][h.fuel_type] = (bucketMap[key][h.fuel_type] ?? 0) + h.price; bucketCount[key][h.fuel_type] = (bucketCount[key][h.fuel_type] ?? 0) + 1; }
@@ -107,21 +155,11 @@ export default function PriceChart({ stationId, activeFuel }) {
   }
   const chartData = Object.values(bucketMap).sort((a, b) => a._ts - b._ts);
 
-  // Stats for active fuel (or all prices if no activeFuel)
-  const fuelForStats = activeFuel ?? Object.keys(FUEL_CONFIG)[0];
-  const activePrices = history.filter((h) => h.fuel_type === fuelForStats && h.price != null).map((h) => h.price);
-  const minPrice = activePrices.length ? Math.min(...activePrices) : null;
-  const maxPrice = activePrices.length ? Math.max(...activePrices) : null;
-  const firstPrice = activePrices[0];
-  const lastPrice  = activePrices[activePrices.length - 1];
-  const change = (firstPrice != null && lastPrice != null) ? lastPrice - firstPrice : null;
-
-  // Last recorded timestamp across all history
-  const lastTs = history.reduce((best, h) => {
-    const t = new Date(h.recorded_at).getTime();
-    return t > best ? t : best;
-  }, 0);
-  const lastTsIso = lastTs ? new Date(lastTs).toISOString() : null;
+  const minPrice = rangeFuelPrices.length ? Math.min(...rangeFuelPrices) : null;
+  const maxPrice = rangeFuelPrices.length ? Math.max(...rangeFuelPrices) : null;
+  const firstPrice = rangeFuelPrices[0];
+  const lastPriceInRange = rangeFuelPrices[rangeFuelPrices.length - 1];
+  const change = (firstPrice != null && lastPriceInRange != null) ? lastPriceInRange - firstPrice : null;
 
   const unit = history[0]?.unit ?? "";
   const unitLabel = (unit.includes("litre") || unit.includes("liter")) ? "¢/L" : "$/gal";
@@ -130,6 +168,20 @@ export default function PriceChart({ stationId, activeFuel }) {
   return (
     <div>
       {rangeBar}
+      {/* Always-on summary — doesn't change with the 24h/7d/30d tab below,
+          unlike Low/High/Change which are scoped to the selected range. */}
+      {currentPrice != null && (
+        <div className="chart-stats-row chart-vsavg-row">
+          {vsAvg.map(({ label, pct }) => (
+            <div key={label} className="chart-stat">
+              <span className="chart-stat-label">vs {label} avg</span>
+              <span className={`chart-stat-value ${pct == null ? "" : pct > 0 ? "red" : pct < 0 ? "green" : ""}`}>
+                {pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="chart-stats-row">
         {minPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} Low</span><span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span></div>}
         {maxPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} High</span><span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span></div>}
@@ -155,7 +207,10 @@ export default function PriceChart({ stationId, activeFuel }) {
                 stroke={color}
                 strokeWidth={isActive ? 2.5 : 1.5}
                 strokeOpacity={isActive ? 1 : 0.35}
-                dot={false}
+                // A marker at every real reading, not just a smooth interpolated
+                // line — otherwise a long gap between two distant readings looks
+                // identical to several closely-spaced ones.
+                dot={{ r: isActive ? 3 : 2, strokeWidth: 0, fill: color, fillOpacity: isActive ? 1 : 0.35 }}
                 activeDot={{ r: 4 }}
                 connectNulls
               />

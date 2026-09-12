@@ -496,6 +496,7 @@ def get_station_history(station_id: str, hours: int = 24) -> list:
                 FROM price_history
                 WHERE station_id = %s
                   AND recorded_at >= NOW() - make_interval(hours => %s)
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
                 ORDER BY recorded_at ASC
             """, (station_id, hours))
             return [dict(r) for r in cur.fetchall()]
