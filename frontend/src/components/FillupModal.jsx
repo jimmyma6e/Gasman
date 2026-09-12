@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBodyScrollLock } from "../useBodyScrollLock.js";
 
 const FUEL_LABELS = {
   regular_gas:  "Regular (87)",
@@ -8,6 +9,7 @@ const FUEL_LABELS = {
 };
 
 export default function FillupModal({ station, fuelType, avgPriceAtLog, onSave, onClose, editEntry, favouriteStations }) {
+  useBodyScrollLock();
   // station may be null when logging manually from the Logs tab
   const stationPrice = station?.[fuelType]?.price ?? null;
   const isEdit = !!editEntry;

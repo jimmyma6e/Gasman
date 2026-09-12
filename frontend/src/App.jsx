@@ -12,6 +12,7 @@ import BottomNav from "./components/BottomNav";
 import { bestCardSavings } from "./creditCards.js";
 import { octaneLabel } from "./octane.js";
 import { pageview } from "./analytics.js";
+import { useBodyScrollLock } from "./useBodyScrollLock.js";
 import posthog from "posthog-js";
 
 // Virtual paths per tab — used for GA4 pageview tracking
@@ -222,6 +223,8 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
   const initFuel = station[activeFuel]?.price != null ? activeFuel : firstAvailable;
   const [selectedFuel, setSelectedFuel] = useState(initFuel);
   const [visitedDone, setVisitedDone] = useState(false);
+
+  useBodyScrollLock();
 
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -594,7 +597,10 @@ export default function App() {
   });
   const [fillupTarget, setFillupTarget] = useState(null); // { station, fuelType }
 
-  const [showAllStations, setShowAllStations] = useState(false);
+  // Paginated, not all-or-nothing — rendering all 666+ stations in one
+  // synchronous update on a phone was ~19,000 DOM nodes in a single frame.
+  const STATIONS_PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const handleSaveFillup = useCallback((entry) => {
     setFillups((prev) => {
@@ -812,9 +818,9 @@ export default function App() {
     }
   }
 
-  // Reset "show more" when tab or filters change
+  // Reset "show more" pagination when tab or filters change
   useEffect(() => {
-    setShowAllStations(false);
+    setVisibleCount(10);
   }, [tab, areaFilter, brandFilter, search]);
 
   // Close area dropdown on outside click
@@ -908,7 +914,7 @@ export default function App() {
   const hasFilters = areaFilter.size > 0 || brandFilter.size > 0 || q;
 
   // Limit initial station list to 10 to reduce cognitive load
-  const displayedStations = showAllStations ? sorted : sorted.slice(0, 10);
+  const displayedStations = sorted.slice(0, visibleCount);
 
   return (
     <div className="app">
@@ -1240,7 +1246,13 @@ export default function App() {
 
         {data && sorted.length === 0 && !loading && (
           <div className="empty-state">
-            {scanning ? (
+            {/* `scanning` reflects the backend's own scan progress, which can
+                be true even when we already have a full dataset loaded — if
+                a scheduled refresh happens to be running while a search
+                matches nothing, that showed "Scanning…" forever instead of
+                "no matches". Branch on whether we actually have any
+                unfiltered stations at all instead. */}
+            {allStations.length === 0 ? (
               <>
                 <p style={{ fontSize: "2rem" }}>📡</p>
                 <p><strong>Scanning for stations…</strong></p>
@@ -1250,6 +1262,7 @@ export default function App() {
               </>
             ) : (
               <>
+                <p className="station-count">0 stations</p>
                 <p style={{ fontSize: "2rem" }}>🔍</p>
                 <p><strong>No stations match your filters</strong></p>
                 {(areaFilter.size > 0 || brandFilter.size > 0 || search) && (
@@ -1380,12 +1393,17 @@ export default function App() {
               )}
             </div>{/* end split-view */}
 
-            {/* Show more button */}
-            {!showAllStations && sorted.length > 10 && (
+            {/* Show more button — paginates in chunks rather than rendering
+                the entire (possibly 600+) result set in one synchronous update */}
+            {visibleCount < sorted.length && (
               <button className="btn-show-more"
-                onClick={() => { setShowAllStations(true); posthog.capture("show_more_clicked", { total: sorted.length }); }}
+                onClick={() => {
+                  const next = Math.min(visibleCount + STATIONS_PAGE_SIZE, sorted.length);
+                  setVisibleCount(next);
+                  posthog.capture("show_more_clicked", { total: sorted.length, visible: next });
+                }}
               >
-                Show {sorted.length - 10} more stations
+                Show {Math.min(STATIONS_PAGE_SIZE, sorted.length - visibleCount)} more stations
               </button>
             )}
           </>

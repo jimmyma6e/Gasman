@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { CREDIT_CARDS } from "../creditCards.js";
+import { useBodyScrollLock } from "../useBodyScrollLock.js";
 
 async function nominatimSearch(q) {
   const url =
@@ -579,6 +580,7 @@ function CardManager() {
 // ── Profile Modal ─────────────────────────────────────────────────────────────
 
 export function ProfileModal({ onClose }) {
+  useBodyScrollLock();
   const [places, setPlaces] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gasman-saved-places") || "[]"); }
     catch { return []; }

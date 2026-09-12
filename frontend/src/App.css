@@ -104,8 +104,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   flex-direction: column;
   gap: 2px;
   min-width: 160px;
-  max-height: 280px;
+  max-height: min(280px, calc(100vh - 140px));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .brand-dropdown-item {
   background: none;
@@ -221,7 +222,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Modal ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; padding: 24px; overscroll-behavior: contain; }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
 .modal-title { font-size: 1.2rem; font-weight: 700; }
 .modal-address { font-size: 0.82rem; color: var(--text-dim); margin-top: 4px; text-decoration: none; display: inline-block; }
@@ -370,7 +371,19 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .area-more-wrap { position: relative; }
 .area-more-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
 .area-more-btn:hover { border-color: var(--accent); color: var(--text); }
-.area-dropdown { position: absolute; top: calc(100% + 6px); left: 0; z-index: 9999; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 6px; display: flex; flex-direction: column; gap: 2px; min-width: 210px; max-height: 360px; overflow-y: auto; }
+.area-dropdown {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 9999;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 6px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 210px;
+  /* .all-stations-sidebar is position:sticky, so scrolling the page can't
+     bring an overflowing dropdown fully into view — clamp to the actual
+     viewport height (with slack for the sticky header) instead of a fixed
+     pixel cap that can exceed short laptop screens. */
+  max-height: min(360px, calc(100vh - 140px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .area-search-input { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.83rem; background: var(--bg); color: var(--text); margin-bottom: 4px; outline: none; }
 .area-search-input:focus { border-color: var(--accent); }
 .area-region-group { margin-top: 4px; }
@@ -1298,7 +1311,18 @@ html { overflow-x: hidden; overflow-y: scroll; }
 .summary-closest strong { color: var(--text); font-weight: 700; }
 .summary-top-pick { background: rgba(245,158,11,0.15); color: var(--accent); font-size: 0.72rem;
   font-weight: 700; padding: 1px 6px; border-radius: 10px; letter-spacing: 0.02em; }
-.summary-sname { color: var(--text); font-weight: 600; }
+/* max-width has no effect on a plain (non-replaced) inline element — the
+   100px cap below was silently doing nothing, letting a long station name
+   alone dictate the whole summary bar's (and by extension #12's) width. */
+.summary-sname {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: var(--text); font-weight: 600;
+}
 .summary-dot { color: var(--border); flex-shrink: 0; }
 @media (max-width: 480px) {
   .station-summary-bar { font-size: 0.78rem; padding: 7px 12px; }
