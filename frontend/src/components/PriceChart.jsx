@@ -117,22 +117,7 @@ export default function PriceChart({ stationId, activeFuel }) {
   const lastTsIso = lastPoint ? new Date(lastPoint._t).toISOString() : null;
   const currentPrice = lastPoint ? lastPoint.price : null;
 
-  // vs-avg row (#3.4) — also independent of the range tab, always comparing
-  // the current price against each fixed window's own average.
   const now = Date.now();
-  function avgOverWindow(hours) {
-    const cutoff = now - hours * 3600 * 1000;
-    const prices = fuelHistory.filter((h) => new Date(h.recorded_at).getTime() >= cutoff).map((h) => h.price);
-    return prices.length ? prices.reduce((s, p) => s + p, 0) / prices.length : null;
-  }
-  function pctVsAvg(avg) {
-    return (currentPrice != null && avg) ? ((currentPrice - avg) / avg) * 100 : null;
-  }
-  const vsAvg = [
-    { label: "24h", pct: pctVsAvg(avgOverWindow(24)) },
-    { label: "7d",  pct: pctVsAvg(avgOverWindow(168)) },
-    { label: "30d", pct: pctVsAvg(avgOverWindow(720)) },
-  ];
 
   // Everything below (chart + Low/High/Change) is scoped to the selected range tab.
   const rangeCutoff = now - range * 3600 * 1000;
@@ -165,29 +150,26 @@ export default function PriceChart({ stationId, activeFuel }) {
   const unitLabel = (unit.includes("litre") || unit.includes("liter")) ? "¢/L" : "$/gal";
   const rangeLabel = RANGES.find((r) => r.hours === range)?.label ?? "";
 
+  const changePct = (change != null && firstPrice) ? (change / firstPrice) * 100 : null;
+
   return (
     <div>
-      {rangeBar}
-      {/* Always-on summary — doesn't change with the 24h/7d/30d tab below,
-          unlike Low/High/Change which are scoped to the selected range. */}
+      {/* Headline, stock-ticker style: current price + change over the
+          selected range, instead of separate vs-24h/7d/30d comparison tiles. */}
       {currentPrice != null && (
-        <div className="chart-stats-row chart-vsavg-row">
-          {vsAvg.map(({ label, pct }) => (
-            <div key={label} className="chart-stat">
-              <span className="chart-stat-label">vs {label} avg</span>
-              <span className={`chart-stat-value ${pct == null ? "" : pct > 0 ? "red" : pct < 0 ? "green" : ""}`}>
-                {pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`}
-              </span>
-            </div>
-          ))}
+        <div className="chart-headline">
+          <span className="chart-headline-price">{currentPrice.toFixed(1)}{unitLabel}</span>
+          {change != null && (
+            <span className={`chart-headline-change ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>
+              {change > 0 ? "▲" : change < 0 ? "▼" : "•"} {Math.abs(change).toFixed(1)}{unitLabel}
+              {changePct != null && ` (${change > 0 ? "+" : "-"}${Math.abs(changePct).toFixed(1)}%)`}
+              <span className="chart-headline-range"> {rangeLabel}</span>
+            </span>
+          )}
+          {lastTsIso && <span className="chart-headline-updated">Updated {timeAgoShort(lastTsIso)}</span>}
         </div>
       )}
-      <div className="chart-stats-row">
-        {minPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} Low</span><span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span></div>}
-        {maxPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} High</span><span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span></div>}
-        {change !== null && <div className="chart-stat"><span className="chart-stat-label">Change</span><span className={`chart-stat-value ${change > 0 ? "red" : change < 0 ? "green" : ""}`}>{change > 0 ? "+" : ""}{change.toFixed(1)}{unitLabel}</span></div>}
-        {lastTsIso && <div className="chart-stat"><span className="chart-stat-label">Last data</span><span className="chart-stat-value">{timeAgoShort(lastTsIso)}</span></div>}
-      </div>
+      {rangeBar}
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2e3245" />
@@ -196,6 +178,7 @@ export default function PriceChart({ stationId, activeFuel }) {
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ paddingTop: 8, fontSize: 12, color: "#94a3b8" }} />
           {minPrice != null && <ReferenceLine y={minPrice} stroke="#22c55e" strokeDasharray="4 4" strokeOpacity={0.5} />}
+          {maxPrice != null && maxPrice !== minPrice && <ReferenceLine y={maxPrice} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.5} />}
           {Object.entries(FUEL_CONFIG).map(([key, { label, color }]) => {
             const isActive = activeFuel ? key === activeFuel : true;
             return (
@@ -218,6 +201,10 @@ export default function PriceChart({ stationId, activeFuel }) {
           })}
         </LineChart>
       </ResponsiveContainer>
+      <div className="chart-stats-row chart-stats-compact">
+        {minPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} Low</span><span className="chart-stat-value green">{minPrice.toFixed(1)}{unitLabel}</span></div>}
+        {maxPrice != null && <div className="chart-stat"><span className="chart-stat-label">{rangeLabel} High</span><span className="chart-stat-value red">{maxPrice.toFixed(1)}{unitLabel}</span></div>}
+      </div>
     </div>
   );
 }

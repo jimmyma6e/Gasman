@@ -199,6 +199,46 @@ function toggleSet(set, value) {
   return next;
 }
 
+// ---------- iOS Install Hint ----------
+// Safari has no beforeinstallprompt API at all, so there's no way to
+// trigger the install itself — the closest thing to "actionable" is a
+// clear, well-illustrated walkthrough of the manual Share-sheet steps.
+function IosInstallModal({ onClose }) {
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal ios-install-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">📲 Add GASMAN to your Home Screen</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <ol className="ios-install-steps">
+          <li>
+            <svg className="ios-install-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v12" /><path d="M8 7l4-4 4 4" /><rect x="5" y="11" width="14" height="10" rx="2" />
+            </svg>
+            <span>Tap the <strong>Share</strong> icon in Safari's toolbar</span>
+          </li>
+          <li>
+            <span className="ios-install-step-num">2</span>
+            <span>Scroll down and tap <strong>Add to Home Screen</strong></span>
+          </li>
+          <li>
+            <span className="ios-install-step-num">3</span>
+            <span>Tap <strong>Add</strong> — GASMAN opens full-screen, just like an app</span>
+          </li>
+        </ol>
+        <button className="btn-modal-action ios-install-done" onClick={onClose}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Trend Banner ----------
 function TrendBanner({ trend }) {
   if (!trend?.length) return null;
@@ -805,6 +845,7 @@ export default function App() {
   // such API at all — Add to Home Screen there is a manual Share-sheet
   // action — so show an instructional button instead of nothing.
   const [showIosInstallHint, setShowIosInstallHint] = useState(false);
+  const [showIosModal, setShowIosModal] = useState(false);
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
     window.addEventListener("beforeinstallprompt", handler);
@@ -996,11 +1037,7 @@ export default function App() {
               </button>
             )}
             {!showInstall && showIosInstallHint && (
-              <button
-                className="btn-install"
-                onClick={() => alert('To install GASMAN: tap the Share icon in Safari, then "Add to Home Screen".')}
-                title="Add to Home Screen"
-              >
+              <button className="btn-install" onClick={() => setShowIosModal(true)} title="Add to Home Screen">
                 📲 Install
               </button>
             )}
@@ -1209,62 +1246,71 @@ export default function App() {
               </div>
             </div>
             <div className="controls-bottom">
-              <div className="toolbar-icons">
-                <button
-                  className={`btn-icon ${showCardDiscounts && selectedCards.length > 0 ? "btn-icon-active" : ""}`}
-                  onClick={selectedCards.length > 0 ? () => setShowCardDiscounts((o) => !o) : () => setShowProfile(true)}
-                  title={selectedCards.length > 0 ? (showCardDiscounts ? "Card prices ON" : "Card prices OFF") : "Add a credit card"}
-                >
-                  <span className="btn-icon-emoji">💳</span>
-                  <span className="btn-icon-label">Card</span>
-                </button>
-                <button
-                  className={`btn-icon ${userCoords ? "btn-icon-active" : ""}`}
-                  onClick={userCoords ? () => { setUserCoords(null); localStorage.removeItem(COORDS_CACHE_KEY); setSortBy("price"); } : getNearMe}
-                  title={userCoords ? "Clear Near Me" : "Find stations near you"}
-                  disabled={nearMeLoading}
-                >
-                  <span className="btn-icon-emoji">{nearMeLoading ? "⏳" : "📍"}</span>
-                  <span className="btn-icon-label">{userCoords ? "Near ✓" : "Near Me"}</span>
-                </button>
-                <button
-                  className={`btn-icon ${showFillCost ? "btn-icon-active" : ""}`}
-                  onClick={() => { if (!fillLitres) { setShowProfile(true); return; } setShowFillCost((o) => !o); }}
-                  title={fillLitres ? `Show fill cost (${fillLitres}L)` : "Set fill litres in Profile"}
-                >
-                  <span className="btn-icon-emoji">⛽</span>
-                  <span className="btn-icon-label">Cost</span>
-                </button>
-              </div>
-              <button className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
-                onClick={() => setShowMap((v) => !v)}>
-                🗺 Map
-              </button>
-              {viewMode !== "table" && (
-                <div className="sort-controls">
-                  <label>Sort</label>
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                    <option value="price">Price</option>
-                    <option value="updated">Latest</option>
-                    <option value="name">Name</option>
-                    <option value="city">City</option>
-                    {userCoords && <option value="distance">Distance</option>}
-                  </select>
+              {/* Row 1: display filters — how prices are shown */}
+              <div className="controls-row controls-row-filters">
+                <div className="toolbar-icons">
+                  <button
+                    className={`btn-icon ${showCardDiscounts && selectedCards.length > 0 ? "btn-icon-active" : ""}`}
+                    onClick={selectedCards.length > 0 ? () => setShowCardDiscounts((o) => !o) : () => setShowProfile(true)}
+                    title={selectedCards.length > 0 ? (showCardDiscounts ? "Card prices ON" : "Card prices OFF") : "Add a credit card"}
+                  >
+                    <span className="btn-icon-emoji">💳</span>
+                    <span className="btn-icon-label">Card</span>
+                  </button>
+                  <button
+                    className={`btn-icon ${userCoords ? "btn-icon-active" : ""}`}
+                    onClick={userCoords ? () => { setUserCoords(null); localStorage.removeItem(COORDS_CACHE_KEY); setSortBy("price"); } : getNearMe}
+                    title={userCoords ? "Clear Near Me" : "Find stations near you"}
+                    disabled={nearMeLoading}
+                  >
+                    <span className="btn-icon-emoji">{nearMeLoading ? "⏳" : "📍"}</span>
+                    <span className="btn-icon-label">{userCoords ? "Near ✓" : "Near Me"}</span>
+                  </button>
+                  <button
+                    className={`btn-icon ${showFillCost ? "btn-icon-active" : ""}`}
+                    onClick={() => { if (!fillLitres) { setShowProfile(true); return; } setShowFillCost((o) => !o); }}
+                    title={fillLitres ? `Show fill cost (${fillLitres}L)` : "Set fill litres in Profile"}
+                  >
+                    <span className="btn-icon-emoji">⛽</span>
+                    <span className="btn-icon-label">Cost</span>
+                  </button>
                 </div>
-              )}
-              <div className="view-toggle">
-                {[
-                  { id: "card",    icon: "⊞", title: "Card view"    },
-                  { id: "compact", icon: "☰", title: "Compact view" },
-                  { id: "table",   icon: "⊟", title: "Table view"   },
-                ].map(({ id, icon, title }) => (
-                  <button key={id}
-                    className={`view-btn ${viewMode === id ? "view-btn-active" : ""}`}
-                    onClick={() => setViewMode(id)} title={title}
-                  >{icon}</button>
-                ))}
+                {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
               </div>
-              {nearMeError === "denied" && <span className="near-me-error">Location denied</span>}
+
+              {/* Row 2: how results are arranged — map / sort on the left, layout style on the right */}
+              <div className="controls-row controls-row-view">
+                <div className="controls-row-view-left">
+                  <button className={`btn-map-toggle ${showMap ? "btn-map-toggle-active" : ""}`}
+                    onClick={() => setShowMap((v) => !v)}>
+                    🗺 Map
+                  </button>
+                  {viewMode !== "table" && (
+                    <div className="sort-controls">
+                      <label>Sort</label>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                        <option value="price">Price</option>
+                        <option value="updated">Latest</option>
+                        <option value="name">Name</option>
+                        <option value="city">City</option>
+                        {userCoords && <option value="distance">Distance</option>}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="view-toggle">
+                  {[
+                    { id: "card",    icon: "⊞", title: "Card view"    },
+                    { id: "compact", icon: "☰", title: "Compact view" },
+                    { id: "table",   icon: "⊟", title: "Table view"   },
+                  ].map(({ id, icon, title }) => (
+                    <button key={id}
+                      className={`view-btn ${viewMode === id ? "view-btn-active" : ""}`}
+                      onClick={() => setViewMode(id)} title={title}
+                    >{icon}</button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>{/* end sidebar */}
@@ -1350,6 +1396,15 @@ export default function App() {
           <>
             <StationSummaryBar sorted={sorted} activeFuel={activeFuel} cheapestPrices={cheapestPrices} userCoords={userCoords} />
             <p className="station-count">{sorted.length} station{sorted.length !== 1 ? "s" : ""}</p>
+            {viewMode === "card" && (
+              <p className="fairness-legend">
+                <span className="fairness-legend-item"><span className="fuel-fairness-dot fairness-good">🟢</span>Great/Good deal</span>
+                <span className="fairness-legend-item"><span className="fuel-fairness-dot fairness-fair">⚪</span>Fair</span>
+                <span className="fairness-legend-item"><span className="fuel-fairness-dot fairness-above-average">🟠</span>Above avg</span>
+                <span className="fairness-legend-item"><span className="fuel-fairness-dot fairness-high">🔴</span>High</span>
+                <span className="fairness-legend-note">vs area average</span>
+              </p>
+            )}
 
             <div className={showMap ? "split-view" : ""}>
               <div className={showMap ? "split-list" : ""}>
@@ -1493,6 +1548,7 @@ export default function App() {
         />
       )}
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {showIosModal && <IosInstallModal onClose={() => setShowIosModal(false)} />}
       {fillupTarget && (
         <FillupModal
           station={fillupTarget.station}

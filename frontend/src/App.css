@@ -130,7 +130,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* ── Fuel Type Tabs + Toolbar ── */
 .controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; min-width: 0; }
 .controls-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.controls-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.controls-bottom { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.controls-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.controls-row-view { justify-content: space-between; }
+.controls-row-view-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .fuel-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .tab { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
 .tab:hover { border-color: var(--accent); color: var(--text); }
@@ -179,7 +182,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-fav-sm { font-size: 0.9rem; width: 26px; height: 26px; }
 .btn-chart-sm { padding: 4px 8px; font-size: 0.75rem; }
 
-.station-count { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px; }
+.station-count { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 4px; }
+.fairness-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 0.72rem; color: var(--text-dim); margin-bottom: 16px; }
+.fairness-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.fairness-legend-note { opacity: 0.75; }
 
 /* ── Grid — auto-reflows at any width ── */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; }
@@ -261,6 +267,19 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .btn-visited-yes:hover { background: rgba(22,163,74,0.2); }
 .btn-visited-update:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ── iOS Install Hint ── */
+.ios-install-modal { max-width: 380px; }
+.ios-install-steps { list-style: none; display: flex; flex-direction: column; gap: 14px; margin: 4px 0 18px; }
+.ios-install-steps li { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; }
+.ios-install-icon { color: var(--accent); flex-shrink: 0; background: rgba(245,158,11,0.1); border-radius: 8px; padding: 4px; width: 30px; height: 30px; box-sizing: content-box; }
+.ios-install-step-num {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--surface2);
+  border: 1px solid var(--border); color: var(--text-dim); font-weight: 700; font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.ios-install-done { width: 100%; justify-content: center; background: var(--accent); color: #000; border-color: var(--accent); }
+.ios-install-done:hover { background: var(--accent); opacity: 0.9; }
+
 /* ── Chart ── */
 .chart-range-row { display: flex; gap: 6px; margin-bottom: 16px; }
 .chart-range-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); padding: 5px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
@@ -273,10 +292,18 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .chart-stat-value { font-size: 1rem; font-weight: 700; }
 .chart-stat-value.green { color: var(--green); }
 .chart-stat-value.red   { color: var(--red); }
-.chart-vsavg-row .chart-stat { padding: 8px 12px; }
-.chart-vsavg-row .chart-stat-label { opacity: 0.8; }
+.chart-stats-compact { margin-bottom: 0; }
 .chart-tooltip { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .chart-tooltip-time { color: var(--text-dim); margin-bottom: 6px; font-size: 0.78rem; }
+
+/* Stock-ticker-style headline: current price + change over the selected range */
+.chart-headline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.chart-headline-price { font-size: 1.7rem; font-weight: 800; color: var(--text); }
+.chart-headline-change { font-size: 0.9rem; font-weight: 600; color: var(--text-dim); }
+.chart-headline-change.green { color: var(--green); }
+.chart-headline-change.red   { color: var(--red); }
+.chart-headline-range { opacity: 0.7; font-weight: 400; }
+.chart-headline-updated { font-size: 0.76rem; color: var(--text-dim); margin-left: auto; }
 
 /* ── States ── */
 .loading-box { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 60px 20px; color: var(--text-dim); }
@@ -854,19 +881,28 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 .route-save-input:focus { border-color: var(--accent); }
 
-/* ── Route Finder hero card (Dashboard) ── */
-.route-hero-card { background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.04));
-  border: 1.5px solid rgba(249,115,22,0.35); border-radius: var(--radius); padding: 18px 20px;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
-.route-hero-card:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
-.route-hero-left { flex: 1; min-width: 0; }
-.route-hero-title { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.route-hero-sub { font-size: 0.84rem; color: var(--text-dim); line-height: 1.4; }
-.route-hero-cta { background: var(--accent); color: #000; border: none; padding: 10px 20px;
-  border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer;
-  transition: opacity 0.15s; flex-shrink: 0; white-space: nowrap; }
-.route-hero-cta:hover { opacity: 0.85; }
+/* ── Dashboard hero promo cards (Route Finder / Add fav station) ── */
+.dash-hero-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.dash-hero-card {
+  flex: 1; min-width: 220px; border-radius: var(--radius); padding: 12px 16px; border: 1.5px solid transparent;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.dash-hero-left { flex: 1; min-width: 0; }
+.dash-hero-title { font-size: 0.92rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.dash-hero-sub { font-size: 0.76rem; color: var(--text-dim); line-height: 1.3; }
+.dash-hero-cta {
+  border: none; padding: 7px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; transition: opacity 0.15s; flex-shrink: 0; white-space: nowrap;
+}
+.dash-hero-cta:hover { opacity: 0.85; }
+.dash-hero-route { background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.04)); border-color: rgba(249,115,22,0.35); }
+.dash-hero-route:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
+.dash-hero-route .dash-hero-cta { background: var(--accent); color: #000; }
+.dash-hero-fav { background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04)); border-color: rgba(59,130,246,0.35); }
+.dash-hero-fav:hover { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+.dash-hero-fav .dash-hero-cta { background: #3b82f6; color: #fff; }
+@media (max-width: 480px) { .dash-hero-row { flex-direction: column; } }
 
 /* ── Profile tip ── */
 .profile-section-row { display: flex; align-items: center; gap: 8px; }

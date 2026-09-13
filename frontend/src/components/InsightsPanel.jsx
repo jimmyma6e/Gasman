@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { haversineKm } from "../geo.js";
 
@@ -95,6 +95,13 @@ export default function InsightsPanel({ trend, userCoords, variant = "home" }) {
     .filter((p) => new Date(p.date).getTime() >= cutoff)
     .map((p) => ({ ...p, label: new Date(p.date).toLocaleDateString([], { month: "short", day: "numeric" }) }));
 
+  // Reference lines for the selected range, so the trend line reads against
+  // its own average/high/low instead of needing to eyeball the axis.
+  const rangePrices = chartData.map((p) => p.avg_price).filter((v) => v != null);
+  const avgPrice = rangePrices.length ? rangePrices.reduce((s, v) => s + v, 0) / rangePrices.length : null;
+  const minPrice = rangePrices.length ? Math.min(...rangePrices) : null;
+  const maxPrice = rangePrices.length ? Math.max(...rangePrices) : null;
+
   return (
     <div className="insights-bar">
       {!isHome && (
@@ -171,6 +178,18 @@ export default function InsightsPanel({ trend, userCoords, variant = "home" }) {
               <XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis domain={["auto", "auto"]} tick={{ fill: "#94a3b8", fontSize: 10 }} width={40} tickFormatter={(v) => v.toFixed(0)} />
               <Tooltip formatter={(v) => `${v.toFixed(1)}¢/L`} contentStyle={{ background: "#1a1f2e", border: "1px solid #2e3245", fontSize: 12 }} />
+              {avgPrice != null && (
+                <ReferenceLine y={avgPrice} stroke="#94a3b8" strokeDasharray="4 4" strokeOpacity={0.7}
+                  label={{ value: `Avg ${avgPrice.toFixed(1)}`, position: "insideTopRight", fill: "#94a3b8", fontSize: 10 }} />
+              )}
+              {maxPrice != null && (
+                <ReferenceLine y={maxPrice} stroke="#dc2626" strokeDasharray="3 3" strokeOpacity={0.6}
+                  label={{ value: `High ${maxPrice.toFixed(1)}`, position: "insideTopLeft", fill: "#dc2626", fontSize: 10 }} />
+              )}
+              {minPrice != null && minPrice !== maxPrice && (
+                <ReferenceLine y={minPrice} stroke="#16a34a" strokeDasharray="3 3" strokeOpacity={0.6}
+                  label={{ value: `Low ${minPrice.toFixed(1)}`, position: "insideBottomLeft", fill: "#16a34a", fontSize: 10 }} />
+              )}
               <Line type="monotone" dataKey="avg_price" stroke="#f97316" strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: "#f97316" }} />
             </LineChart>
           </ResponsiveContainer>

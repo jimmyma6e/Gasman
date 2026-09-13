@@ -697,17 +697,28 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* ── Route Finder Hero ── */}
-      <div className="route-hero-card" onClick={() => onNavigate("route")}>
-        <div className="route-hero-left">
-          <div className="route-hero-title">🗺️ Route Finder</div>
-          <div className="route-hero-sub">
-            Enter A → B and we find the cheapest gas along your drive
+      {/* ── Hero promo cards ── */}
+      <div className="dash-hero-row">
+        <div className="dash-hero-card dash-hero-route" onClick={() => onNavigate("route")}>
+          <div className="dash-hero-left">
+            <div className="dash-hero-title">🗺️ Route Finder</div>
+            <div className="dash-hero-sub">Cheapest gas along your drive</div>
           </div>
+          <button className="dash-hero-cta" onClick={(e) => { e.stopPropagation(); onNavigate("route"); }}>
+            Start →
+          </button>
         </div>
-        <button className="route-hero-cta" onClick={(e) => { e.stopPropagation(); onNavigate("route"); }}>
-          Start →
-        </button>
+        {favStations.length === 0 && (
+          <div className="dash-hero-card dash-hero-fav" onClick={() => onNavigate("all")}>
+            <div className="dash-hero-left">
+              <div className="dash-hero-title">⭐ Add your fav gas station</div>
+              <div className="dash-hero-sub">Pin your regular stops for quick access</div>
+            </div>
+            <button className="dash-hero-cta" onClick={(e) => { e.stopPropagation(); onNavigate("all"); }}>
+              Browse →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Saved Routes ── */}
