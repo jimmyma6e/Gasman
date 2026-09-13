@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { FUEL_TYPES } from "../fuelTypes.js";
 
 function MapController({ selectedStation, stations }) {
   const map = useMap();
@@ -22,13 +23,6 @@ function MapController({ selectedStation, stations }) {
 
   return null;
 }
-
-const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular (87)" },
-  { key: "midgrade_gas", label: "Mid (89)"     },
-  { key: "premium_gas",  label: "Premium (91)" },
-  { key: "diesel",       label: "Diesel"       },
-];
 
 function getPriceColor(price, minPrice, maxPrice) {
   if (price == null || price <= 0) return "#aaaaaa";

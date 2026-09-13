@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { octaneLabel } from "../octane.js";
-
-const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular (87)" },
-  { key: "midgrade_gas", label: "Mid (89)"     },
-  { key: "premium_gas",  label: "Premium"      }, // octane varies by brand — shown per-cell
-  { key: "diesel",       label: "Diesel"       },
-];
+import { FUEL_TYPES } from "../fuelTypes.js";
 
 function formatPrice(price, unit) {
   if (price == null) return null;

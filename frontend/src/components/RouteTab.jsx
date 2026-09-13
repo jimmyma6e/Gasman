@@ -4,13 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import posthog from "posthog-js";
 import { bestCardSavings } from "../creditCards.js";
-
-const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular (87)" },
-  { key: "midgrade_gas", label: "Mid (89)"     },
-  { key: "premium_gas",  label: "Premium (91)" },
-  { key: "diesel",       label: "Diesel"       },
-];
+import { FUEL_TYPES } from "../fuelTypes.js";
 
 const SAVE_PRESETS = [
   { emoji: "🏠", label: "Home"   },

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { CREDIT_CARDS } from "../creditCards.js";
 import { useBodyScrollLock } from "../useBodyScrollLock.js";
+import { FUEL_TYPES } from "../fuelTypes.js";
 
 async function nominatimSearch(q) {
   const url =
@@ -44,12 +45,6 @@ const FUEL_LABELS = {
   diesel:       "Diesel",
 };
 
-const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular" },
-  { key: "midgrade_gas", label: "Mid" },
-  { key: "premium_gas",  label: "Premium" },
-  { key: "diesel",       label: "Diesel" },
-];
 
 const VEHICLE_PRESETS = [
   { icon: "🚗", label: "Compact",  l100km: 7  },
@@ -661,13 +656,6 @@ export function ProfileModal({ onClose }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-
-const FUEL_LABELS_FULL = {
-  regular_gas:  "Regular (87)",
-  midgrade_gas: "Mid (89)",
-  premium_gas:  "Premium (91)",
-  diesel:       "Diesel",
-};
 
 export default function Dashboard({
   snapshots, savedRoutes, stationsWithArea,

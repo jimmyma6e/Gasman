@@ -10,7 +10,10 @@ import FillupModal from "./components/FillupModal";
 import LogsTab from "./components/LogsTab";
 import BottomNav from "./components/BottomNav";
 import { bestCardSavings } from "./creditCards.js";
-import { octaneLabel, PREMIUM_OCTANE_BY_BRAND, DEFAULT_OCTANE } from "./octane.js";
+import { octaneLabel } from "./octane.js";
+import { insightsFuelKey, nearestAreaAverage, computeFairness } from "./fairness.js";
+import { haversineKm } from "./geo.js";
+import { FUEL_TYPES } from "./fuelTypes.js";
 import { pageview } from "./analytics.js";
 import { useBodyScrollLock } from "./useBodyScrollLock.js";
 import posthog from "posthog-js";
@@ -154,17 +157,24 @@ function normalizeBrand(name) {
 }
 
 
-const FUEL_TYPES = [
-  { key: "regular_gas",  label: "Regular" },
-  { key: "midgrade_gas", label: "Mid" },
-  { key: "premium_gas",  label: "Premium" },
-  { key: "diesel",       label: "Diesel" },
-];
-
 const REFRESH_INTERVAL = 5 * 60 * 1000;
 
 // Valid price range for BC gas in cents/litre
 const VALID_PRICE = (p) => p != null && p >= 80 && p <= 350;
+
+// The virtual premium_91/premium_93 keys (see database.py) split GasBuddy's
+// single blended premium_gas field into real octane tiers for area-wide
+// averages — a per-fuel fairness dot on a card needs whichever tier
+// matches that station's own brand, so both are fetched up front.
+const INSIGHTS_FUEL_KEYS = ["regular_gas", "midgrade_gas", "premium_91", "premium_93", "diesel"];
+
+function fairnessForFuel(station, fuelKey, insightsByKey = {}) {
+  const price = station[fuelKey]?.price;
+  if (!VALID_PRICE(price)) return null;
+  const key = insightsFuelKey(fuelKey, station._brand || station.name);
+  const areaAvg = nearestAreaAverage(insightsByKey[key], station.latitude, station.longitude);
+  return computeFairness(price, areaAvg?.avg_today ?? null, station[fuelKey]?.last_updated);
+}
 
 function formatPrice(price, unit) {
   if (price == null) return null;
@@ -187,15 +197,6 @@ function toggleSet(set, value) {
   const next = new Set(set);
   next.has(value) ? next.delete(value) : next.add(value);
   return next;
-}
-
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // ---------- Trend Banner ----------
@@ -237,56 +238,24 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
   // this station's own history, so a station that's always expensive
   // relative to its neighbours never reads as "fair" just because it
   // matches its own trend.
+  const brand = station._brand || station.name;
   useEffect(() => {
     let cancelled = false;
     setAreaAvgToday(null);
-
-    // Premium octane varies by brand (91/93/94) — compare against the
-    // matching octane tier, not a blended average across all premium
-    // brands, same split the Home widget uses.
-    const brand = station._brand || station.name;
-    const octane = PREMIUM_OCTANE_BY_BRAND[brand] ?? DEFAULT_OCTANE.premium_gas;
-    const insightsFuelKey = selectedFuel === "premium_gas"
-      ? (octane === 93 ? "premium_93" : "premium_91")
-      : selectedFuel;
-
-    fetch(`/api/insights?fuel_type=${insightsFuelKey}`)
+    fetch(`/api/insights?fuel_type=${insightsFuelKey(selectedFuel, brand)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const areas = data.area_averages || [];
-        if (!areas.length || station.latitude == null || station.longitude == null) {
-          setAreaAvgToday(null);
-          return;
-        }
-        // Nearest-centroid match by the station's own coordinates — matching
-        // station._area by name can fail, since that's derived from a
-        // coarser reverse-geocoded city (e.g. "Vancouver") while this
-        // response uses finer named areas (e.g. "Downtown Vancouver").
-        let best = null, bestDist = Infinity;
-        for (const a of areas) {
-          const d = haversineKm(station.latitude, station.longitude, a.latitude, a.longitude);
-          if (d < bestDist) { bestDist = d; best = a; }
-        }
+        const best = nearestAreaAverage(data.area_averages, station.latitude, station.longitude);
         setAreaAvgToday(best?.avg_today ?? null);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [selectedFuel, station.latitude, station.longitude, station._brand, station.name]);
+  }, [selectedFuel, station.latitude, station.longitude, brand]);
 
-  const fairness = (() => {
-    const price = station[selectedFuel]?.price;
-    if (!VALID_PRICE(price) || !areaAvgToday) return null;
-    const pct = ((price - areaAvgToday) / areaAvgToday) * 100;
-    let label = pct <= -5 ? "Great" : pct <= -1 ? "Good" : pct <= 1 ? "Fair" : pct <= 5 ? "Above average" : "High";
-    // A stale price could easily be wrong by now — don't call it a great
-    // deal on data that's over 2 days old.
-    const lastUpdated = station[selectedFuel]?.last_updated;
-    const staleHours = lastUpdated ? (Date.now() - new Date(lastUpdated).getTime()) / 3600000 : Infinity;
-    if (staleHours > 48 && (label === "Great" || label === "Good")) label = "Fair";
-    const emoji = { Great: "🟢", Good: "🟢", Fair: "⚪", "Above average": "🟠", High: "🔴" }[label];
-    return { label, emoji, pct };
-  })();
+  const fairness = VALID_PRICE(station[selectedFuel]?.price)
+    ? computeFairness(station[selectedFuel].price, areaAvgToday, station[selectedFuel]?.last_updated)
+    : null;
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.name}, ${station.address}, ${station._area}, BC`)}`;
 
@@ -360,7 +329,7 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, showFillCost, userCoords, onLogFillup }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, showFillCost, userCoords, onLogFillup, insightsByKey }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
@@ -402,6 +371,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
         {FUEL_TYPES.map(({ key }) => {
           const price = station[key]?.price;
           const delta = deltas[key];
+          const fairness = fairnessForFuel(station, key, insightsByKey);
           return (
             <div key={key} className={`fuel-item ${key === activeFuel ? "fuel-active" : ""}`}>
               <span className="fuel-label">{octaneLabel(key, station._brand || station.name)}</span>
@@ -416,7 +386,18 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
                         {delta > 0 ? "↑" : "↓"}{Math.abs(delta).toFixed(1)}
                       </span>
                     )}
+                    {fairness && (
+                      <span
+                        className={`fuel-fairness-dot fairness-${fairness.label.replace(/\s+/g, "-").toLowerCase()}`}
+                        title={`${fairness.label} · ${fairness.pct > 0 ? "+" : ""}${fairness.pct.toFixed(0)}% vs area avg`}
+                      >
+                        {fairness.emoji}
+                      </span>
+                    )}
                   </div>
+                  {station[key]?.last_updated && (
+                    <span className="fuel-last-updated">{timeAgo(station[key].last_updated)}</span>
+                  )}
                   {key === activeFuel && showCardDiscounts && (() => {
                     const brand = station._brand || station.name;
                     const result = bestCardSavings(selectedCards, price, brand);
@@ -455,9 +436,6 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
       </div>
 
       <div className="card-footer">
-        {fuelData?.last_updated && (
-          <span className="last-updated">Updated {timeAgo(fuelData.last_updated)}</span>
-        )}
         <div className="card-footer-actions">
           {VALID_PRICE(fuelData?.price) && (
             <button className="btn-fillup" onClick={(e) => { e.stopPropagation(); onLogFillup(station); }}
@@ -777,6 +755,19 @@ export default function App() {
     return () => clearInterval(id);
   }, [fetchData, scanning]);
 
+  // Area averages for the Fair/Good/Great dots shown per fuel row on every
+  // card in the grid — fetched once for all fuel keys (rather than per
+  // card) and re-fetched alongside the normal station data refresh.
+  const [insightsByKey, setInsightsByKey] = useState({});
+  useEffect(() => {
+    INSIGHTS_FUEL_KEYS.forEach((key) => {
+      fetch(`/api/insights?fuel_type=${key}`)
+        .then((r) => r.json())
+        .then((data) => setInsightsByKey((prev) => ({ ...prev, [key]: data.area_averages || [] })))
+        .catch(() => {});
+    });
+  }, [lastRefresh]);
+
   // Poll /api/scan-status every 4 s to drive the progress bar
   useEffect(() => {
     let id;
@@ -809,10 +800,19 @@ export default function App() {
     }
   }, [showProfile]);
 
-  // PWA install prompt
+  // PWA install prompt — Chrome/Edge/Android fire beforeinstallprompt
+  // (requires the manifest.json linked in index.html). iOS Safari has no
+  // such API at all — Add to Home Screen there is a manual Share-sheet
+  // action — so show an instructional button instead of nothing.
+  const [showIosInstallHint, setShowIosInstallHint] = useState(false);
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
     window.addEventListener("beforeinstallprompt", handler);
+
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
+    if (isIOS && !isStandalone) setShowIosInstallHint(true);
+
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
@@ -995,13 +995,22 @@ export default function App() {
                 📲 Install
               </button>
             )}
+            {!showInstall && showIosInstallHint && (
+              <button
+                className="btn-install"
+                onClick={() => alert('To install GASMAN: tap the Share icon in Safari, then "Add to Home Screen".')}
+                title="Add to Home Screen"
+              >
+                📲 Install
+              </button>
+            )}
             <button className="btn-edit-profile" onClick={() => setShowProfile(true)} title="My Profile">⚙️</button>
           </div>
         </div>
       </header>
 
       <main className="main">
-        <InsightsPanel trend={data?.trend} userCoords={userCoords} />
+        <InsightsPanel trend={data?.trend} userCoords={userCoords} variant={tab === "dashboard" ? "home" : "compact"} />
 
         {/* Tabs */}
         <div className="tabs-row">
@@ -1367,6 +1376,7 @@ export default function App() {
                       fillLitres={fillLitres}
                       showFillCost={showFillCost}
                       userCoords={userCoords}
+                      insightsByKey={insightsByKey}
                       onLogFillup={(s) => {
                         setFillupTarget({ station: s, fuelType: activeFuel });
                         posthog.capture("station_log_started", { source: "station_card", station_id: s.station_id });

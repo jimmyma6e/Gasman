@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { haversineKm } from "../geo.js";
 
 // Virtual keys for the two octane-split premium tiers (91 vs 93) are
 // resolved backend-side (database.py's _resolve_fuel_type) — a station's
@@ -22,16 +23,12 @@ const RANGES = [
   { label: "30d", days: 30 },
 ];
 
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-export default function InsightsPanel({ trend, userCoords }) {
+export default function InsightsPanel({ trend, userCoords, variant = "home" }) {
+  // "home" = full section, always expanded (the Home/dashboard tab).
+  // "compact" = collapsed strip by default elsewhere, expandable on tap.
+  const isHome = variant === "home";
+  const [manualExpand, setManualExpand] = useState(false);
+  const expanded = isHome || manualExpand;
   // Independent of the Stations tab's activeFuel — the octane-split tiles
   // (91/93) are a widget-only concept that doesn't map onto a single
   // station's one real premium_gas price.
@@ -81,6 +78,18 @@ export default function InsightsPanel({ trend, userCoords }) {
   const anyLoaded = Object.keys(insightsByFuel).length > 0;
   if (!anyLoaded) return null;
 
+  if (!expanded) {
+    const regular = insightsByFuel.regular_gas?.ytd_vs_today?.today_avg;
+    return (
+      <button className="insights-bar insights-bar-collapsed" onClick={() => setManualExpand(true)}>
+        <span className="insights-collapsed-summary">
+          ⛽ Regular avg {regular != null ? `${regular.toFixed(1)}¢/L` : "—"}
+        </span>
+        <span className="insights-collapsed-caret">Insights ▾</span>
+      </button>
+    );
+  }
+
   const cutoff = Date.now() - range * 24 * 3600 * 1000;
   const chartData = (series || [])
     .filter((p) => new Date(p.date).getTime() >= cutoff)
@@ -88,6 +97,9 @@ export default function InsightsPanel({ trend, userCoords }) {
 
   return (
     <div className="insights-bar">
+      {!isHome && (
+        <button className="insights-collapse-btn" onClick={() => setManualExpand(false)}>▴ Collapse</button>
+      )}
       <div className="insights-tiles-row">
         {FUEL_TILES.map(({ key, label }) => {
           const d = insightsByFuel[key];
