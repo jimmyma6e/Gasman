@@ -10,7 +10,7 @@ import FillupModal from "./components/FillupModal";
 import LogsTab from "./components/LogsTab";
 import BottomNav from "./components/BottomNav";
 import { bestCardSavings } from "./creditCards.js";
-import { octaneLabel } from "./octane.js";
+import { octaneLabel, PREMIUM_OCTANE_BY_BRAND, DEFAULT_OCTANE } from "./octane.js";
 import { pageview } from "./analytics.js";
 import { useBodyScrollLock } from "./useBodyScrollLock.js";
 import posthog from "posthog-js";
@@ -240,16 +240,39 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
   useEffect(() => {
     let cancelled = false;
     setAreaAvgToday(null);
-    fetch(`/api/insights?fuel_type=${selectedFuel}`)
+
+    // Premium octane varies by brand (91/93/94) — compare against the
+    // matching octane tier, not a blended average across all premium
+    // brands, same split the Home widget uses.
+    const brand = station._brand || station.name;
+    const octane = PREMIUM_OCTANE_BY_BRAND[brand] ?? DEFAULT_OCTANE.premium_gas;
+    const insightsFuelKey = selectedFuel === "premium_gas"
+      ? (octane === 93 ? "premium_93" : "premium_91")
+      : selectedFuel;
+
+    fetch(`/api/insights?fuel_type=${insightsFuelKey}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const match = (data.area_averages || []).find((a) => a.area === station._area);
-        setAreaAvgToday(match?.avg_today ?? null);
+        const areas = data.area_averages || [];
+        if (!areas.length || station.latitude == null || station.longitude == null) {
+          setAreaAvgToday(null);
+          return;
+        }
+        // Nearest-centroid match by the station's own coordinates — matching
+        // station._area by name can fail, since that's derived from a
+        // coarser reverse-geocoded city (e.g. "Vancouver") while this
+        // response uses finer named areas (e.g. "Downtown Vancouver").
+        let best = null, bestDist = Infinity;
+        for (const a of areas) {
+          const d = haversineKm(station.latitude, station.longitude, a.latitude, a.longitude);
+          if (d < bestDist) { bestDist = d; best = a; }
+        }
+        setAreaAvgToday(best?.avg_today ?? null);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [selectedFuel, station._area]);
+  }, [selectedFuel, station.latitude, station.longitude, station._brand, station.name]);
 
   const fairness = (() => {
     const price = station[selectedFuel]?.price;
@@ -978,7 +1001,7 @@ export default function App() {
       </header>
 
       <main className="main">
-        <InsightsPanel trend={data?.trend} activeFuel={activeFuel} setActiveFuel={setActiveFuel} userCoords={userCoords} />
+        <InsightsPanel trend={data?.trend} userCoords={userCoords} />
 
         {/* Tabs */}
         <div className="tabs-row">

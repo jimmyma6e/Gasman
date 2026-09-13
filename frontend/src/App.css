@@ -358,15 +358,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .insights-stat-value { font-size: 0.9rem; font-weight: 700; color: var(--text); }
 .insights-val-up   { color: var(--red); }
 .insights-val-down { color: var(--green); }
-.insights-expand {
-  position: relative;
-  background: none; border: 1px solid var(--border); color: var(--text-dim);
-  border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 0.78rem;
-  transition: all 0.15s; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; margin-left: auto;
-}
-.insights-expand:hover { border-color: var(--accent); color: var(--accent); }
-/* Area breakdown — spans full width below the tile row */
+/* City chip row — always visible now, "Overall" pinned first, rest by
+   popularity (station count), instead of hidden behind an expand toggle. */
 .insights-areas-row {
   display: flex; gap: 6px; overflow-x: auto;
   flex-wrap: nowrap; padding-top: 8px;
@@ -377,14 +370,12 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .insight-area-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 0.76rem; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
 .insight-area-pill-clickable { cursor: pointer; transition: border-color 0.15s; }
 .insight-area-pill-clickable:hover { border-color: var(--accent); }
+.insight-area-pill-active { border-color: var(--accent); background: rgba(245,158,11,0.08); }
 .insight-area-name  { color: var(--text-dim); }
 .insight-area-today { font-weight: 600; color: var(--text); }
 .insight-area-change { font-size: 0.7rem; font-weight: 600; }
-/* City drill-down chart */
-.insights-drilldown { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
-.insights-drilldown-header { display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; margin-bottom: 8px; }
-.insights-drilldown-close { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; padding: 2px 6px; }
-.insights-drilldown-close:hover { color: var(--accent); }
+/* Always-visible chart — Regular · Overall by default */
+.insights-chart-section { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
 
 /* ── Area filter dropdown ── */
 .area-more-wrap { position: relative; }
@@ -647,7 +638,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* Below WCAG's 24x24 minimum (iOS/Material want 44x44) but visually
    correct at their current size — grow the invisible tap area instead
    of the control itself. */
-.insights-expand::after, .btn-unfav::after,
+.btn-unfav::after,
 .btn-section-nav::after, .btn-edit-profile::after {
   content: ""; position: absolute; inset: 50% auto auto 50%;
   width: 44px; height: 44px; transform: translate(-50%, -50%);

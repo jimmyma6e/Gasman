@@ -97,6 +97,24 @@ def normalize_brand(name: str) -> str:
     return BRAND_ALIASES.get(name, name) if name else name
 
 
+# Premium octane varies by brand in BC — mirrors frontend/src/octane.js's
+# PREMIUM_OCTANE_BY_BRAND exactly, so the two stay in sync. Used to split
+# the single scraped "premium_gas" field into real 91/93-octane tiers for
+# area-wide aggregates (a station's own premium price is always one
+# specific octane already, implied by its brand — this split only matters
+# once you're averaging across many stations/brands).
+PREMIUM_OCTANE_BY_BRAND = {
+    "Petro-Canada": 94,
+    "Esso":         93,
+    "Shell":        93,
+}
+DEFAULT_PREMIUM_OCTANE = 91
+
+
+def premium_octane_for(name: str) -> int:
+    return PREMIUM_OCTANE_BY_BRAND.get(normalize_brand(name), DEFAULT_PREMIUM_OCTANE)
+
+
 CACHE_TTL = timedelta(hours=4)
 
 _cache: dict = {"stations": None, "trends": None, "fetched_at": None}

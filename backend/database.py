@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import psycopg2
 import psycopg2.extras
 
+from gasbuddy_client import premium_octane_for
+
 # Railway injects DATABASE_URL automatically when a Postgres service is linked.
 # Also try POSTGRES_URL / individual PG* vars as fallback.
 _DATABASE_URL = (
@@ -286,28 +288,53 @@ def get_price_deltas() -> dict:
     return result
 
 
+# Virtual fuel-type keys for octane-split premium tiers — GasBuddy only
+# gives one blended "premium_gas" field per station; the real octane (91,
+# 93, or Petro-Canada's 94) is inferred per-brand and only matters once
+# you're averaging across many stations/brands (a single station's own
+# premium price is always one specific octane already).
+PREMIUM_OCTANE_TIERS = {
+    "premium_91": {91, 94},  # everyone except Esso/Shell, plus Petro-Canada's 94
+    "premium_93": {93},      # Esso, Shell
+}
+
+
+def _resolve_fuel_type(fuel_type: str):
+    """Returns (real fuel_type column value, octane set to filter to, or None)."""
+    if fuel_type in PREMIUM_OCTANE_TIERS:
+        return "premium_gas", PREMIUM_OCTANE_TIERS[fuel_type]
+    return fuel_type, None
+
+
+def _filter_by_octane(rows: list, octane_filter) -> list:
+    if not octane_filter:
+        return rows
+    return [r for r in rows if premium_octane_for(r["name"]) in octane_filter]
+
+
 def get_area_averages(fuel_type: str = "regular_gas") -> dict:
+    sql_fuel, octane_filter = _resolve_fuel_type(fuel_type)
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT latitude, longitude, AVG(price) as avg_price
+                SELECT name, latitude, longitude, AVG(price) as avg_price
                 FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= NOW() - INTERVAL '24 hours'
                   AND price IS NOT NULL AND price >= 80 AND price <= 350
-                GROUP BY station_id, latitude, longitude
-            """, (fuel_type,))
-            today_rows = cur.fetchall()
+                GROUP BY station_id, name, latitude, longitude
+            """, (sql_fuel,))
+            today_rows = _filter_by_octane(cur.fetchall(), octane_filter)
 
             cur.execute("""
-                SELECT latitude, longitude, AVG(price) as avg_price
+                SELECT name, latitude, longitude, AVG(price) as avg_price
                 FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= date_trunc('year', NOW())
                   AND price IS NOT NULL AND price >= 80 AND price <= 350
-                GROUP BY station_id, latitude, longitude
-            """, (fuel_type,))
-            ytd_rows = cur.fetchall()
+                GROUP BY station_id, name, latitude, longitude
+            """, (sql_fuel,))
+            ytd_rows = _filter_by_octane(cur.fetchall(), octane_filter)
 
     return {"today": today_rows, "ytd": ytd_rows}
 
@@ -317,46 +344,50 @@ def get_area_price_series(fuel_type: str, days: int) -> list:
     the caller can bucket by area (nearest-centroid classification lives in
     main.py, same as get_area_averages's today/ytd split above).
     """
+    sql_fuel, octane_filter = _resolve_fuel_type(fuel_type)
     with _conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT latitude, longitude, DATE(recorded_at) AS day, AVG(price) AS avg_price
+                SELECT name, latitude, longitude, DATE(recorded_at) AS day, AVG(price) AS avg_price
                 FROM price_history
                 WHERE fuel_type = %s
                   AND recorded_at >= NOW() - make_interval(days => %s)
                   AND price IS NOT NULL AND price >= 80 AND price <= 350
-                GROUP BY station_id, latitude, longitude, DATE(recorded_at)
+                GROUP BY station_id, name, latitude, longitude, DATE(recorded_at)
                 ORDER BY day ASC
-            """, (fuel_type, days))
-            return [dict(r) for r in cur.fetchall()]
+            """, (sql_fuel, days))
+            return _filter_by_octane([dict(r) for r in cur.fetchall()], octane_filter)
+
+
+def _avg_price_since(cur, sql_fuel: str, since_clause: str, octane_filter) -> float | None:
+    """AVG(price) since a fixed time clause — when octane_filter is set
+    (a virtual premium_91/premium_93 tier), SQL can't filter by brand, so
+    fetch the raw rows and filter+average in Python instead.
+    """
+    if octane_filter:
+        cur.execute(f"""
+            SELECT name, price FROM price_history
+            WHERE fuel_type = %s AND {since_clause}
+              AND price IS NOT NULL AND price >= 80 AND price <= 350
+        """, (sql_fuel,))
+        prices = [p for (name, p) in cur.fetchall() if premium_octane_for(name) in octane_filter]
+        return (sum(prices) / len(prices)) if prices else None
+
+    cur.execute(f"""
+        SELECT AVG(price) FROM price_history
+        WHERE fuel_type = %s AND {since_clause}
+          AND price IS NOT NULL AND price >= 80 AND price <= 350
+    """, (sql_fuel,))
+    return cur.fetchone()[0]
 
 
 def get_ytd_vs_today(fuel_type: str = "regular_gas") -> dict:
+    sql_fuel, octane_filter = _resolve_fuel_type(fuel_type)
     with _conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT AVG(price) FROM price_history
-                WHERE fuel_type = %s
-                  AND recorded_at >= NOW() - INTERVAL '24 hours'
-                  AND price IS NOT NULL AND price >= 80 AND price <= 350
-            """, (fuel_type,))
-            today_avg = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT AVG(price) FROM price_history
-                WHERE fuel_type = %s
-                  AND recorded_at >= date_trunc('year', NOW())
-                  AND price IS NOT NULL AND price >= 80 AND price <= 350
-            """, (fuel_type,))
-            ytd_avg = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT AVG(price) FROM price_history
-                WHERE fuel_type = %s
-                  AND recorded_at >= NOW() - INTERVAL '7 days'
-                  AND price IS NOT NULL AND price >= 80 AND price <= 350
-            """, (fuel_type,))
-            seven_day_avg = cur.fetchone()[0]
+            today_avg     = _avg_price_since(cur, sql_fuel, "recorded_at >= NOW() - INTERVAL '24 hours'", octane_filter)
+            ytd_avg       = _avg_price_since(cur, sql_fuel, "recorded_at >= date_trunc('year', NOW())", octane_filter)
+            seven_day_avg = _avg_price_since(cur, sql_fuel, "recorded_at >= NOW() - INTERVAL '7 days'", octane_filter)
 
     today_avg     = round(today_avg,     1) if today_avg     else None
     ytd_avg       = round(ytd_avg,       1) if ytd_avg       else None
