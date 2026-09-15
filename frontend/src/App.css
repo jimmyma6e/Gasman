@@ -715,6 +715,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   padding: 5px 8px; border-radius: 6px; font-size: 0.85rem; outline: none; cursor: pointer; }
 .alert-suppress-select { width: 100%; box-sizing: border-box; padding: 8px 10px; }
 .alert-error { color: var(--red); font-size: 0.82rem; margin-top: 12px; }
+.alert-result { font-size: 0.88rem; line-height: 1.5; padding: 12px 14px; border-radius: 8px; }
+.alert-result-ok { background: rgba(22,163,74,0.1); color: var(--text); }
+.alert-result-warn { background: rgba(220,38,38,0.08); color: var(--text); }
+.alert-result code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
 .alert-modal-actions { margin-top: 20px; margin-bottom: 0; justify-content: flex-end; }
 .alert-submit-btn { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
 .alert-submit-btn:hover { background: var(--accent); opacity: 0.85; }

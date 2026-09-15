@@ -50,6 +50,37 @@ def _describe_trigger(alert: dict) -> str:
     return f"below its {BASELINE_LABELS.get(cfg.get('baseline'), cfg.get('baseline'))}"
 
 
+def _describe_scope(alert: dict) -> str:
+    if alert["scope_type"] == "any":
+        return "any station"
+    if alert["scope_type"] == "cities":
+        return ", ".join(alert["scope_values"] or []) or "no cities selected"
+    n = len(alert["scope_values"] or [])
+    return f"{n} selected station{'s' if n != 1 else ''}"
+
+
+def _describe_fuels(alert: dict) -> str:
+    return ", ".join(FUEL_LABELS.get(f, f) for f in (alert["fuel_types"] or [])) or "no gas types selected"
+
+
+def send_confirmation_email(alert: dict) -> bool:
+    """Sent once, immediately when an alert is created — confirms it's live
+    and doubles as a way to verify SMTP is actually configured correctly
+    without waiting for a real price trigger, which could take a while.
+    """
+    subject = "⛽ GASMAN price alert created"
+    body = (
+        "Your GASMAN price alert is set up and watching:\n\n"
+        f"- Stations: {_describe_scope(alert)}\n"
+        f"- Gas type: {_describe_fuels(alert)}\n"
+        f"- Trigger: {_describe_trigger(alert)}\n"
+        f"- Quiet period after triggering: {alert['suppress_hours']}h\n\n"
+        "Prices are checked roughly every 30 minutes. You'll get another "
+        "email the next time this condition is met."
+    )
+    return send_alert_email(alert["email"], subject, body)
+
+
 def _format_email(alert: dict, hits_by_fuel: dict) -> tuple:
     lines = []
     for fuel_type, hits in hits_by_fuel.items():

@@ -45,6 +45,7 @@ export default function AlertModal({ stationsWithArea, prefilledStation, onClose
   const [suppressHours, setSuppressHours] = useState(24);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
 
   useEffect(() => {
     // /api/cities only returns cities with a station that's reported a
@@ -110,14 +111,46 @@ export default function AlertModal({ stationsWithArea, prefilledStation, onClose
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `HTTP ${res.status}`);
       }
+      const created = await res.json();
       try { localStorage.setItem(EMAIL_STORAGE_KEY, email); } catch { /* storage unavailable — ignore */ }
-      onCreated(email);
-      onClose();
+      // Stay open one more beat to show whether the confirmation email
+      // actually sent — closing immediately (which onCreated triggers, via
+      // App.jsx) would hide the one signal you have for whether SMTP is
+      // even configured, right when it matters most. onCreated fires from
+      // the result screen's "Done" button instead.
+      setResult({ emailSent: !!created.email_sent });
     } catch (err) {
       setError(err.message || "Failed to create alert.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (result) {
+    const finish = () => onCreated(email);
+    return (
+      <div className="modal-overlay" onClick={finish}>
+        <div className="modal alert-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2 className="modal-title">🔔 Alert created</h2>
+            <button type="button" className="modal-close" onClick={finish}>✕</button>
+          </div>
+          {result.emailSent ? (
+            <p className="alert-result alert-result-ok">
+              ✅ Confirmation email sent to <strong>{email}</strong> — check your inbox to confirm it arrived.
+            </p>
+          ) : (
+            <p className="alert-result alert-result-warn">
+              ⚠️ The alert was created, but the confirmation email couldn't be sent. If this keeps happening,
+              double-check <code>SMTP_USER</code> / <code>SMTP_APP_PASSWORD</code> on the server.
+            </p>
+          )}
+          <div className="modal-actions alert-modal-actions">
+            <button type="button" className="btn-modal-action alert-submit-btn" onClick={finish}>Done</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

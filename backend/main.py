@@ -300,10 +300,18 @@ async def create_alert(body: AlertCreate):
         raise HTTPException(status_code=400, detail="fuel_types is required")
     if not body.email or "@" not in body.email:
         raise HTTPException(status_code=400, detail="a valid email is required")
-    return database.create_alert(
+    alert = database.create_alert(
         body.email, body.scope_type, body.scope_values, body.fuel_types,
         body.trigger_type, body.trigger_config, body.suppress_hours,
     )
+    # Confirmation email doubles as an easy way to verify SMTP is actually
+    # configured — failing to send it shouldn't fail alert creation itself.
+    email_sent = False
+    try:
+        email_sent = alert_engine.send_confirmation_email(alert)
+    except Exception:
+        logger.exception("Failed to send alert confirmation email")
+    return {**alert, "email_sent": email_sent}
 
 
 @app.get("/api/alerts")
