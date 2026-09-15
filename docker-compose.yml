@@ -21,6 +21,13 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://gasman:${POSTGRES_PASSWORD:-gasman}@db/gasman
+      # Gmail SMTP for price-alert emails — set these in a `.env` file next
+      # to this compose file (gitignored, never committed). Generate an App
+      # Password at myaccount.google.com/apppasswords; a regular Gmail
+      # password will not work here.
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_APP_PASSWORD: ${SMTP_APP_PASSWORD:-}
+      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-${SMTP_USER:-}}
     depends_on:
       db:
         condition: service_healthy

@@ -10,7 +10,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
+import alerts as alert_engine
 import database
 import gasbuddy_client as gb
 from geocoding import reverse_geocode_city
@@ -87,6 +89,14 @@ async def price_refresh_job() -> None:
         logger.info("price_refresh_job: done — %d stations updated", len(stations))
     except Exception:
         logger.exception("price_refresh_job failed")
+
+    # Check price alerts against whatever prices are now in the DB, whether
+    # this run scraped fresh data above or fell through from an exception —
+    # a transient scrape failure shouldn't also block alert evaluation.
+    try:
+        await alert_engine.run_alert_checks()
+    except Exception:
+        logger.exception("run_alert_checks failed")
 
 
 async def cleanup_job() -> None:
@@ -261,6 +271,63 @@ async def scan_status():
 async def trigger_discovery():
     asyncio.create_task(discovery_job())
     return {"status": "discovery job started"}
+
+
+# ── Price alerts ────────────────────────────────────────────────────────
+
+@app.get("/api/cities")
+async def get_cities():
+    return {"cities": database.get_distinct_cities()}
+
+
+class AlertCreate(BaseModel):
+    email: str
+    scope_type: str            # 'stations' | 'cities' | 'any'
+    scope_values: list[str] = []
+    fuel_types: list[str]
+    trigger_type: str          # 'fixed_price' | 'lowest_over_days' | 'below_baseline'
+    trigger_config: dict
+    suppress_hours: int = 24
+
+
+@app.post("/api/alerts")
+async def create_alert(body: AlertCreate):
+    if body.scope_type not in ("stations", "cities", "any"):
+        raise HTTPException(status_code=400, detail="invalid scope_type")
+    if body.trigger_type not in ("fixed_price", "lowest_over_days", "below_baseline"):
+        raise HTTPException(status_code=400, detail="invalid trigger_type")
+    if not body.fuel_types:
+        raise HTTPException(status_code=400, detail="fuel_types is required")
+    if not body.email or "@" not in body.email:
+        raise HTTPException(status_code=400, detail="a valid email is required")
+    return database.create_alert(
+        body.email, body.scope_type, body.scope_values, body.fuel_types,
+        body.trigger_type, body.trigger_config, body.suppress_hours,
+    )
+
+
+@app.get("/api/alerts")
+async def get_alerts(email: str):
+    return {"alerts": database.list_alerts(email)}
+
+
+@app.delete("/api/alerts/{alert_id}")
+async def remove_alert(alert_id: int, email: str):
+    if not database.delete_alert(alert_id, email):
+        raise HTTPException(status_code=404, detail="alert not found")
+    return {"status": "deleted"}
+
+
+class AlertUpdate(BaseModel):
+    email: str
+    active: bool
+
+
+@app.patch("/api/alerts/{alert_id}")
+async def update_alert(alert_id: int, body: AlertUpdate):
+    if not database.set_alert_active(alert_id, body.email, body.active):
+        raise HTTPException(status_code=404, detail="alert not found")
+    return {"status": "updated"}
 
 
 # Public, API-key-authenticated v1 API — isolated sub-app with its own

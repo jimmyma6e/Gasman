@@ -133,6 +133,21 @@ def init_db():
                     last_used_at  TIMESTAMPTZ
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS price_alerts (
+                    id              SERIAL PRIMARY KEY,
+                    email           TEXT NOT NULL,
+                    scope_type      TEXT NOT NULL,              -- 'stations' | 'cities' | 'any'
+                    scope_values    JSONB NOT NULL DEFAULT '[]', -- station_ids or city names
+                    fuel_types      JSONB NOT NULL DEFAULT '[]', -- e.g. ["regular_gas","diesel"]
+                    trigger_type    TEXT NOT NULL,               -- 'fixed_price' | 'lowest_over_days' | 'below_baseline'
+                    trigger_config  JSONB NOT NULL DEFAULT '{}',
+                    suppress_hours  INTEGER NOT NULL DEFAULT 24,
+                    active          BOOLEAN NOT NULL DEFAULT TRUE,
+                    last_triggered_at TIMESTAMPTZ,
+                    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
 
 
 def upsert_stations(stations: list) -> None:
@@ -549,4 +564,173 @@ def get_station_history(station_id: str, hours: int = 24) -> list:
                   AND price IS NOT NULL AND price >= 80 AND price <= 350
                 ORDER BY recorded_at ASC
             """, (station_id, hours))
+            return [dict(r) for r in cur.fetchall()]
+
+
+# ── Price alerts ──────────────────────────────────────────────────────────
+
+def get_distinct_cities() -> list:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT city FROM stations WHERE city IS NOT NULL ORDER BY city")
+            return [r[0] for r in cur.fetchall()]
+
+
+def get_station_ids_for_cities(cities: list) -> list:
+    if not cities:
+        return []
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT station_id FROM stations WHERE city = ANY(%s)", (cities,))
+            return [r[0] for r in cur.fetchall()]
+
+
+def create_alert(email: str, scope_type: str, scope_values: list, fuel_types: list,
+                  trigger_type: str, trigger_config: dict, suppress_hours: int) -> dict:
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO price_alerts
+                    (email, scope_type, scope_values, fuel_types, trigger_type, trigger_config, suppress_hours)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING *
+            """, (
+                email, scope_type, psycopg2.extras.Json(scope_values), psycopg2.extras.Json(fuel_types),
+                trigger_type, psycopg2.extras.Json(trigger_config), suppress_hours,
+            ))
+            return dict(cur.fetchone())
+
+
+def list_alerts(email: str) -> list:
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM price_alerts WHERE email = %s ORDER BY created_at DESC", (email,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def delete_alert(alert_id: int, email: str) -> bool:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM price_alerts WHERE id = %s AND email = %s", (alert_id, email))
+            return cur.rowcount > 0
+
+
+def set_alert_active(alert_id: int, email: str, active: bool) -> bool:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE price_alerts SET active = %s WHERE id = %s AND email = %s",
+                (active, alert_id, email),
+            )
+            return cur.rowcount > 0
+
+
+def get_evaluable_alerts() -> list:
+    """Active alerts that aren't currently suppressed by their own cooldown."""
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT * FROM price_alerts
+                WHERE active = TRUE
+                  AND (last_triggered_at IS NULL
+                       OR last_triggered_at <= NOW() - (suppress_hours * INTERVAL '1 hour'))
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def mark_alert_triggered(alert_id: int) -> None:
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE price_alerts SET last_triggered_at = NOW() WHERE id = %s", (alert_id,))
+
+
+# station_ids=None means "no scope filter" (alert scope = 'any').
+_STATION_FILTER_SQL = "(%(station_ids)s::text[] IS NULL OR station_id = ANY(%(station_ids)s))"
+
+
+def find_fixed_price_hits(station_ids: list | None, fuel_type: str, threshold: float) -> list:
+    """Stations whose latest price (within the last 2h) is at or below `threshold`."""
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                SELECT DISTINCT ON (station_id) station_id, name, price, recorded_at
+                FROM price_history
+                WHERE fuel_type = %(fuel_type)s
+                  AND {_STATION_FILTER_SQL}
+                  AND price IS NOT NULL AND price >= 80 AND price <= 350
+                  AND recorded_at >= NOW() - INTERVAL '2 hours'
+                  AND price <= %(threshold)s
+                ORDER BY station_id, recorded_at DESC
+            """, {"fuel_type": fuel_type, "station_ids": station_ids, "threshold": threshold})
+            return [dict(r) for r in cur.fetchall()]
+
+
+def find_new_low_hits(station_ids: list | None, fuel_type: str, days: int) -> list:
+    """Stations whose latest price ties or beats their own min over the last `days` days."""
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                WITH latest AS (
+                    SELECT DISTINCT ON (station_id) station_id, name, price, recorded_at
+                    FROM price_history
+                    WHERE fuel_type = %(fuel_type)s
+                      AND {_STATION_FILTER_SQL}
+                      AND price IS NOT NULL AND price >= 80 AND price <= 350
+                      AND recorded_at >= NOW() - INTERVAL '2 hours'
+                    ORDER BY station_id, recorded_at DESC
+                ),
+                mins AS (
+                    SELECT station_id, MIN(price) AS min_price
+                    FROM price_history
+                    WHERE fuel_type = %(fuel_type)s
+                      AND {_STATION_FILTER_SQL}
+                      AND recorded_at >= NOW() - make_interval(days => %(days)s)
+                      AND price IS NOT NULL AND price >= 80 AND price <= 350
+                    GROUP BY station_id
+                )
+                SELECT latest.station_id, latest.name, latest.price, latest.recorded_at, mins.min_price
+                FROM latest JOIN mins USING (station_id)
+                WHERE latest.price <= mins.min_price
+            """, {"fuel_type": fuel_type, "station_ids": station_ids, "days": days})
+            return [dict(r) for r in cur.fetchall()]
+
+
+# Fixed SQL fragments (not user input) selecting the comparison window for
+# the "below baseline" trigger — mirrors the ytd/2d/3d framing already used
+# elsewhere (get_ytd_vs_today, PriceChart's vs-avg row).
+_BASELINE_SINCE = {
+    "ytd": "date_trunc('year', NOW())",
+    "2d":  "NOW() - INTERVAL '2 days'",
+    "3d":  "NOW() - INTERVAL '3 days'",
+}
+
+
+def find_below_baseline_hits(station_ids: list | None, fuel_type: str, baseline: str) -> list:
+    """Stations whose latest price is below their own ytd/2-day/3-day average."""
+    since_expr = _BASELINE_SINCE.get(baseline, _BASELINE_SINCE["3d"])
+    with _conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                WITH latest AS (
+                    SELECT DISTINCT ON (station_id) station_id, name, price, recorded_at
+                    FROM price_history
+                    WHERE fuel_type = %(fuel_type)s
+                      AND {_STATION_FILTER_SQL}
+                      AND price IS NOT NULL AND price >= 80 AND price <= 350
+                      AND recorded_at >= NOW() - INTERVAL '2 hours'
+                    ORDER BY station_id, recorded_at DESC
+                ),
+                baselines AS (
+                    SELECT station_id, AVG(price) AS baseline_avg
+                    FROM price_history
+                    WHERE fuel_type = %(fuel_type)s
+                      AND {_STATION_FILTER_SQL}
+                      AND recorded_at >= {since_expr}
+                      AND price IS NOT NULL AND price >= 80 AND price <= 350
+                    GROUP BY station_id
+                )
+                SELECT latest.station_id, latest.name, latest.price, latest.recorded_at, baselines.baseline_avg
+                FROM latest JOIN baselines USING (station_id)
+                WHERE latest.price < baselines.baseline_avg
+            """, {"fuel_type": fuel_type, "station_ids": station_ids})
             return [dict(r) for r in cur.fetchall()]

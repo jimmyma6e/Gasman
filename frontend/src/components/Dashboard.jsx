@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { CREDIT_CARDS } from "../creditCards.js";
 import { useBodyScrollLock } from "../useBodyScrollLock.js";
 import { FUEL_TYPES } from "../fuelTypes.js";
+import AlertModal from "./AlertModal.jsx";
 
 async function nominatimSearch(q) {
   const url =
@@ -655,6 +656,50 @@ export function ProfileModal({ onClose }) {
   );
 }
 
+// ── Price Alerts section ──────────────────────────────────────────────────────
+
+const BASELINE_LABELS = { ytd: "YTD avg", "2d": "2-day avg", "3d": "3-day avg" };
+
+function describeAlertScope(alert) {
+  if (alert.scope_type === "any") return "Any station";
+  if (alert.scope_type === "cities") return alert.scope_values.join(", ");
+  return `${alert.scope_values.length} station${alert.scope_values.length !== 1 ? "s" : ""}`;
+}
+
+function describeAlertFuels(alert) {
+  return (alert.fuel_types || []).map((k) => FUEL_TYPES.find((f) => f.key === k)?.label || k).join(", ");
+}
+
+function describeAlertTrigger(alert) {
+  const cfg = alert.trigger_config || {};
+  if (alert.trigger_type === "fixed_price") return `Price ≤ ${cfg.price}¢/L`;
+  if (alert.trigger_type === "lowest_over_days") return `New low over ${cfg.days}d`;
+  return `Below ${BASELINE_LABELS[cfg.baseline] || cfg.baseline}`;
+}
+
+function AlertRow({ alert, onDelete, onToggle }) {
+  return (
+    <div className="alert-row">
+      <div className="alert-row-info">
+        <div className="alert-row-title">{describeAlertScope(alert)} · {describeAlertFuels(alert)}</div>
+        <div className="alert-row-sub">
+          {describeAlertTrigger(alert)} · quiet for {alert.suppress_hours}h
+          {alert.last_triggered_at ? ` · last sent ${timeAgo(alert.last_triggered_at)}` : ""}
+        </div>
+      </div>
+      <div className="alert-row-actions">
+        <button
+          className={`alert-toggle-btn ${alert.active ? "alert-toggle-active" : ""}`}
+          onClick={() => onToggle(alert.id, !alert.active)}
+        >
+          {alert.active ? "Active" : "Paused"}
+        </button>
+        <button className="btn-delete-snapshot" onClick={() => onDelete(alert.id)} title="Remove alert">×</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard({
@@ -664,6 +709,38 @@ export default function Dashboard({
   fillups = [], onDeleteFillup,
 }) {
   const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
+
+  // Price alerts — no account system, so nothing is persisted in the
+  // browser; the email you type is only kept in memory for this page visit
+  // so the list can refresh after you create/change an alert. Reload the
+  // page (or use "View my alerts") to look them up again by email.
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertEmail, setAlertEmail] = useState("");
+  const [alertLookupInput, setAlertLookupInput] = useState("");
+  const [alerts, setAlerts] = useState([]);
+
+  const refreshAlerts = (email) => {
+    if (!email) return;
+    fetch(`/api/alerts?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((d) => setAlerts(d.alerts || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => { if (alertEmail) refreshAlerts(alertEmail); }, [alertEmail]);
+
+  const handleAlertCreated = (email) => { setAlertEmail(email); };
+  const handleDeleteAlert = (id) => {
+    fetch(`/api/alerts/${id}?email=${encodeURIComponent(alertEmail)}`, { method: "DELETE" })
+      .then(() => refreshAlerts(alertEmail));
+  };
+  const handleToggleAlert = (id, active) => {
+    fetch(`/api/alerts/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: alertEmail, active }),
+    }).then(() => refreshAlerts(alertEmail));
+  };
 
   // Savings stats from fill-up log
   const now = new Date();
@@ -784,6 +861,53 @@ export default function Dashboard({
           </div>
         )}
       </div>
+
+      {/* ── Price Alerts ── */}
+      <div>
+        <div className="dashboard-section-header">
+          <div className="dashboard-section-title">
+            🔔 Price Alerts
+            {alerts.length > 0 && <span className="tab-badge">{alerts.length}</span>}
+          </div>
+          <button className="btn-section-nav" onClick={() => setShowAlertModal(true)}>+ New Alert</button>
+        </div>
+
+        {alertEmail ? (
+          alerts.length === 0 ? (
+            <p className="dashboard-empty">No alerts yet for {alertEmail}.</p>
+          ) : (
+            <div className="alert-list">
+              {alerts.map((a) => (
+                <AlertRow key={a.id} alert={a} onDelete={handleDeleteAlert} onToggle={handleToggleAlert} />
+              ))}
+            </div>
+          )
+        ) : (
+          <div className="alert-lookup-row">
+            <p className="dashboard-empty" style={{ padding: 0 }}>
+              Create an alert, or look up ones you already have:
+            </p>
+            <form
+              className="alert-lookup-form"
+              onSubmit={(e) => { e.preventDefault(); if (alertLookupInput.includes("@")) setAlertEmail(alertLookupInput); }}
+            >
+              <input
+                type="email" className="alert-text-input" placeholder="you@example.com"
+                value={alertLookupInput} onChange={(e) => setAlertLookupInput(e.target.value)}
+              />
+              <button type="submit" className="btn-section-nav">View my alerts</button>
+            </form>
+          </div>
+        )}
+      </div>
+
+      {showAlertModal && (
+        <AlertModal
+          stationsWithArea={stationsWithArea}
+          onClose={() => setShowAlertModal(false)}
+          onCreated={handleAlertCreated}
+        />
+      )}
 
     </div>
   );
