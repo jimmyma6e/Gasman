@@ -4,11 +4,17 @@ the owner once per match batch when a trigger condition is met.
 """
 
 import logging
+import os
 
 import database
 from email_alerts import send_alert_email
 
 logger = logging.getLogger(__name__)
+
+# Linked from every alert email so the reader lands on live, current data
+# instead of trusting numbers that may already be stale by the time they
+# read the email.
+SITE_URL = os.environ.get("SITE_URL", "https://gasman.sportsup.ca")
 
 FUEL_LABELS = {
     "regular_gas":  "Regular (87)",
@@ -76,23 +82,26 @@ def send_confirmation_email(alert: dict) -> bool:
         f"- Trigger: {_describe_trigger(alert)}\n"
         f"- Quiet period after triggering: {alert['suppress_hours']}h\n\n"
         "Prices are checked roughly every 30 minutes. You'll get another "
-        "email the next time this condition is met."
+        "email the next time this condition is met.\n\n"
+        f"View it anytime: {SITE_URL}"
     )
     return send_alert_email(alert["email"], subject, body)
 
 
 def _format_email(alert: dict, hits_by_fuel: dict) -> tuple:
-    lines = []
-    for fuel_type, hits in hits_by_fuel.items():
-        label = FUEL_LABELS.get(fuel_type, fuel_type)
-        for h in hits:
-            lines.append(f"- {h['name']} ({label}): {h['price']:.1f}¢/L")
-    match_count = len(lines)
+    all_hits = [(fuel_type, h) for fuel_type, hits in hits_by_fuel.items() for h in hits]
+    match_count = len(all_hits)
+    best_fuel, best = min(all_hits, key=lambda item: item[1]["price"])
+    best_label = FUEL_LABELS.get(best_fuel, best_fuel)
+    others = match_count - 1
+
     subject = f"⛽ GASMAN price alert — {match_count} match{'es' if match_count != 1 else ''}"
     body = (
-        f"Your GASMAN price alert triggered ({_describe_trigger(alert)}):\n\n"
-        + "\n".join(lines)
-        + "\n\nOpen GASMAN to see details."
+        f"Your GASMAN price alert triggered ({_describe_trigger(alert)}).\n\n"
+        f"Best match: {best['name']} ({best_label}) at {best['price']:.1f}¢/L"
+        + (f", plus {others} more match{'es' if others != 1 else ''}" if others > 0 else "")
+        + f".\n\nSee current prices: {SITE_URL}\n\n"
+        f"We'll stay quiet for {alert['suppress_hours']}h before checking again."
     )
     return subject, body
 

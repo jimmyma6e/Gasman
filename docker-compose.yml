@@ -28,6 +28,10 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_APP_PASSWORD: ${SMTP_APP_PASSWORD:-}
       ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-${SMTP_USER:-}}
+      # Display name only — Gmail still requires the underlying address
+      # above to be the authenticated account or a verified "Send mail as"
+      # alias, so this doesn't need any Gmail-side setup.
+      ALERT_FROM_NAME: ${ALERT_FROM_NAME:-GASMAN Alerts}
     depends_on:
       db:
         condition: service_healthy
