@@ -6,6 +6,7 @@ the owner once per match batch when a trigger condition is met.
 import logging
 import os
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 import database
 from email_alerts import send_alert_email
@@ -48,6 +49,12 @@ def _time_ago(dt) -> str:
 
 def _station_link(station_id: str) -> str:
     return f"{SITE_URL}/?station={station_id}"
+
+
+def _deactivate_link(alert: dict) -> str:
+    # A GET link so it works as a plain click from an email — the backend
+    # serves an actual confirmation page at this URL, not JSON.
+    return f"{SITE_URL}/api/alerts/{alert['id']}/deactivate?email={quote(alert['email'])}"
 
 
 def _resolve_station_ids(alert: dict):
@@ -107,7 +114,8 @@ def send_confirmation_email(alert: dict) -> bool:
         f"- Quiet period after triggering: {alert['suppress_hours']}h\n\n"
         "Prices are checked roughly every 30 minutes. You'll get another "
         "email the next time this condition is met.\n\n"
-        f"View it anytime: {SITE_URL}"
+        f"View it anytime: {SITE_URL}\n\n"
+        f"Don't want this alert? Deactivate it: {_deactivate_link(alert)}"
     )
     return send_alert_email(alert["email"], subject, body)
 
@@ -135,7 +143,8 @@ def _format_email(alert: dict, hits_by_fuel: dict) -> tuple:
         f"Best match: {best['name']} ({best_label}) at {best['price']:.1f}¢/L:\n\n"
         + "\n".join(lines)
         + f"\n\nSee current prices: {SITE_URL}\n\n"
-        f"We'll stay quiet for {alert['suppress_hours']}h before checking again."
+        f"We'll stay quiet for {alert['suppress_hours']}h before checking again.\n\n"
+        f"Don't want this alert anymore? Deactivate it: {_deactivate_link(alert)}"
     )
     return subject, body
 

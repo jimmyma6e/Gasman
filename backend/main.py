@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 import alerts as alert_engine
@@ -336,6 +336,41 @@ async def update_alert(alert_id: int, body: AlertUpdate):
     if not database.set_alert_active(alert_id, body.email, body.active):
         raise HTTPException(status_code=404, detail="alert not found")
     return {"status": "updated"}
+
+
+_DEACTIVATE_PAGE = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          max-width: 420px; margin: 80px auto; padding: 0 20px; color: #1e293b; text-align: center; }}
+  a {{ color: #f97316; }}
+</style></head><body>
+<h2>{heading}</h2>
+<p>{message}</p>
+<p><a href="{site_url}">Open GASMAN</a></p>
+</body></html>"""
+
+
+# GET (not DELETE/PATCH) so this works as a plain link clicked from an email
+# — no ownership check beyond the id/email pair, same trust level as the
+# rest of the alerts API in this personal-use app.
+@app.get("/api/alerts/{alert_id}/deactivate", response_class=HTMLResponse)
+async def deactivate_alert_link(alert_id: int, email: str):
+    ok = database.set_alert_active(alert_id, email, False)
+    if ok:
+        html = _DEACTIVATE_PAGE.format(
+            title="Alert deactivated", heading="🔔 Alert deactivated",
+            message="You won't get any more emails for this alert.",
+            site_url=alert_engine.SITE_URL,
+        )
+    else:
+        html = _DEACTIVATE_PAGE.format(
+            title="Alert not found", heading="Couldn't find that alert",
+            message="It may already be deactivated or removed.",
+            site_url=alert_engine.SITE_URL,
+        )
+    return HTMLResponse(html)
 
 
 # Public, API-key-authenticated v1 API — isolated sub-app with its own
