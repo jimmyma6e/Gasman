@@ -697,18 +697,9 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* ── Hero promo cards ── */}
-      <div className="dash-hero-row">
-        <div className="dash-hero-card dash-hero-route" onClick={() => onNavigate("route")}>
-          <div className="dash-hero-left">
-            <div className="dash-hero-title">🗺️ Route Finder</div>
-            <div className="dash-hero-sub">Cheapest gas along your drive</div>
-          </div>
-          <button className="dash-hero-cta" onClick={(e) => { e.stopPropagation(); onNavigate("route"); }}>
-            Start →
-          </button>
-        </div>
-        {favStations.length === 0 && (
+      {/* ── Hero promo card ── */}
+      {favStations.length === 0 && (
+        <div className="dash-hero-row">
           <div className="dash-hero-card dash-hero-fav" onClick={() => onNavigate("all")}>
             <div className="dash-hero-left">
               <div className="dash-hero-title">⭐ Add your fav gas station</div>
@@ -718,8 +709,8 @@ export default function Dashboard({
               Browse →
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Saved Routes ── */}
       <div>

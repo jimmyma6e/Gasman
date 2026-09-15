@@ -881,7 +881,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 .route-save-input:focus { border-color: var(--accent); }
 
-/* ── Dashboard hero promo cards (Route Finder / Add fav station) ── */
+/* ── Dashboard hero promo card (Add fav station) ── */
 .dash-hero-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .dash-hero-card {
   flex: 1; min-width: 220px; border-radius: var(--radius); padding: 12px 16px; border: 1.5px solid transparent;
@@ -896,9 +896,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   cursor: pointer; transition: opacity 0.15s; flex-shrink: 0; white-space: nowrap;
 }
 .dash-hero-cta:hover { opacity: 0.85; }
-.dash-hero-route { background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.04)); border-color: rgba(249,115,22,0.35); }
-.dash-hero-route:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
-.dash-hero-route .dash-hero-cta { background: var(--accent); color: #000; }
 .dash-hero-fav { background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04)); border-color: rgba(59,130,246,0.35); }
 .dash-hero-fav:hover { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 .dash-hero-fav .dash-hero-cta { background: #3b82f6; color: #fff; }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot,
 } from "recharts";
 import { haversineKm } from "../geo.js";
 
@@ -95,9 +95,24 @@ export default function InsightsPanel({ trend, userCoords, variant = "home" }) {
     .filter((p) => new Date(p.date).getTime() >= cutoff)
     .map((p) => ({ ...p, label: new Date(p.date).toLocaleDateString([], { month: "short", day: "numeric" }) }));
 
+  // The daily series can lag a bit behind "right now" (today's bucket only
+  // fills in as scans come in), so its last checkpoint may not match the
+  // live "avg today" shown on the tile above. Append that live figure as
+  // the chart's final point when the series hasn't caught up to today yet,
+  // and mark it as the "Now" reference dot either way.
+  const todayLabel = new Date().toLocaleDateString([], { month: "short", day: "numeric" });
+  const currentAvg = selectedArea
+    ? areas.find((a) => a.area === selectedArea)?.avg_today ?? null
+    : selectedData?.ytd_vs_today?.today_avg ?? null;
+  const lastSeriesPoint = chartData[chartData.length - 1];
+  const fullChartData = (currentAvg != null && lastSeriesPoint?.label !== todayLabel)
+    ? [...chartData, { label: todayLabel, avg_price: currentAvg }]
+    : chartData;
+  const nowPoint = fullChartData[fullChartData.length - 1] ?? null;
+
   // Reference lines for the selected range, so the trend line reads against
   // its own average/high/low instead of needing to eyeball the axis.
-  const rangePrices = chartData.map((p) => p.avg_price).filter((v) => v != null);
+  const rangePrices = fullChartData.map((p) => p.avg_price).filter((v) => v != null);
   const avgPrice = rangePrices.length ? rangePrices.reduce((s, v) => s + v, 0) / rangePrices.length : null;
   const minPrice = rangePrices.length ? Math.min(...rangePrices) : null;
   const maxPrice = rangePrices.length ? Math.max(...rangePrices) : null;
@@ -169,11 +184,11 @@ export default function InsightsPanel({ trend, userCoords, variant = "home" }) {
         </div>
         {series === null ? (
           <div className="chart-state"><div className="spinner" /></div>
-        ) : chartData.length === 0 ? (
+        ) : fullChartData.length === 0 ? (
           <div className="chart-state"><p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>No history yet.</p></div>
         ) : (
           <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <LineChart data={fullChartData} margin={{ top: 8, right: 30, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2e3245" />
               <XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis domain={["auto", "auto"]} tick={{ fill: "#94a3b8", fontSize: 10 }} width={40} tickFormatter={(v) => v.toFixed(0)} />
@@ -191,6 +206,10 @@ export default function InsightsPanel({ trend, userCoords, variant = "home" }) {
                   label={{ value: `Low ${minPrice.toFixed(1)}`, position: "insideBottomLeft", fill: "#16a34a", fontSize: 10 }} />
               )}
               <Line type="monotone" dataKey="avg_price" stroke="#f97316" strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: "#f97316" }} />
+              {nowPoint && (
+                <ReferenceDot x={nowPoint.label} y={nowPoint.avg_price} r={5} fill="#f97316" stroke="#fff" strokeWidth={2}
+                  label={{ value: `Now ${nowPoint.avg_price.toFixed(1)}`, position: "top", textAnchor: "end", dx: 6, dy: -2, fill: "#f97316", fontSize: 10, fontWeight: 700 }} />
+              )}
             </LineChart>
           </ResponsiveContainer>
         )}
