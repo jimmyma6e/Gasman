@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { CREDIT_CARDS } from "../creditCards.js";
 import { useBodyScrollLock } from "../useBodyScrollLock.js";
 import { FUEL_TYPES } from "../fuelTypes.js";
-import AlertModal from "./AlertModal.jsx";
+
+const ALERT_EMAIL_STORAGE_KEY = "gasman-alert-email";
 
 async function nominatimSearch(q) {
   const url =
@@ -706,16 +707,14 @@ export default function Dashboard({
   snapshots, savedRoutes, stationsWithArea,
   favourites, activeFuel, cheapestPrices, onToggleFavourite,
   onDeleteSnapshot, onDeleteRoute, onLaunchRoute, onNavigate,
-  fillups = [], onDeleteFillup,
+  fillups = [], onDeleteFillup, onNewAlert, alertsRefreshSignal,
 }) {
   const favStations = stationsWithArea.filter((s) => favourites.includes(s.station_id));
 
-  // Price alerts — no account system, so nothing is persisted in the
-  // browser; the email you type is only kept in memory for this page visit
-  // so the list can refresh after you create/change an alert. Reload the
-  // page (or use "View my alerts") to look them up again by email.
-  const [showAlertModal, setShowAlertModal] = useState(false);
-  const [alertEmail, setAlertEmail] = useState("");
+  // Price alerts — no account system, so the email is remembered in
+  // localStorage (same key AlertModal writes to on create) purely as a
+  // convenience so you don't have to retype it to see your own alerts again.
+  const [alertEmail, setAlertEmail] = useState(() => localStorage.getItem(ALERT_EMAIL_STORAGE_KEY) || "");
   const [alertLookupInput, setAlertLookupInput] = useState("");
   const [alerts, setAlerts] = useState([]);
 
@@ -729,7 +728,24 @@ export default function Dashboard({
 
   useEffect(() => { if (alertEmail) refreshAlerts(alertEmail); }, [alertEmail]);
 
-  const handleAlertCreated = (email) => { setAlertEmail(email); };
+  // The "New Alert" entry points at the header and on each station card
+  // create alerts through a modal that lives outside this component (so
+  // it's reachable from any tab) — when one of those fires, App bumps
+  // alertsRefreshSignal so this already-mounted Dashboard picks up the
+  // change instead of only showing it after the next remount/reload.
+  useEffect(() => {
+    if (alertsRefreshSignal == null) return;
+    const stored = localStorage.getItem(ALERT_EMAIL_STORAGE_KEY);
+    if (stored) {
+      setAlertEmail(stored);
+      refreshAlerts(stored);
+    }
+  }, [alertsRefreshSignal]);
+
+  const rememberAlertEmail = (email) => {
+    setAlertEmail(email);
+    try { localStorage.setItem(ALERT_EMAIL_STORAGE_KEY, email); } catch { /* storage unavailable — ignore */ }
+  };
   const handleDeleteAlert = (id) => {
     fetch(`/api/alerts/${id}?email=${encodeURIComponent(alertEmail)}`, { method: "DELETE" })
       .then(() => refreshAlerts(alertEmail));
@@ -774,20 +790,44 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* ── Hero promo card ── */}
-      {favStations.length === 0 && (
-        <div className="dash-hero-row">
-          <div className="dash-hero-card dash-hero-fav" onClick={() => onNavigate("all")}>
-            <div className="dash-hero-left">
-              <div className="dash-hero-title">⭐ Add your fav gas station</div>
-              <div className="dash-hero-sub">Pin your regular stops for quick access</div>
-            </div>
-            <button className="dash-hero-cta" onClick={(e) => { e.stopPropagation(); onNavigate("all"); }}>
-              Browse →
-            </button>
+      {/* ── Price Alerts ── */}
+      <div>
+        <div className="dashboard-section-header">
+          <div className="dashboard-section-title">
+            🔔 Price Alerts
+            {alerts.length > 0 && <span className="tab-badge">{alerts.length}</span>}
           </div>
+          <button className="btn-section-nav" onClick={onNewAlert}>+ New Alert</button>
         </div>
-      )}
+
+        {alertEmail ? (
+          alerts.length === 0 ? (
+            <p className="dashboard-empty">No alerts yet for {alertEmail}.</p>
+          ) : (
+            <div className="alert-list">
+              {alerts.map((a) => (
+                <AlertRow key={a.id} alert={a} onDelete={handleDeleteAlert} onToggle={handleToggleAlert} />
+              ))}
+            </div>
+          )
+        ) : (
+          <div className="alert-lookup-row">
+            <p className="dashboard-empty" style={{ padding: 0 }}>
+              Create an alert, or look up ones you already have:
+            </p>
+            <form
+              className="alert-lookup-form"
+              onSubmit={(e) => { e.preventDefault(); if (alertLookupInput.includes("@")) rememberAlertEmail(alertLookupInput); }}
+            >
+              <input
+                type="email" className="alert-text-input" placeholder="you@example.com"
+                value={alertLookupInput} onChange={(e) => setAlertLookupInput(e.target.value)}
+              />
+              <button type="submit" className="btn-section-nav">View my alerts</button>
+            </form>
+          </div>
+        )}
+      </div>
 
       {/* ── Saved Routes ── */}
       <div>
@@ -861,53 +901,6 @@ export default function Dashboard({
           </div>
         )}
       </div>
-
-      {/* ── Price Alerts ── */}
-      <div>
-        <div className="dashboard-section-header">
-          <div className="dashboard-section-title">
-            🔔 Price Alerts
-            {alerts.length > 0 && <span className="tab-badge">{alerts.length}</span>}
-          </div>
-          <button className="btn-section-nav" onClick={() => setShowAlertModal(true)}>+ New Alert</button>
-        </div>
-
-        {alertEmail ? (
-          alerts.length === 0 ? (
-            <p className="dashboard-empty">No alerts yet for {alertEmail}.</p>
-          ) : (
-            <div className="alert-list">
-              {alerts.map((a) => (
-                <AlertRow key={a.id} alert={a} onDelete={handleDeleteAlert} onToggle={handleToggleAlert} />
-              ))}
-            </div>
-          )
-        ) : (
-          <div className="alert-lookup-row">
-            <p className="dashboard-empty" style={{ padding: 0 }}>
-              Create an alert, or look up ones you already have:
-            </p>
-            <form
-              className="alert-lookup-form"
-              onSubmit={(e) => { e.preventDefault(); if (alertLookupInput.includes("@")) setAlertEmail(alertLookupInput); }}
-            >
-              <input
-                type="email" className="alert-text-input" placeholder="you@example.com"
-                value={alertLookupInput} onChange={(e) => setAlertLookupInput(e.target.value)}
-              />
-              <button type="submit" className="btn-section-nav">View my alerts</button>
-            </form>
-          </div>
-        )}
-      </div>
-
-      {showAlertModal && (
-        <AlertModal
-          stationsWithArea={stationsWithArea}
-          onClose={() => setShowAlertModal(false)}
-          onCreated={handleAlertCreated}
-        />
-      )}
 
     </div>
   );

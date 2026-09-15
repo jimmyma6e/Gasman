@@ -17,21 +17,26 @@ const BASELINE_OPTIONS = [
   { label: "3-day average",        value: "3d" },
 ];
 
+const EMAIL_STORAGE_KEY = "gasman-alert-email";
+
 function toggleSetValue(set, value) {
   const next = new Set(set);
   next.has(value) ? next.delete(value) : next.add(value);
   return next;
 }
 
-export default function AlertModal({ stationsWithArea, onClose, onCreated }) {
+export default function AlertModal({ stationsWithArea, prefilledStation, onClose, onCreated }) {
   useBodyScrollLock();
 
-  const [email, setEmail] = useState("");
-  const [scopeType, setScopeType] = useState("any");
+  const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_STORAGE_KEY) || "");
+  const [scopeType, setScopeType] = useState(prefilledStation ? "stations" : "any");
   const [cities, setCities] = useState([]);
+  const [citySearch, setCitySearch] = useState("");
   const [selectedCities, setSelectedCities] = useState(new Set());
   const [stationSearch, setStationSearch] = useState("");
-  const [selectedStations, setSelectedStations] = useState(new Set());
+  const [selectedStations, setSelectedStations] = useState(
+    () => new Set(prefilledStation ? [prefilledStation.station_id] : [])
+  );
   const [fuelTypes, setFuelTypes] = useState(new Set());
   const [triggerType, setTriggerType] = useState("fixed_price");
   const [fixedPrice, setFixedPrice] = useState("");
@@ -42,13 +47,25 @@ export default function AlertModal({ stationsWithArea, onClose, onCreated }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // /api/cities only returns cities with a station that's reported a
+    // price recently — no point offering a city that has nothing to alert on.
     fetch("/api/cities").then((r) => r.json()).then((d) => setCities(d.cities || [])).catch(() => {});
   }, []);
+
+  const filteredCities = useMemo(() => {
+    const q = citySearch.trim().toLowerCase();
+    return q ? cities.filter((c) => c.toLowerCase().includes(q)) : cities;
+  }, [citySearch, cities]);
 
   const filteredStations = useMemo(() => {
     const q = stationSearch.trim().toLowerCase();
     const list = q
-      ? stationsWithArea.filter((s) => s.name?.toLowerCase().includes(q) || s.address?.toLowerCase().includes(q))
+      ? stationsWithArea.filter((s) =>
+          s.name?.toLowerCase().includes(q) ||
+          s.address?.toLowerCase().includes(q) ||
+          s._area?.toLowerCase().includes(q) ||
+          s.city?.toLowerCase().includes(q)
+        )
       : stationsWithArea;
     return list.slice(0, 40);
   }, [stationSearch, stationsWithArea]);
@@ -93,6 +110,7 @@ export default function AlertModal({ stationsWithArea, onClose, onCreated }) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `HTTP ${res.status}`);
       }
+      try { localStorage.setItem(EMAIL_STORAGE_KEY, email); } catch { /* storage unavailable — ignore */ }
       onCreated(email);
       onClose();
     } catch (err) {
@@ -110,6 +128,10 @@ export default function AlertModal({ stationsWithArea, onClose, onCreated }) {
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
 
+        {prefilledStation && (
+          <p className="alert-prefill-note">For <strong>{prefilledStation.name}</strong> — change scope below to widen it.</p>
+        )}
+
         <label className="alert-field-label">Email me at</label>
         <input
           type="email" className="alert-text-input" placeholder="you@example.com"
@@ -124,23 +146,32 @@ export default function AlertModal({ stationsWithArea, onClose, onCreated }) {
         </div>
 
         {scopeType === "cities" && (
-          <div className="alert-chip-picker">
-            {cities.length === 0 && <p className="alert-picker-empty">Loading cities…</p>}
-            {cities.map((city) => (
-              <button type="button" key={city}
-                className={`alert-chip ${selectedCities.has(city) ? "alert-chip-active" : ""}`}
-                onClick={() => setSelectedCities((prev) => toggleSetValue(prev, city))}
-              >
-                {city}
-              </button>
-            ))}
+          <div className="alert-station-picker">
+            <input
+              type="text" className="alert-text-input" placeholder="Search cities…"
+              value={citySearch} onChange={(e) => setCitySearch(e.target.value)}
+            />
+            <div className="alert-station-list">
+              {cities.length === 0 && <p className="alert-picker-empty">Loading cities…</p>}
+              {cities.length > 0 && filteredCities.length === 0 && <p className="alert-picker-empty">No cities match.</p>}
+              {filteredCities.map((city) => (
+                <label key={city} className="alert-station-row">
+                  <input
+                    type="checkbox" checked={selectedCities.has(city)}
+                    onChange={() => setSelectedCities((prev) => toggleSetValue(prev, city))}
+                  />
+                  <span className="alert-station-name">{city}</span>
+                </label>
+              ))}
+            </div>
+            {selectedCities.size > 0 && <p className="alert-picker-count">{selectedCities.size} selected</p>}
           </div>
         )}
 
         {scopeType === "stations" && (
           <div className="alert-station-picker">
             <input
-              type="text" className="alert-text-input" placeholder="Search stations…"
+              type="text" className="alert-text-input" placeholder="Search by name, address, or city…"
               value={stationSearch} onChange={(e) => setStationSearch(e.target.value)}
             />
             <div className="alert-station-list">
@@ -151,7 +182,7 @@ export default function AlertModal({ stationsWithArea, onClose, onCreated }) {
                     onChange={() => setSelectedStations((prev) => toggleSetValue(prev, s.station_id))}
                   />
                   <span className="alert-station-name">{s.name}</span>
-                  <span className="alert-station-addr">{s.address}</span>
+                  <span className="alert-station-addr">{s.address}{s._area ? `, ${s._area}` : ""}</span>
                 </label>
               ))}
               {filteredStations.length === 0 && <p className="alert-picker-empty">No stations match.</p>}

@@ -570,9 +570,21 @@ def get_station_history(station_id: str, hours: int = 24) -> list:
 # ── Price alerts ──────────────────────────────────────────────────────────
 
 def get_distinct_cities() -> list:
+    """Cities with at least one station that's reported a price in the last
+    48h — no point offering a city to alert on on that has nothing recent
+    to actually check prices against.
+    """
     with _conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT city FROM stations WHERE city IS NOT NULL ORDER BY city")
+            cur.execute("""
+                SELECT DISTINCT s.city
+                FROM stations s
+                JOIN price_history ph ON ph.station_id = s.station_id
+                WHERE s.city IS NOT NULL
+                  AND ph.recorded_at >= NOW() - INTERVAL '48 hours'
+                  AND ph.price IS NOT NULL AND ph.price >= 80 AND ph.price <= 350
+                ORDER BY s.city
+            """)
             return [r[0] for r in cur.fetchall()]
 
 

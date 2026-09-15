@@ -9,6 +9,7 @@ import Onboarding from "./components/Onboarding";
 import FillupModal from "./components/FillupModal";
 import LogsTab from "./components/LogsTab";
 import BottomNav from "./components/BottomNav";
+import AlertModal from "./components/AlertModal";
 import { bestCardSavings } from "./creditCards.js";
 import { octaneLabel } from "./octane.js";
 import { insightsFuelKey, nearestAreaAverage, computeFairness } from "./fairness.js";
@@ -369,7 +370,7 @@ function ChartModal({ station, activeFuel, onClose, onLogFillup, onSnapshot }) {
 }
 
 // ---------- Station Card ----------
-function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, showFillCost, userCoords, onLogFillup, insightsByKey }) {
+function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggleFavourite, onOpenChart, onSnapshot, showArea, selectedCards, showCardDiscounts, fillLitres, showFillCost, userCoords, onLogFillup, insightsByKey, onOpenAlert }) {
   const fuelData  = station[activeFuel];
   const isCheapest = VALID_PRICE(fuelData?.price) && fuelData.price === cheapestPrices[activeFuel];
   const deltas    = station.price_delta || {};
@@ -485,6 +486,7 @@ function StationCard({ station, activeFuel, cheapestPrices, isFavourite, onToggl
             <button className="btn-snapshot" onClick={() => onSnapshot(station, activeFuel)}
               title="Snapshot price to My Dashboard">📷</button>
           )}
+          <button className="btn-snapshot" onClick={() => onOpenAlert(station)} title="Set a price alert for this station">🔔</button>
           <button className="btn-chart" onClick={() => onOpenChart(station)}>
             📈
           </button>
@@ -846,6 +848,16 @@ export default function App() {
   // action — so show an instructional button instead of nothing.
   const [showIosInstallHint, setShowIosInstallHint] = useState(false);
   const [showIosModal, setShowIosModal] = useState(false);
+
+  // Price alert modal — openable from the header (no scope pre-filled) or
+  // from a station card's 🔔 button (scoped to that station).
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertPrefillStation, setAlertPrefillStation] = useState(null);
+  const [alertsRefreshSignal, setAlertsRefreshSignal] = useState(0);
+  const openAlertModal = useCallback((station = null) => {
+    setAlertPrefillStation(station);
+    setShowAlertModal(true);
+  }, []);
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
     window.addEventListener("beforeinstallprompt", handler);
@@ -1041,6 +1053,7 @@ export default function App() {
                 📲 Install
               </button>
             )}
+            <button className="btn-edit-profile" onClick={() => openAlertModal()} title="New price alert">🔔</button>
             <button className="btn-edit-profile" onClick={() => setShowProfile(true)} title="My Profile">⚙️</button>
           </div>
         </div>
@@ -1123,6 +1136,8 @@ export default function App() {
             onNavigate={setTab}
             fillups={fillups}
             onDeleteFillup={handleDeleteFillup}
+            onNewAlert={() => openAlertModal()}
+            alertsRefreshSignal={alertsRefreshSignal}
           />
         )}
 
@@ -1432,6 +1447,7 @@ export default function App() {
                       showFillCost={showFillCost}
                       userCoords={userCoords}
                       insightsByKey={insightsByKey}
+                      onOpenAlert={openAlertModal}
                       onLogFillup={(s) => {
                         setFillupTarget({ station: s, fuelType: activeFuel });
                         posthog.capture("station_log_started", { source: "station_card", station_id: s.station_id });
@@ -1549,6 +1565,14 @@ export default function App() {
       )}
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {showIosModal && <IosInstallModal onClose={() => setShowIosModal(false)} />}
+      {showAlertModal && (
+        <AlertModal
+          stationsWithArea={stationsWithArea}
+          prefilledStation={alertPrefillStation}
+          onClose={() => setShowAlertModal(false)}
+          onCreated={() => { setShowAlertModal(false); setAlertsRefreshSignal((n) => n + 1); }}
+        />
+      )}
       {fillupTarget && (
         <FillupModal
           station={fillupTarget.station}
