@@ -967,6 +967,21 @@ export default function App() {
     _brand: normalizeBrand(s.name),
   }));
 
+  // Deep link from an alert email (?station=<id>) — open that station's
+  // chart directly once its data has loaded, instead of making the reader
+  // hunt for it themselves.
+  useEffect(() => {
+    if (!data) return;
+    const stationId = new URLSearchParams(window.location.search).get("station");
+    if (!stationId) return;
+    const station = stationsWithArea.find((s) => s.station_id === stationId);
+    if (station) {
+      setChartStation(station);
+      setTab("all");
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [data]);
+
   const brands = [...new Set(stationsWithArea.map((s) => s._brand).filter(Boolean))];
   brands.sort((a, b) => {
     const ai = POPULAR_BRANDS.indexOf(a);

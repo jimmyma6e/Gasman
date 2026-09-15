@@ -5,6 +5,7 @@ the owner once per match batch when a trigger condition is met.
 
 import logging
 import os
+from datetime import datetime, timezone
 
 import database
 from email_alerts import send_alert_email
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 # read the email.
 SITE_URL = os.environ.get("SITE_URL", "https://gasman.sportsup.ca")
 
+# A single "any station" alert can match dozens of stations at once (e.g. a
+# broad market dip) — cap the listed stations so the email stays readable.
+MAX_LISTED_HITS = 20
+
 FUEL_LABELS = {
     "regular_gas":  "Regular (87)",
     "midgrade_gas": "Mid-Grade (89)",
@@ -24,6 +29,25 @@ FUEL_LABELS = {
 }
 
 BASELINE_LABELS = {"ytd": "YTD average", "2d": "2-day average", "3d": "3-day average"}
+
+
+def _time_ago(dt) -> str:
+    if dt is None:
+        return "unknown"
+    diff = (datetime.now(timezone.utc) - dt).total_seconds()
+    if diff < 60:
+        return "just now"
+    minutes = int(diff // 60)
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours = int(minutes // 60)
+    if hours < 24:
+        return f"{hours}h ago"
+    return f"{int(hours // 24)}d ago"
+
+
+def _station_link(station_id: str) -> str:
+    return f"{SITE_URL}/?station={station_id}"
 
 
 def _resolve_station_ids(alert: dict):
@@ -90,17 +114,27 @@ def send_confirmation_email(alert: dict) -> bool:
 
 def _format_email(alert: dict, hits_by_fuel: dict) -> tuple:
     all_hits = [(fuel_type, h) for fuel_type, hits in hits_by_fuel.items() for h in hits]
-    match_count = len(all_hits)
-    best_fuel, best = min(all_hits, key=lambda item: item[1]["price"])
+    all_hits.sort(key=lambda item: item[1]["price"])
+    best_fuel, best = all_hits[0]
     best_label = FUEL_LABELS.get(best_fuel, best_fuel)
-    others = match_count - 1
 
-    subject = f"⛽ GASMAN price alert — {match_count} match{'es' if match_count != 1 else ''}"
+    trigger_desc = _describe_trigger(alert)
+    subject = f"⛽ GASMAN Price Alert — {trigger_desc[0].upper()}{trigger_desc[1:]}"
+
+    listed = all_hits[:MAX_LISTED_HITS]
+    lines = [
+        f"- {h['name']} — {h['price']:.1f}¢/L — {_time_ago(h['recorded_at'])} — {_station_link(h['station_id'])}"
+        for _, h in listed
+    ]
+    remaining = len(all_hits) - len(listed)
+    if remaining > 0:
+        lines.append(f"...and {remaining} more, see the site below.")
+
     body = (
-        f"Your GASMAN price alert triggered ({_describe_trigger(alert)}).\n\n"
-        f"Best match: {best['name']} ({best_label}) at {best['price']:.1f}¢/L"
-        + (f", plus {others} more match{'es' if others != 1 else ''}" if others > 0 else "")
-        + f".\n\nSee current prices: {SITE_URL}\n\n"
+        f"Your GASMAN price alert triggered ({trigger_desc}).\n\n"
+        f"Best match: {best['name']} ({best_label}) at {best['price']:.1f}¢/L:\n\n"
+        + "\n".join(lines)
+        + f"\n\nSee current prices: {SITE_URL}\n\n"
         f"We'll stay quiet for {alert['suppress_hours']}h before checking again."
     )
     return subject, body
